@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { TrainingSession } from '../types';
 import { GYMS, COURTS } from '../constants';
-import { getTeamColor } from '../utils/color';
+import { getTeamColorStyles } from '../utils/color';
 
 interface ScheduleGridProps {
   schedule: TrainingSession[];
-  gymFilter: string;
+  gymFilter: string[];
 }
 
 const timeToMinutes = (time: string): number => {
@@ -19,49 +19,140 @@ const formatTime = (minutes: number): string => {
   return `${h}:${m}`;
 };
 
+/**
+ * Custom hook to check if a media query matches.
+ * @param query The media query string (e.g., '(max-width: 768px)').
+ */
+const useMediaQuery = (query: string): boolean => {
+  // Ensure window is defined for server-side rendering safety, though not strictly needed for this client-side app.
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const [matches, setMatches] = useState(window.matchMedia(query).matches);
+
+  useEffect(() => {
+    const mediaQueryList = window.matchMedia(query);
+    const listener = (event: MediaQueryListEvent) => setMatches(event.matches);
+
+    // Add the listener
+    mediaQueryList.addEventListener('change', listener);
+
+    // Initial check in case state changed between initial render and effect run
+    setMatches(mediaQueryList.matches);
+
+    // Cleanup by removing the listener
+    return () => mediaQueryList.removeEventListener('change', listener);
+  }, [query]);
+
+  return matches;
+};
+
+
 const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, gymFilter }) => {
-  const locations = useMemo(() => {
-    // Determine which gyms to display columns for.
-    // If a specific gym is filtered, only show that one.
-    // Otherwise, show all gyms that have sessions in the current schedule, maintaining original order.
-    const gymsToShow = gymFilter !== 'all' 
-      ? [gymFilter.charAt(0).toUpperCase() + gymFilter.slice(1)]
-      : GYMS.filter(gym => schedule.some(s => s.gym === gym));
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
-    return gymsToShow.flatMap(gym => COURTS.map(court => ({ gym, court, id: `${gym}-${court}` })));
-  }, [schedule, gymFilter]);
-
-
-  const { timeSlots, minTime, maxTime, timeStep } = useMemo(() => {
-    if (schedule.length === 0) {
-      return { timeSlots: [], minTime: 0, maxTime: 0, timeStep: 30 };
+  const { timeSlots, minTime, maxTime, timeStep, locations, groupedSchedule } = useMemo(() => {
+    if (isMobile || schedule.length === 0) {
+      return { timeSlots: [], minTime: 0, maxTime: 0, timeStep: 30, locations: [], groupedSchedule: [] };
     }
+
+    const gymsWithEventsOnDay = GYMS.filter(gym => schedule.some(s => s.gym === gym));
+    const gymsToShow = gymFilter.length > 0
+      ? gymsWithEventsOnDay.filter(gym => gymFilter.includes(gym.toLowerCase()))
+      : gymsWithEventsOnDay;
+    const currentLocations = gymsToShow.flatMap(gym => COURTS.map(court => ({ gym, court, id: `${gym}-${court}` })));
+
+    if (currentLocations.length === 0) {
+       return { timeSlots: [], minTime: 0, maxTime: 0, timeStep: 30, locations: [], groupedSchedule: [] };
+    }
+
     const allTimes = schedule.flatMap(s => [timeToMinutes(s.startTime), timeToMinutes(s.endTime)]);
     const minTimeVal = Math.min(...allTimes);
     const maxTimeVal = Math.max(...allTimes);
-    const timeStep = 30; // 30 minute intervals
+    const step = 30;
     
     const slots = [];
-    const alignedMinTime = Math.floor(minTimeVal / timeStep) * timeStep;
-    for (let t = alignedMinTime; t < maxTimeVal; t += timeStep) {
+    const alignedMinTime = Math.floor(minTimeVal / step) * step;
+    for (let t = alignedMinTime; t < maxTimeVal; t += step) {
       slots.push(t);
     }
-    return { timeSlots: slots, minTime: alignedMinTime, maxTime: maxTimeVal, timeStep };
-  }, [schedule]);
 
-  const groupedSchedule = useMemo(() => {
     const groups = new Map<string, TrainingSession[]>();
     schedule.forEach(session => {
-        // Group sessions that occupy the exact same block of time and space
         const key = `${session.startTime}|${session.endTime}|${session.gym}|${session.courts.join(',')}`;
         if (!groups.has(key)) {
             groups.set(key, []);
         }
         groups.get(key)!.push(session);
     });
-    return Array.from(groups.values());
-  }, [schedule]);
 
+    return { 
+        timeSlots: slots, 
+        minTime: alignedMinTime, 
+        maxTime: maxTimeVal, 
+        timeStep: step, 
+        locations: currentLocations, 
+        groupedSchedule: Array.from(groups.values())
+    };
+  }, [schedule, gymFilter, isMobile]);
+  
+  // Mobile View: Vertical list of cards grouped by gym
+  if (isMobile) {
+    const sessionsByGym = schedule.reduce<Record<string, TrainingSession[]>>((acc, session) => {
+        if (!acc[session.gym]) acc[session.gym] = [];
+        acc[session.gym].push(session);
+        return acc;
+    }, {});
+    
+    const gymsWithEvents = Object.keys(sessionsByGym);
+
+    const gymsToShow = gymFilter.length > 0 
+        ? gymsWithEvents.filter(gym => gymFilter.includes(gym.toLowerCase()))
+        : gymsWithEvents;
+
+    if (gymsToShow.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="space-y-8">
+            {gymsToShow
+                .sort((gymA, gymB) => GYMS.indexOf(gymA) - GYMS.indexOf(gymB))
+                .map(gym => (
+                    <div key={gym}>
+                        <h3 className="text-xl font-semibold mb-3 text-light-onSurface dark:text-dark-onSurface sticky top-[80px] bg-light-background/80 dark:bg-dark-background/80 backdrop-blur-sm py-2 z-10">{gym}</h3>
+                        <div className="space-y-3">
+                            {sessionsByGym[gym]
+                                .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
+                                .map(session => {
+                                    const teamColorStyles = getTeamColorStyles(session.team);
+                                    return (
+                                        <div
+                                            key={session.id}
+                                            className="p-3 rounded-lg shadow-md flex"
+                                            style={{ backgroundColor: teamColorStyles.backgroundColor, color: teamColorStyles.color }}
+                                        >
+                                            <div className="w-1/4 pr-3 border-r border-current border-opacity-30 flex flex-col justify-center items-center text-center">
+                                                <p className="font-bold text-base sm:text-lg">{session.startTime}</p>
+                                                <p className="text-xs sm:text-sm opacity-80">{session.endTime}</p>
+                                            </div>
+                                            <div className="w-3/4 pl-4 flex flex-col justify-center">
+                                                <p className="font-bold text-base sm:text-lg leading-tight">{session.team}</p>
+                                                <p className="text-sm opacity-90">{session.coach}</p>
+                                                <p className="text-xs opacity-80 mt-1">Terrain(s): {session.courts.join(', ')}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                        </div>
+                    </div>
+                ))}
+        </div>
+    );
+  }
+
+  // Desktop Grid View
   if (schedule.length === 0 || locations.length === 0) {
     return null;
   }
@@ -133,19 +224,20 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, gymFilter }) => {
           const gridColumn = `${startColIndex + 2} / span ${colSpan}`;
           
           if (sessionGroup.length === 1) {
-            const teamColor = getTeamColor(session.team);
+            const teamColorStyles = getTeamColorStyles(session.team);
             return (
               <div
                 key={session.id}
-                className={`rounded-lg p-2 text-white flex flex-col justify-center overflow-hidden transition-transform transform hover:scale-105 hover:z-10 ${teamColor}`}
+                className="rounded-lg p-2 flex flex-col justify-center overflow-hidden transition-transform transform hover:scale-105 hover:z-10"
                 style={{
                   gridRow,
                   gridColumn,
+                  ...teamColorStyles
                 }}
               >
                 <p className="font-bold text-sm leading-tight">{session.team}</p>
-                <p className="text-xs opacity-90">{session.coach}</p>
-                <p className="text-xs opacity-90 mt-1">{`${session.startTime} - ${session.endTime}`}</p>
+                <p className="text-sm opacity-90">{session.coach}</p>
+                <p className="text-sm opacity-90 mt-1">{`${session.startTime} - ${session.endTime}`}</p>
               </div>
             );
           } else {
@@ -156,16 +248,17 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, gymFilter }) => {
                     className="rounded-lg overflow-hidden flex flex-row shadow-lg"
                 >
                     {sessionGroup.sort((a,b) => a.team.localeCompare(b.team)).map((s, index) => {
-                        const teamColor = getTeamColor(s.team);
+                        const teamColorStyles = getTeamColorStyles(s.team);
                         const borderClass = index > 0 ? 'border-l border-white/30' : '';
                         return (
                             <div
                                 key={s.id}
-                                className={`p-2 text-white flex-1 flex flex-col justify-center overflow-hidden ${teamColor} ${borderClass} transition-transform transform hover:scale-105 hover:z-20 relative`}
+                                className={`p-2 flex-1 flex flex-col justify-center overflow-hidden ${borderClass} transition-transform transform hover:scale-105 hover:z-20 relative`}
+                                style={teamColorStyles}
                             >
                                 <p className="font-bold text-sm leading-tight">{s.team}</p>
-                                <p className="text-xs opacity-90">{s.coach}</p>
-                                <p className="text-xs opacity-90 mt-1">{`${s.startTime} - ${s.endTime}`}</p>
+                                <p className="text-sm opacity-90">{s.coach}</p>
+                                <p className="text-sm opacity-90 mt-1">{`${s.startTime} - ${s.endTime}`}</p>
                             </div>
                         );
                     })}

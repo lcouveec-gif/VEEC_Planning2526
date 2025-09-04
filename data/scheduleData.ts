@@ -31,7 +31,7 @@ export const scheduleData: TrainingSession[] = [
   { id: 29, team: 'M18F2', coach: 'Guilhem', day: 'vendredi', gym: 'Magny', courts: ['T2'], startTime: '18:30', endTime: '20:30' },
   { id: 30, team: 'M18G2', coach: 'Gianni', day: 'jeudi', gym: 'Coupvray', courts: ['T2'], startTime: '18:30', endTime: '20:30' },
   { id: 31, team: 'M18G2', coach: 'Gianni', day: 'vendredi', gym: 'Coupvray', courts: ['T2'], startTime: '18:30', endTime: '20:30' },
-  { id: 32, team: 'M15F', coach: 'Emmy', day: 'lundi', gym: 'Coupvray', courts: ['T1'], startTime: '18:30', endTime: '20:30' },
+  { id: 32, team: 'M15F1', coach: 'Emmy', day: 'lundi', gym: 'Coupvray', courts: ['T1'], startTime: '18:30', endTime: '20:30' },
   { id: 33, team: 'M15G1', coach: 'Damien', day: 'lundi', gym: 'Coupvray', courts: ['T3'], startTime: '18:30', endTime: '20:30' },
   { id: 34, team: 'M15F2', coach: 'Lucie', day: 'lundi', gym: 'Coupvray', courts: ['T2'], startTime: '18:30', endTime: '20:30' },
   { id: 35, team: 'M15F2', coach: 'Lucie', day: 'jeudi', gym: 'Esbly', courts: ['T2'], startTime: '18:00', endTime: '20:00' },
