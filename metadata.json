@@ -1,0 +1,5 @@
+{
+  "name": "FS VEEC Volleyball - Planning",
+  "description": "Une application pour afficher le planning hebdomadaire des entraînements du club de volleyball FS Val d'Europe Esbly Coupvray Volleyball. Filtrez par jour, gymnase ou équipe pour trouver facilement vos créneaux.",
+  "requestFramePermissions": []
+}
