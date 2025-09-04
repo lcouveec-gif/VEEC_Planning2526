@@ -18,7 +18,7 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      # Eviter le lockfile Windows pour Rollup (bug npm optional deps)
+      # Eviter le lockfile Windows pour Rollup (npm optional deps bug)
       - name: Remove Windows lockfile
         run: rm -f package-lock.json
 
@@ -28,18 +28,22 @@ jobs:
       - name: Build (Vite)
         run: npm run build
 
-      # Écrit la clé privée (depuis le secret) dans un fichier local
+      # Ecrire la clé privée depuis le secret dans un fichier sécurisé
       - name: Write SSH key
         run: |
           echo "${{ secrets.SSH_KEY }}" > key.pem
           chmod 600 key.pem
 
-      # Ajoute l'hôte au known_hosts pour éviter le prompt
+      # (Optionnel) afficher l'empreinte de la clé pour debug
+      - name: Show key fingerprint
+        run: ssh-keygen -lf key.pem
+
+      # Ajouter l'hôte pour éviter le prompt fingerprint
       - name: Add host to known_hosts
         run: |
           ssh-keyscan -p ${SSH_PORT:-22} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      # Déploiement via rsync en utilisant la clé directement (-i)
+      # Déploiement via rsync avec la clé (-i)
       - name: Rsync dist/ to VPS
         run: |
           rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/fs-veec-planning/
