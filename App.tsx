@@ -74,14 +74,10 @@ const App: React.FC = () => {
         const canvasWidth = canvas.width;
         const canvasHeight = canvas.height;
         const ratio = canvasWidth / canvasHeight;
-        let imgWidthInPdf = pdfWidth;
-        let imgHeightInPdf = imgWidthInPdf / ratio;
-
-        // If the content is short and fits on one page, adjust height to avoid stretching
-        if (imgHeightInPdf < pdfHeight) {
-            imgHeightInPdf = pdfHeight;
-            imgWidthInPdf = imgHeightInPdf * ratio;
-        }
+        
+        // Always fit the image to the page width and scale height proportionally.
+        const imgWidthInPdf = pdfWidth;
+        const imgHeightInPdf = imgWidthInPdf / ratio;
         
         let heightLeft = imgHeightInPdf;
         let position = 0;
