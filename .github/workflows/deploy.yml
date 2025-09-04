@@ -9,36 +9,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Récupérer le code
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2) Installer Node.js
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
 
-      # 3) Installer les dépendances (npm install au lieu de npm ci)
+      # ---- Fix Rollup on Linux (npm optional deps bug) ----
+      # Le lockfile généré sous Windows empêche l'optional @rollup/rollup-linux-x64-gnu
+      # On supprime le package-lock pour laisser npm résoudre proprement sous Linux.
+      - name: Remove Windows lockfile
+        run: rm -f package-lock.json
+
       - name: Install deps
         run: npm install
 
-      # 4) Build Vite
       - name: Build (Vite)
         run: npm run build
+      # -----------------------------------------------------
 
-      # 5) Charger la clé SSH privée depuis les secrets GitHub
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
-      # 6) Ajouter ton VPS à known_hosts (évite l'erreur de fingerprint)
       - name: Add host to known_hosts
         run: |
           ssh-keyscan -p ${SSH_PORT:-22} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      # 7) Déployer le contenu de dist/ sur ton VPS via rsync
       - name: Rsync dist/ to VPS
         run: |
           rsync -avz --delete -e "ssh -p ${SSH_PORT:-22}" dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/fs-veec-planning/
