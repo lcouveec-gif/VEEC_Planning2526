@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface FilterControlsProps {
@@ -7,6 +8,9 @@ interface FilterControlsProps {
   setGymFilter: (gyms: string[]) => void;
   teamSearch: string;
   setTeamSearch: (search: string) => void;
+  highlightedTeam: string;
+  setHighlightedTeam: (team: string) => void;
+  allTeams: string[];
   days: string[];
   gyms: string[];
   resetFilters: () => void;
@@ -19,6 +23,9 @@ const FilterControls: React.FC<FilterControlsProps> = ({
   setGymFilter,
   teamSearch,
   setTeamSearch,
+  highlightedTeam,
+  setHighlightedTeam,
+  allTeams,
   days,
   gyms,
   resetFilters
@@ -88,8 +95,8 @@ const FilterControls: React.FC<FilterControlsProps> = ({
           </div>
         </div>
       </div>
-      <div className="pt-4 border-t border-light-border dark:border-dark-border flex flex-col md:flex-row items-center gap-4">
-        <div className="w-full md:flex-1">
+      <div className="pt-4 border-t border-light-border dark:border-dark-border grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+        <div className="w-full">
             <label htmlFor="team-search" className="sr-only">Rechercher par équipe ou coach</label>
             <input
                 id="team-search"
@@ -100,9 +107,24 @@ const FilterControls: React.FC<FilterControlsProps> = ({
                 className={commonInputClasses}
             />
         </div>
+        <div className="w-full">
+            <label htmlFor="highlight-team" className="sr-only">Mettre en avant une équipe</label>
+            <select
+                id="highlight-team"
+                value={highlightedTeam}
+                onChange={(e) => setHighlightedTeam(e.target.value)}
+                className={commonInputClasses}
+                aria-label="Mettre en avant une équipe"
+            >
+                <option value="">Mettre en avant une équipe...</option>
+                {allTeams.map(team => (
+                    <option key={team} value={team}>{team}</option>
+                ))}
+            </select>
+        </div>
         <button
             onClick={resetFilters}
-            className="w-full md:w-auto px-6 py-2 border border-transparent text-sm font-medium rounded-lg text-light-primary dark:text-dark-primary hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-light-primary dark:focus:ring-dark-primary transition-colors"
+            className="w-full md:w-auto justify-self-stretch md:justify-self-end px-6 py-2 border border-transparent text-sm font-medium rounded-lg text-light-primary dark:text-dark-primary hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-light-primary dark:focus:ring-dark-primary transition-colors"
         >
             Réinitialiser
         </button>

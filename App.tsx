@@ -15,6 +15,7 @@ const App: React.FC = () => {
   const [dayFilter, setDayFilter] = useState<string[]>([]);
   const [gymFilter, setGymFilter] = useState<string[]>([]);
   const [teamSearch, setTeamSearch] = useState<string>('');
+  const [highlightedTeam, setHighlightedTeam] = useState<string>('');
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
   useEffect(() => {
@@ -30,10 +31,16 @@ const App: React.FC = () => {
     setTheme(prevTheme => (prevTheme === 'dark' ? 'light' : 'dark'));
   };
 
+  const allTeams = useMemo(() => {
+    const teams = [...new Set(scheduleData.map(s => s.team))];
+    return teams.sort((a, b) => a.localeCompare(b));
+  }, []);
+
   const resetFilters = () => {
     setDayFilter([]);
     setGymFilter([]);
     setTeamSearch('');
+    setHighlightedTeam('');
   };
   
   const handleExportPdf = async () => {
@@ -123,6 +130,9 @@ const App: React.FC = () => {
           setGymFilter={setGymFilter}
           teamSearch={teamSearch}
           setTeamSearch={setTeamSearch}
+          highlightedTeam={highlightedTeam}
+          setHighlightedTeam={setHighlightedTeam}
+          allTeams={allTeams}
           gyms={GYMS}
           days={DAYS}
           resetFilters={resetFilters}
@@ -137,6 +147,7 @@ const App: React.FC = () => {
                         <ScheduleGrid 
                             schedule={filteredSchedule.filter(s => s.day === day)} 
                             gymFilter={gymFilter}
+                            highlightedTeam={highlightedTeam}
                         />
                     </div>
                 ))

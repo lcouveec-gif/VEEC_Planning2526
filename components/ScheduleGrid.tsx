@@ -1,11 +1,14 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { TrainingSession } from '../types';
 import { GYMS, COURTS } from '../constants';
 import { getTeamColorStyles } from '../utils/color';
+import { CourtIcon, StarIcon } from './icons/ThemeIcons';
 
 interface ScheduleGridProps {
   schedule: TrainingSession[];
   gymFilter: string[];
+  highlightedTeam: string;
 }
 
 const timeToMinutes = (time: string): number => {
@@ -49,7 +52,7 @@ const useMediaQuery = (query: string): boolean => {
 };
 
 
-const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, gymFilter }) => {
+const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, gymFilter, highlightedTeam }) => {
   const isMobile = useMediaQuery('(max-width: 768px)');
 
   const { timeSlots, minTime, maxTime, timeStep, locations, groupedSchedule } = useMemo(() => {
@@ -122,25 +125,36 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, gymFilter }) => {
                 .map(gym => (
                     <div key={gym}>
                         <h3 className="text-xl font-semibold mb-3 text-light-onSurface dark:text-dark-onSurface sticky top-[80px] bg-light-background/80 dark:bg-dark-background/80 backdrop-blur-sm py-2 z-10">{gym}</h3>
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             {sessionsByGym[gym]
                                 .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
                                 .map(session => {
                                     const teamColorStyles = getTeamColorStyles(session.team);
+                                    const isHighlighted = highlightedTeam && session.team === highlightedTeam;
+                                    const isDimmed = highlightedTeam && session.team !== highlightedTeam;
+
                                     return (
                                         <div
                                             key={session.id}
-                                            className="p-3 rounded-lg shadow-md flex"
+                                            className={`p-5 rounded-xl shadow-md flex gap-5 items-center relative transition-all duration-300 ${isDimmed ? 'opacity-40 hover:opacity-100' : ''} ${isHighlighted ? 'ring-2 ring-offset-2 ring-offset-light-surface dark:ring-offset-dark-surface ring-yellow-400 dark:ring-yellow-300' : ''}`}
                                             style={{ backgroundColor: teamColorStyles.backgroundColor, color: teamColorStyles.color }}
                                         >
-                                            <div className="w-1/4 pr-3 border-r border-current border-opacity-30 flex flex-col justify-center items-center text-center">
-                                                <p className="font-bold text-base sm:text-lg">{session.startTime}</p>
-                                                <p className="text-xs sm:text-sm opacity-80">{session.endTime}</p>
+                                            {isHighlighted && (
+                                                <div className="absolute top-2 right-2 text-yellow-300">
+                                                    <StarIcon className="w-6 h-6" />
+                                                </div>
+                                            )}
+                                            <div className="w-1/4 flex-shrink-0 text-center pr-5 border-r border-current border-opacity-30">
+                                                <p className="font-bold text-xl sm:text-2xl">{session.startTime}</p>
+                                                <p className="text-base opacity-80">{session.endTime}</p>
                                             </div>
-                                            <div className="w-3/4 pl-4 flex flex-col justify-center">
-                                                <p className="font-bold text-base sm:text-lg leading-tight">{session.team}</p>
-                                                <p className="text-sm opacity-90">{session.coach}</p>
-                                                <p className="text-xs opacity-80 mt-1">Terrain(s): {session.courts.join(', ')}</p>
+                                            <div className="w-3/4 flex flex-col gap-1.5">
+                                                <p className="font-bold text-xl sm:text-2xl leading-tight">{session.team}</p>
+                                                <p className="text-lg opacity-90">{session.coach}</p>
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    <CourtIcon className="w-5 h-5 flex-shrink-0 opacity-80" />
+                                                    <p className="text-base font-medium opacity-90">{session.courts.join(', ')}</p>
+                                                </div>
                                             </div>
                                         </div>
                                     );
@@ -225,38 +239,42 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({ schedule, gymFilter }) => {
           
           if (sessionGroup.length === 1) {
             const teamColorStyles = getTeamColorStyles(session.team);
+            const isHighlighted = highlightedTeam && session.team === highlightedTeam;
+            const isDimmed = highlightedTeam && session.team !== highlightedTeam;
             return (
               <div
                 key={session.id}
-                className="rounded-lg p-2 flex flex-col justify-center overflow-hidden transition-transform transform hover:scale-105 hover:z-10"
+                className={`rounded-lg p-2 flex flex-col justify-center overflow-hidden transition-all duration-300 transform hover:scale-105 hover:z-20 ${isDimmed ? 'opacity-40' : ''} ${isHighlighted ? 'ring-2 ring-yellow-400 dark:ring-yellow-300 z-10' : ''}`}
                 style={{
                   gridRow,
                   gridColumn,
                   ...teamColorStyles
                 }}
               >
-                <p className="font-bold text-sm leading-tight">{session.team}</p>
+                <p className="font-bold text-base leading-tight">{session.team}</p>
                 <p className="text-sm opacity-90">{session.coach}</p>
                 <p className="text-sm opacity-90 mt-1">{`${session.startTime} - ${session.endTime}`}</p>
               </div>
             );
           } else {
+             const isGroupDimmed = highlightedTeam && !sessionGroup.some(s => s.team === highlightedTeam);
              return (
                 <div
                     key={sessionGroup.map(s => s.id).join('-')}
                     style={{ gridRow, gridColumn }}
-                    className="rounded-lg overflow-hidden flex flex-row shadow-lg"
+                    className={`rounded-lg overflow-hidden flex flex-row shadow-lg transition-opacity duration-300 ${isGroupDimmed ? 'opacity-40 hover:opacity-100' : ''}`}
                 >
                     {sessionGroup.sort((a,b) => a.team.localeCompare(b.team)).map((s, index) => {
                         const teamColorStyles = getTeamColorStyles(s.team);
                         const borderClass = index > 0 ? 'border-l border-white/30' : '';
+                        const isTeamHighlighted = highlightedTeam && s.team === highlightedTeam;
                         return (
                             <div
                                 key={s.id}
-                                className={`p-2 flex-1 flex flex-col justify-center overflow-hidden ${borderClass} transition-transform transform hover:scale-105 hover:z-20 relative`}
+                                className={`p-2 flex-1 flex flex-col justify-center overflow-hidden ${borderClass} transition-transform transform hover:scale-105 hover:z-20 relative ${isTeamHighlighted ? 'ring-1 ring-inset ring-yellow-400 dark:ring-yellow-300' : ''}`}
                                 style={teamColorStyles}
                             >
-                                <p className="font-bold text-sm leading-tight">{s.team}</p>
+                                <p className="font-bold text-base leading-tight">{s.team}</p>
                                 <p className="text-sm opacity-90">{s.coach}</p>
                                 <p className="text-sm opacity-90 mt-1">{`${s.startTime} - ${s.endTime}`}</p>
                             </div>

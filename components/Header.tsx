@@ -2,6 +2,7 @@
 import React from 'react';
 import ThemeSwitcher from './ThemeSwitcher';
 import { PdfIcon, SpinnerIcon } from './icons/ThemeIcons';
+import Logo from './Logo';
 
 interface HeaderProps {
   theme: 'dark' | 'light';
@@ -16,6 +17,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           <div className="flex items-center">
+            <Logo />
             <div className="flex flex-col">
                 <h1 className="text-base sm:text-lg md:text-xl font-bold">
                 FS VAL D'EUROPE ESBLY COUPVRAY VOLLEYBALL

@@ -1,6 +1,8 @@
+import { scheduleData } from '../data/scheduleData';
+import type { TrainingSession } from '../types';
+
 /**
  * Converts a single channel of an sRGB color to linear RGB.
- * @param colorChannel Value of the color channel (0-1).
  */
 const sRGBtoLin = (colorChannel: number): number => {
   if (colorChannel <= 0.03928) {
@@ -12,7 +14,6 @@ const sRGBtoLin = (colorChannel: number): number => {
 
 /**
  * Calculates the relative luminance of a color.
- * @param hexColor The color in hex format (e.g., "#RRGGBB").
  */
 const getLuminance = (hexColor: string): number => {
   const hex = hexColor.startsWith('#') ? hexColor.slice(1) : hexColor;
@@ -29,8 +30,6 @@ const getLuminance = (hexColor: string): number => {
 
 /**
  * Calculates the contrast ratio between two colors.
- * @param hex1 First color in hex format.
- * @param hex2 Second color in hex format.
  */
 const getContrast = (hex1: string, hex2: string): number => {
   const lum1 = getLuminance(hex1);
@@ -43,9 +42,6 @@ const getContrast = (hex1: string, hex2: string): number => {
 
 /**
  * Converts an HSL color value to a hex string.
- * @param h Hue (0-360)
- * @param s Saturation (0-100)
- * @param l Lightness (0-100)
  */
 const hslToHex = (h: number, s: number, l: number): string => {
   l /= 100;
@@ -58,107 +54,70 @@ const hslToHex = (h: number, s: number, l: number): string => {
   return `#${f(0)}${f(8)}${f(4)}`;
 };
 
+type ColorStyle = { backgroundColor: string; color: string };
+
 /**
- * Generates a consistent number hash from a string.
- * @param text The input string.
+ * Generates a list of visually distinct HSL colors using the golden angle.
+ * This ensures colors are maximally separated on the color wheel.
+ * @param count The number of colors to generate.
  */
-const generateNumberFromText = (text: string): number => {
-    let hash = 0;
-    if (text.length === 0) return hash;
-    for (let i = 0; i < text.length; i++) {
-        const char = text.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
+const generateDistinctHslColors = (count: number): { h: number; s: number; l: number }[] => {
+    const colors: { h: number; s: number; l: number }[] = [];
+    const goldenAngle = 137.5;
+    let hue = Math.random() * 360; // Start with a random hue for variety
+
+    const saturation = 70; // A good, vibrant saturation level
+    const lightness = 55;  // A mid-range lightness for good contrast potential
+
+    for (let i = 0; i < count; i++) {
+        hue = (hue + goldenAngle) % 360;
+        colors.push({ h: hue, s: saturation, l: lightness });
     }
-    return hash;
-};
-
-type TeamGroup = 'SM' | 'SF' | 'M18' | 'M15' | 'M13' | 'LOISIRS' | 'ASSIS' | 'BABY' | 'SANTE' | 'M11' | 'DEFAULT';
-
-// Define the base color palette for each team group
-const GROUP_PALETTES: Record<TeamGroup, { baseHue: number, saturation: number }> = {
-    'SM':      { baseHue: 220, saturation: 75 }, // Blues
-    'SF':      { baseHue: 340, saturation: 75 }, // Pinks/Reds
-    'M18':     { baseHue: 275, saturation: 70 }, // Purples
-    'M15':     { baseHue: 140, saturation: 70 }, // Greens
-    'M13':     { baseHue: 40,  saturation: 80 }, // Oranges
-    'M11':     { baseHue: 60, saturation: 75 }, // Yellows
-    'LOISIRS': { baseHue: 180, saturation: 65 }, // Teals
-    'ASSIS':   { baseHue: 50,  saturation: 85 }, // Gold
-    'BABY':    { baseHue: 195, saturation: 70 }, // Light Blue/Cyan
-    'SANTE':   { baseHue: 200, saturation: 20 }, // Slate/Gray-Blue
-    'DEFAULT': { baseHue: 0,   saturation: 0  }, // Gray
+    
+    return colors;
 };
 
 /**
- * Identifies the group a team belongs to based on its name.
+ * Creates a map of team names to unique, accessible color styles.
+ * This function is executed once to pre-compute all colors, guaranteeing uniqueness.
+ * @param sessions The list of all training sessions.
+ */
+const createTeamColorMap = (sessions: TrainingSession[]): Map<string, ColorStyle> => {
+    // 1. Get all unique team names, sorted for consistent color assignment
+    const uniqueTeams = [...new Set(sessions.map(s => s.team))].sort();
+    const colorMap = new Map<string, ColorStyle>();
+
+    // 2. Generate a palette of visually distinct colors
+    const colorPalette = generateDistinctHslColors(uniqueTeams.length);
+
+    // 3. Assign each team a unique color and determine the best contrast text color
+    uniqueTeams.forEach((teamName, index) => {
+        const { h, s, l } = colorPalette[index];
+        const backgroundColor = hslToHex(h, s, l);
+        
+        // Determine the best text color for accessibility
+        const contrastWithWhite = getContrast(backgroundColor, '#FFFFFF');
+        const contrastWithBlack = getContrast(backgroundColor, '#000000');
+        const textColor = contrastWithWhite > contrastWithBlack ? '#FFFFFF' : '#000000';
+        
+        colorMap.set(teamName, { backgroundColor, color: textColor });
+    });
+    
+    // Add a default for safety, although it should not be needed with this approach.
+    colorMap.set('DEFAULT', { backgroundColor: '#6c757d', color: '#FFFFFF' });
+
+    return colorMap;
+};
+
+// --- SINGLE SOURCE OF TRUTH FOR COLORS ---
+// Pre-compute the color map for the entire application when this module is loaded.
+const teamColorMap = createTeamColorMap(scheduleData);
+
+/**
+ * Retrieves the pre-generated, unique color style for a given team.
+ * This is a simple and high-performance lookup function.
  * @param teamName The name of the team.
  */
-const getTeamGroup = (teamName: string): TeamGroup => {
-    const name = teamName.toLowerCase();
-    if (name.startsWith('sm')) return 'SM';
-    if (name.startsWith('sf')) return 'SF';
-    if (name.startsWith('m18')) return 'M18';
-    if (name.startsWith('m15')) return 'M15';
-    if (name.startsWith('m13')) return 'M13';
-    if (name.startsWith('m11')) return 'M11';
-    if (name.startsWith('loisir')) return 'LOISIRS';
-    if (name.includes('vb assis')) return 'ASSIS';
-    if (name.startsWith('baby-volley')) return 'BABY';
-    if (name.startsWith('soft volley')) return 'SANTE';
-    return 'DEFAULT';
-};
-
-/**
- * Generates an accessible color pair (background and text) from a string.
- * It ensures the contrast ratio meets WCAG AA standards (4.5:1).
- * @param text The string to generate the color from (e.g., team name).
- */
-export const getTeamColorStyles = (text: string): { backgroundColor: string; color: string } => {
-  const group = getTeamGroup(text);
-  const palette = GROUP_PALETTES[group];
-  
-  const hash = generateNumberFromText(text);
-  // Create a small, consistent hue variation within the group palette for each team
-  const hueOffset = hash % 20 - 10; // +/- 10 degrees of hue variation
-  const finalHue = (palette.baseHue + hueOffset + 360) % 360; // Ensure hue is within 0-360 range
-  
-  const saturation = palette.saturation;
-  // Add a slight lightness variation to better distinguish teams in the same group
-  const lightnessOffset = (Math.abs(hash) % 10) - 5; // +/- 5%
-  let lightness = 50 + lightnessOffset; // Start from a mid-point lightness for better variation
-  const minContrast = 4.5;
-  
-  let backgroundColor = hslToHex(finalHue, saturation, lightness);
-  
-  // Determine which text color provides better contrast initially
-  const contrastWithWhite = getContrast(backgroundColor, '#FFFFFF');
-  const contrastWithBlack = getContrast(backgroundColor, '#000000');
-  
-  const initialTextColor = contrastWithWhite > contrastWithBlack ? '#FFFFFF' : '#000000';
-  let currentContrast = Math.max(contrastWithWhite, contrastWithBlack);
-  
-  // Determine adjustment direction for lightness
-  const adjustment = initialTextColor === '#FFFFFF' ? -2.5 : 2.5;
-
-  let iteration = 0;
-  const maxIterations = 20; // Failsafe to prevent infinite loops
-
-  // Adjust lightness until the minimum contrast with the chosen text color is met
-  while (currentContrast < minContrast && iteration < maxIterations && lightness > 0 && lightness < 100) {
-    lightness += adjustment;
-    backgroundColor = hslToHex(finalHue, saturation, lightness);
-    currentContrast = getContrast(backgroundColor, initialTextColor);
-    iteration++;
-  }
-  
-  // After adjusting the background, re-evaluate the best text color one last time
-  const finalContrastWithWhite = getContrast(backgroundColor, '#FFFFFF');
-  const finalContrastWithBlack = getContrast(backgroundColor, '#000000');
-  const finalTextColor = finalContrastWithWhite > finalContrastWithBlack ? '#FFFFFF' : '#000000';
-
-  return {
-    backgroundColor,
-    color: finalTextColor,
-  };
+export const getTeamColorStyles = (teamName: string): ColorStyle => {
+  return teamColorMap.get(teamName) || teamColorMap.get('DEFAULT')!;
 };
