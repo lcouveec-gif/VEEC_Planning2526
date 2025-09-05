@@ -14,3 +14,5 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+import './register-sw';
