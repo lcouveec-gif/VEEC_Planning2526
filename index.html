@@ -1,11 +1,35 @@
-
 <!DOCTYPE html>
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FS VECV - Planning</title>
+    <title>VEEC Volleyball - Planning</title>
+
+    <!-- Open Graph (Facebook / WhatsApp / LinkedIn) -->
+    <meta property="og:title" content="VEEC Volleyball - Planning" />
+    <meta property="og:description" content="Application du club VEEC pour visualiser les créneaux d'entraînement." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://planning.veec.coutellec.fr/" />
+    <meta property="og:image" content="https://planning.veec.coutellec.fr/logo.png" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="VEEC Volleyball - Planning" />
+    <meta name="twitter:description" content="Application du club VEEC pour visualiser les créneaux d'entraînement." />
+    <meta name="twitter:image" content="https://planning.veec.coutellec.fr/logo.png" />
+
+ <!-- Favicon classique -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/logo.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/logo.png" />
+
+    <!-- Icône pour iOS / Android (ajout à l’écran d’accueil) -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/logo.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -36,18 +60,23 @@
         }
       }
     </script>
+
+    <!-- Librairies pour export PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.1.1/",
-    "react": "https://aistudiocdn.com/react@^19.1.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/"
-  }
-}
-</script>
-</head>
+
+    <!-- Import maps React -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react/": "https://aistudiocdn.com/react@^19.1.1/",
+        "react": "https://aistudiocdn.com/react@^19.1.1",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/"
+      }
+    }
+    </script>
+  </head>
+
   <body class="bg-light-background dark:bg-dark-background">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
