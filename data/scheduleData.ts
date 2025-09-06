@@ -45,6 +45,6 @@ export const scheduleData: TrainingSession[] = [
   { id: 43, team: 'Baby-volley M7-M9', coach: 'Vincent M / Mathis / William', day: 'samedi', gym: 'Coupvray', courts: ['T1', 'T2', 'T3'], startTime: '10:30', endTime: '12:00' },
   { id: 44, team: 'Soft volley', coach: 'Vincent V', day: 'jeudi', gym: 'Coupvray', courts: ['T1'], startTime: '14:00', endTime: '16:00' },
   { id: 45, team: 'M15G2', coach: 'Mathis', day: 'jeudi', gym: 'Esbly', courts: ['T1'], startTime: '18:00', endTime: '20:00' },
-  { id: 46, team: 'M15G1', coach: 'Damien', day: 'jeudi', gym: 'Coupvray', courts: ['T3'], startTime: '18:30', endTime: '20:30' }
+  { id: 46, team: 'M15G1', coach: 'Damien', day: 'jeudi', gym: 'Coupvray', courts: ['T3'], startTime: '18:30', endTime: '20:30' },
   { id: 47, team: 'M15F1', coach: 'Emmy', day: 'vendredi', gym: 'Magny', courts: ['T3'], startTime: '18:30', endTime: '20:30' },
 ];
