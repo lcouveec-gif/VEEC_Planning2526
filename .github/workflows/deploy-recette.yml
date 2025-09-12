@@ -1,8 +1,8 @@
-name: Deploy to VPS (Prod)
+name: Deploy to VPS (Recette)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "recette" ]
 
 jobs:
   build-and-deploy:
@@ -41,22 +41,22 @@ jobs:
           chmod 700 ~/.ssh
           ssh-keyscan -p ${SSH_PORT:-22} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Rsync dist/ to VPS (Prod)
+      - name: Rsync dist/ to VPS (Recette)
         run: |
-          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/fs-veec-planning/
+          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/fs-veec-planning-recette/
         env:
           SSH_PORT: ${{ secrets.SSH_PORT }}
 
-      - name: Save last deploy date (Prod)
+      - name: Save last deploy date (Recette)
         run: |
-          echo "## Dernier déploiement Production" > LAST_DEPLOY_PROD.md
-          echo "" >> LAST_DEPLOY_PROD.md
-          echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> LAST_DEPLOY_PROD.md
+          echo "## Dernier déploiement Recette" > LAST_DEPLOY_RECETTE.md
+          echo "" >> LAST_DEPLOY_RECETTE.md
+          echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> LAST_DEPLOY_RECETTE.md
 
-      - name: Commit last deploy date (Prod)
+      - name: Commit last deploy date (Recette)
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add LAST_DEPLOY_PROD.md
-          git commit -m "Update last deploy date (Prod) [skip ci]" || echo "No changes"
+          git add LAST_DEPLOY_RECETTE.md
+          git commit -m "Update last deploy date (Recette) [skip ci]" || echo "No changes"
           git push
