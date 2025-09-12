@@ -5,24 +5,15 @@ import cors from 'cors';
 
 const app = express();
 app.use(bodyParser.json());
-app.use(cors()); // Autorise CORS pour toutes les routes
+app.use(cors()); // Enable CORS for all routes
 
-// 🔑 Clés VAPID (à externaliser plus tard dans un .env)
+// 🔑 Clés VAPID (à mettre plus tard dans un .env)
 const publicVapidKey = 'BHwjs1r_j0oxzPQGR0kTgW1YixQDNmuCKRHCCcwCv_F8DMYNPY8kNZOatdQlaFNQO_e_3VUVCyvQwAHu_zikjqc';
 const privateVapidKey = 'gtBHqIyxYfgM5sps_n14GzrF0YAW0A6WnJLMuYsk5NQ';
 
 webpush.setVapidDetails('mailto:test@example.com', publicVapidKey, privateVapidKey);
 
 let subscriptions = [];
-
-// ✅ Route santé pour vérifier le backend
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    uptime: process.uptime(),
-    subscriptionsCount: subscriptions.length
-  });
-});
 
 // ✅ Route de diagnostic
 app.get('/api/health', (req, res) => {
