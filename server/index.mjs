@@ -5,8 +5,9 @@ import cors from 'cors';
 
 const app = express();
 app.use(bodyParser.json());
-app.use(cors()); // Enable CORS for all routes
+app.use(cors()); // Autorise CORS pour toutes les routes
 
+// 🔑 Clés VAPID (à externaliser plus tard dans un .env)
 const publicVapidKey = 'BHwjs1r_j0oxzPQGR0kTgW1YixQDNmuCKRHCCcwCv_F8DMYNPY8kNZOatdQlaFNQO_e_3VUVCyvQwAHu_zikjqc';
 const privateVapidKey = 'gtBHqIyxYfgM5sps_n14GzrF0YAW0A6WnJLMuYsk5NQ';
 
@@ -14,31 +15,43 @@ webpush.setVapidDetails('mailto:test@example.com', publicVapidKey, privateVapidK
 
 let subscriptions = [];
 
-app.post('/save-subscription', (req, res) => {
-  const subscription = req.body;
-  subscriptions.push(subscription);
-  res.status(201).json({});
+// ✅ Route santé pour vérifier le backend
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    subscriptionsCount: subscriptions.length
+  });
 });
 
-app.post('/send-notification', (req, res) => {
+// ✅ Sauvegarde des abonnements
+app.post('/api/save-subscription', (req, res) => {
+  const subscription = req.body;
+  subscriptions.push(subscription);
+  res.status(201).json({ message: 'Subscription saved' });
+});
+
+// ✅ Envoi de notifications
+app.post('/api/send-notification', (req, res) => {
   const notificationPayload = {
     title: 'New Notification',
     body: 'This is a new notification'
   };
 
-  const promises = subscriptions.map(subscription => 
+  const promises = subscriptions.map(subscription =>
     webpush.sendNotification(subscription, JSON.stringify(notificationPayload))
   );
 
   Promise.all(promises)
     .then(() => res.sendStatus(200))
     .catch(err => {
-      console.error("Error sending notification, reason: ", err);
+      console.error('Error sending notification, reason: ', err);
       res.sendStatus(500);
     });
 });
 
-const port = 4000;
+// 🚀 Lancement serveur
+const port = process.env.PORT || 4000;
 app.listen(port, () => {
-  console.log(`Server started on port ${port}`);
+  console.log(`✅ Backend API started on port ${port}`);
 });
