@@ -1,0 +1,15 @@
+{
+  "name": "veec-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "body-parser": "^1.20.2",
+    "web-push": "^3.6.7",
+    "cors": "^2.8.5"
+  }
+}

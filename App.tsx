@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import Header from './components/Header';
 import FilterControls from './components/FilterControls';
@@ -9,6 +8,22 @@ import { GYMS, DAYS } from './constants';
 
 // For PDF export libraries from CDN
 declare const html2canvas: any;
+
+// Utility function to convert VAPID key
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -29,6 +44,40 @@ const App: React.FC = () => {
 
   const toggleTheme = () => {
     setTheme(prevTheme => (prevTheme === 'dark' ? 'light' : 'dark'));
+  };
+
+  const handleSubscribe = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert('Push notifications are not supported by your browser.');
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        alert('Permission for notifications was denied.');
+        return;
+      }
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(process.env.VITE_VAPID_PUBLIC_KEY!),
+      });
+      
+      const apiUrl = `${process.env.VITE_API_URL}/save-subscription`;
+      console.log(`Fetching to: ${apiUrl}`);
+      await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(subscription),
+      });
+
+      alert('Successfully subscribed to notifications!');
+    } catch (error) {
+      console.error('Failed to subscribe to push notifications:', error);
+      alert('Failed to subscribe to notifications.');
+    }
   };
 
   const allTeams = useMemo(() => {
@@ -117,7 +166,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-light-background dark:bg-dark-background text-light-onSurface dark:text-dark-onSurface font-sans transition-colors duration-300">
-      <Header theme={theme} toggleTheme={toggleTheme} onExportPdf={handleExportPdf} isExporting={isExporting} />
+      <Header theme={theme} toggleTheme={toggleTheme} onExportPdf={handleExportPdf} isExporting={isExporting} onSubscribeToNotifications={handleSubscribe} />
       <main className="p-4 sm:p-6 lg:p-8">
         <FilterControls
           dayFilter={dayFilter}

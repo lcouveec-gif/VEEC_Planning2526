@@ -9,6 +9,16 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
 
+    env:
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      FRONTEND_DIR: /var/www/fs-veec-planning
+      BACKEND_DIR: /var/www/fs-veec-planning-api
+      BACKEND_PM2_NAME: veec-prod-backend
+      BACKEND_PORT: "4011"
+      VITE_API_URL: https://planning.veec.coutellec.fr/api
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,11 +32,13 @@ jobs:
       - name: Remove Windows lockfile
         run: rm -f package-lock.json
 
-      - name: Install deps
+      - name: Install deps (frontend root)
         run: npm install
 
-      - name: Build (Vite)
+      - name: Build (Vite) with API URL
         run: npm run build
+        env:
+          VITE_API_URL: ${{ env.VITE_API_URL }}
 
       - name: Write SSH key
         run: |
@@ -40,14 +52,35 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          ssh-keyscan -p ${SSH_PORT:-22} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p ${SSH_PORT:-22} ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
 
+      # --- Déploiement FRONTEND ---
       - name: Rsync dist/ to VPS (Prod)
         run: |
-          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/fs-veec-planning/
-        env:
-          SSH_PORT: ${{ secrets.SSH_PORT }}
+          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" dist/ \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.FRONTEND_DIR }}/
 
+      # --- Déploiement BACKEND ---
+      - name: Rsync server/ to VPS (Backend Prod)
+        run: |
+          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" server/ \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.BACKEND_DIR }}/
+
+      - name: Install & restart backend with PM2 (force clean)
+        run: |
+          ssh -i key.pem -p ${SSH_PORT:-22} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+            set -e
+            cd ${BACKEND_DIR}
+            npm install --production
+
+            pm2 delete ${BACKEND_PM2_NAME} || true
+            fuser -k ${BACKEND_PORT}/tcp || true
+
+            PORT=${BACKEND_PORT} pm2 start index.mjs --name ${BACKEND_PM2_NAME}
+            pm2 save || true
+          "
+
+      # --- Last deploy stamp ---
       - name: Save last deploy date (Prod)
         run: |
           echo "## Dernier déploiement Production" > LAST_DEPLOY_PROD.md
