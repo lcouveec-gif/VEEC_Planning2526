@@ -1,7 +1,8 @@
 
+
 import React from 'react';
 import ThemeSwitcher from './ThemeSwitcher';
-import { PdfIcon, SpinnerIcon } from './icons/ThemeIcons';
+import { PdfIcon, SpinnerIcon, BellIcon } from './icons/ThemeIcons';
 import Logo from './Logo';
 
 interface HeaderProps {
@@ -9,9 +10,10 @@ interface HeaderProps {
   toggleTheme: () => void;
   onExportPdf: () => void;
   isExporting: boolean;
+  onSubscribeToNotifications: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExporting }) => {
+const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExporting, onSubscribeToNotifications }) => {
   return (
     <header className="bg-light-surface dark:bg-dark-surface shadow-md sticky top-0 z-10">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -26,6 +28,13 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            <button
+              onClick={onSubscribeToNotifications}
+              className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-light-surface dark:focus:ring-offset-dark-surface focus:ring-light-primary dark:focus:ring-dark-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Subscribe to notifications"
+            >
+              <BellIcon className="w-6 h-6" />
+            </button>
             <button
               onClick={onExportPdf}
               disabled={isExporting}
