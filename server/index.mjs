@@ -24,6 +24,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ✅ Route de diagnostic
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    subscriptionsCount: subscriptions.length
+  });
+});
+
 // ✅ Sauvegarde des abonnements
 app.post('/api/save-subscription', (req, res) => {
   const subscription = req.body;
