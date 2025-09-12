@@ -22,7 +22,7 @@ export const scheduleData: TrainingSession[] = [
   { id: 19, team: 'Loisirs Confirmés', coach: 'Karine / Laurent L', day: 'dimanche', gym: 'Coupvray', courts: ['T1'], startTime: '10:00', endTime: '12:00' },
   { id: 20, team: 'Loisirs Débutants', coach: 'Laurent Co', day: 'jeudi', gym: 'Esbly', courts: ['T1', 'T2', 'T3'], startTime: '20:00', endTime: '22:00' },
   { id: 21, team: 'Loisirs Débutants', coach: 'Laurent Co', day: 'dimanche', gym: 'Coupvray', courts: ['T2', 'T3'], startTime: '10:00', endTime: '12:00' },
-  { id: 22, team: 'Loisirs Expérimenté', coach: 'Fabrizio', day: 'mercredi', gym: 'Coupvray', courts: ['T2'], startTime: '20:30', endTime: '22:30' },
+  { id: 22, team: 'Loisirs Expérimenté', coach: 'Fabrizio', day: 'mercredi', gym: 'Magny', courts: ['T3'], startTime: '20:30', endTime: '22:30' },
   { id: 24, team: 'M18F1', coach: 'Karine P', day: 'mercredi', gym: 'Coupvray', courts: ['T1'], startTime: '18:30', endTime: '20:30' },
   { id: 25, team: 'M18F1', coach: 'Karine P', day: 'vendredi', gym: 'Magny', courts: ['T1'], startTime: '18:30', endTime: '20:30' },
   { id: 26, team: 'M18G1', coach: 'Jurgen', day: 'mercredi', gym: 'Coupvray', courts: ['T2'], startTime: '18:30', endTime: '20:30' },
@@ -47,4 +47,6 @@ export const scheduleData: TrainingSession[] = [
   { id: 45, team: 'M15G2', coach: 'Mathis', day: 'jeudi', gym: 'Esbly', courts: ['T1'], startTime: '18:00', endTime: '20:00' },
   { id: 46, team: 'M15G1', coach: 'Damien', day: 'jeudi', gym: 'Coupvray', courts: ['T3'], startTime: '18:30', endTime: '20:30' },
   { id: 47, team: 'M15F1', coach: 'Emmy', day: 'vendredi', gym: 'Magny', courts: ['T3'], startTime: '18:30', endTime: '20:30' },
+  { id: 48, team: 'SM2', coach: 'Jurgen', day: 'lundi', gym: 'Coupvray', courts: ['T1'], startTime: '20:30', endTime: '22:30' },
+  { id: 49, team: 'SM2', coach: 'Jurgen', day: 'mercredi', gym: 'Coupvray', courts: ['T2'], startTime: '20:30', endTime: '22:30' },
 ];
