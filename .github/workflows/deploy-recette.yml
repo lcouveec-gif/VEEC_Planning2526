@@ -9,6 +9,16 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
 
+    env:
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      FRONTEND_DIR: /var/www/fs-veec-planning-recette
+      BACKEND_DIR: /var/www/fs-veec-planning-api-recette
+      BACKEND_PM2_NAME: veec-recette-backend
+      BACKEND_PORT: "4000"
+      VITE_API_URL: https://recette.planning.veec.coutellec.fr/api
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,32 +32,58 @@ jobs:
       - name: Remove Windows lockfile
         run: rm -f package-lock.json
 
-      - name: Install deps
+      - name: Install deps (frontend root)
         run: npm install
 
-      - name: Build (Vite)
+      - name: Build (Vite) with API URL
         run: npm run build
+        env:
+          VITE_API_URL: ${{ env.VITE_API_URL }}
 
+      # --- SSH key for rsync/ssh ---
       - name: Write SSH key
         run: |
           echo "${{ secrets.SSH_KEY }}" > key.pem
           chmod 600 key.pem
 
-      - name: Show key fingerprint
-        run: ssh-keygen -lf key.pem
-
       - name: Prepare known_hosts
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          ssh-keyscan -p ${SSH_PORT:-22} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p ${SSH_PORT:-22} ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Rsync dist/ to VPS (Recette)
+      # --- Deploy FRONTEND ---
+      - name: Rsync dist/ to VPS (Frontend Recette)
         run: |
-          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/fs-veec-planning-recette/
-        env:
-          SSH_PORT: ${{ secrets.SSH_PORT }}
+          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" dist/ \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.FRONTEND_DIR }}/
 
+      # --- Deploy BACKEND (dossier `server/`) ---
+      - name: Rsync server/ to VPS (Backend Recette)
+        run: |
+          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" server/ \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.BACKEND_DIR }}/
+
+      # --- Install deps backend & (re)start PM2 ---
+      - name: Install & restart backend with PM2
+        run: |
+          ssh -i key.pem -p ${SSH_PORT:-22} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+            set -e
+            cd ${BACKEND_DIR}
+            npm install --production
+
+            # Démarre ou redémarre le process sur le port choisi
+            if pm2 describe ${BACKEND_PM2_NAME} > /dev/null; then
+              PORT=${BACKEND_PORT} pm2 restart ${BACKEND_PM2_NAME} --update-env
+            else
+              PORT=${BACKEND_PORT} pm2 start index.mjs --name ${BACKEND_PM2_NAME}
+            fi
+
+            # (1ère fois) rends PM2 persistant au reboot
+            pm2 save || true
+          "
+
+      # --- Last deploy stamp ---
       - name: Save last deploy date (Recette)
         run: |
           echo "## Dernier déploiement Recette" > LAST_DEPLOY_RECETTE.md

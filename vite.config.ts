@@ -47,7 +47,7 @@ export default defineConfig(({ mode }) => {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.VITE_VAPID_PUBLIC_KEY': JSON.stringify('BHwjs1r_j0oxzPQGR0kTgW1YixQDNmuCKRHCCcwCv_F8DMYNPY8kNZOatdQlaFNQO_e_3VUVCyvQwAHu_zikjqc'),
-        'process.env.VITE_API_URL': JSON.stringify('http://localhost:4000')
+        'process.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'http://localhost:4000')
       },
       resolve: {
         alias: {
