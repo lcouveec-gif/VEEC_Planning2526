@@ -50,8 +50,8 @@ app.post('/api/send-notification', (req, res) => {
     });
 });
 
-// 🚀 Lancement serveur
-const port = process.env.PORT || 4000;
+// 🚀 Lancement serveur sur 4010 par défaut
+const port = process.env.PORT || 4010;
 app.listen(port, () => {
   console.log(`✅ Backend API started on port ${port}`);
 });

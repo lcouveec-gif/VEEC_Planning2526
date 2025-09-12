@@ -16,7 +16,7 @@ jobs:
       FRONTEND_DIR: /var/www/fs-veec-planning-recette
       BACKEND_DIR: /var/www/fs-veec-planning-api-recette
       BACKEND_PM2_NAME: veec-recette-backend
-      BACKEND_PORT: "4000"
+      BACKEND_PORT: "4010"   # ✅ Recette tourne sur 4010
       VITE_API_URL: https://recette.planning.veec.coutellec.fr/api
 
     steps:
@@ -64,7 +64,7 @@ jobs:
           rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" server/ \
             ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.BACKEND_DIR }}/
 
-      # --- Install deps backend & (re)start PM2 ---
+      # --- Install deps backend & restart PM2 (force clean) ---
       - name: Install & restart backend with PM2
         run: |
           ssh -i key.pem -p ${SSH_PORT:-22} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
@@ -72,16 +72,19 @@ jobs:
             cd ${BACKEND_DIR}
             npm install --production
 
-            # Démarre ou redémarre le process sur le port choisi
-            if pm2 describe ${BACKEND_PM2_NAME} > /dev/null; then
-              PORT=${BACKEND_PORT} pm2 restart ${BACKEND_PM2_NAME} --update-env
-            else
-              PORT=${BACKEND_PORT} pm2 start index.mjs --name ${BACKEND_PM2_NAME}
-            fi
+            # Stoppe et supprime l'ancienne instance
+            pm2 delete ${BACKEND_PM2_NAME} || true
 
-            # (1ère fois) rends PM2 persistant au reboot
+            # Libère le port au cas où un vieux process bloque encore
+            fuser -k ${BACKEND_PORT}/tcp || true
+
+            # Redémarre sur le bon port
+            PORT=${BACKEND_PORT} pm2 start index.mjs --name ${BACKEND_PM2_NAME}
+
+            # Persiste la conf PM2 pour reboot
             pm2 save || true
           "
+
 
       # --- Last deploy stamp ---
       - name: Save last deploy date (Recette)
