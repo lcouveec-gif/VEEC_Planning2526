@@ -39,6 +39,8 @@ jobs:
         run: npm run build
         env:
           VITE_API_URL: ${{ env.VITE_API_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       # --- SSH key for rsync/ssh ---
       - name: Write SSH key
