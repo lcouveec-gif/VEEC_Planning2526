@@ -1,6 +1,6 @@
 
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ThemeSwitcher from './ThemeSwitcher';
 import { PdfIcon, SpinnerIcon, BellIcon } from './icons/ThemeIcons';
 import Logo from './Logo';
@@ -18,6 +18,31 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExporting, onSubscribeToNotifications, currentPage, onPageChange }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Fermer le menu quand on clique à l'extérieur
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMenuOpen]);
+
+  const handlePageChange = (page: PageType) => {
+    onPageChange(page);
+    setIsMenuOpen(false);
+  };
+
   return (
     <header className="bg-light-surface dark:bg-dark-surface shadow-md sticky top-0 z-10">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -25,36 +50,60 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
           <div className="flex items-center">
             <Logo />
             <div className="flex flex-col">
-                <h1 className="text-base sm:text-lg md:text-xl font-bold">
-                FS VAL D'EUROPE ESBLY COUPVRAY VOLLEYBALL
+                {/* Version mobile : VEEC, Version desktop : nom complet */}
+                <h1 className="text-xl sm:text-lg md:text-xl font-bold">
+                  <span className="sm:hidden">VEEC</span>
+                  <span className="hidden sm:inline">FS VAL D'EUROPE ESBLY COUPVRAY VOLLEYBALL</span>
                 </h1>
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                {/* Sous-titre uniquement sur desktop */}
+                <p className="hidden sm:block text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                   {currentPage === 'training' ? 'Planning des entraînements Saison 25-26' : 'Planning des matchs Saison 25-26'}
                 </p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1 mr-2">
+            {/* Menu déroulant pour navigation */}
+            <div className="relative mr-2" ref={menuRef}>
               <button
-                onClick={() => onPageChange('training')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  currentPage === 'training'
-                    ? 'bg-black dark:bg-gray-300 text-white dark:text-black'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary hover:opacity-90 transition-all"
               >
-                Entraînements
+                <span>{currentPage === 'training' ? 'Entraînements' : 'Matchs'}</span>
+                <svg
+                  className={`w-4 h-4 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
-              <button
-                onClick={() => onPageChange('matches')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  currentPage === 'matches'
-                    ? 'bg-black dark:bg-gray-300 text-white dark:text-black'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-              >
-                Matchs
-              </button>
+
+              {/* Menu déroulant */}
+              {isMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden z-20">
+                  <button
+                    onClick={() => handlePageChange('matches')}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                      currentPage === 'matches'
+                        ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Matchs
+                  </button>
+                  <button
+                    onClick={() => handlePageChange('training')}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                      currentPage === 'training'
+                        ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Entraînements
+                  </button>
+                </div>
+              )}
             </div>
             <button
               onClick={onSubscribeToNotifications}

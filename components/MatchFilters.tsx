@@ -7,10 +7,12 @@ interface MatchFiltersProps {
   selectedTeamIds: string[];
   teams: Team[];
   searchTerm: string;
+  locationFilter: 'all' | 'home' | 'away';
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
   onTeamIdsChange: (teamIds: string[]) => void;
   onSearchChange: (search: string) => void;
+  onLocationFilterChange: (filter: 'all' | 'home' | 'away') => void;
   onReset: () => void;
 }
 
@@ -20,10 +22,12 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
   selectedTeamIds,
   teams,
   searchTerm,
+  locationFilter,
   onStartDateChange,
   onEndDateChange,
   onTeamIdsChange,
   onSearchChange,
+  onLocationFilterChange,
   onReset,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -145,13 +149,10 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
     onEndDateChange(lastDay.toISOString().split('T')[0]);
   };
 
-  const setNext3Months = () => {
-    const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastDay = new Date(today.getFullYear(), today.getMonth() + 3, 0);
-
-    onStartDateChange(firstDay.toISOString().split('T')[0]);
-    onEndDateChange(lastDay.toISOString().split('T')[0]);
+  const setAllDates = () => {
+    // Mettre à blanc les dates (toutes les dates)
+    onStartDateChange('');
+    onEndDateChange('');
   };
 
   return (
@@ -218,10 +219,10 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
                 Mois prochain
               </button>
               <button
-                onClick={setNext3Months}
+                onClick={setAllDates}
                 className="px-3 py-2 text-xs font-medium bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary rounded hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 transition-colors border border-light-primary/20 dark:border-dark-primary/20"
               >
-                3 mois
+                Toutes
               </button>
             </div>
           </div>
@@ -303,19 +304,61 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
             </div>
           </details>
 
-          {/* Recherche équipe */}
-          <div>
-            <label htmlFor="team-search" className="block text-xs font-medium mb-1.5">
-              Recherche par nom
-            </label>
-            <input
-              type="text"
-              id="team-search"
-              placeholder="Filtrer par SM, SF, équipe..."
-              value={searchTerm}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-light-border dark:border-dark-border rounded bg-light-background dark:bg-dark-background text-light-onSurface dark:text-dark-onSurface focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary"
-            />
+          {/* Recherche équipe et Filtre Domicile/Extérieur */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Recherche par nom */}
+            <div>
+              <label htmlFor="team-search" className="block text-xs font-medium mb-1.5">
+                Recherche par nom
+              </label>
+              <input
+                type="text"
+                id="team-search"
+                placeholder="Filtrer par SM, SF, équipe..."
+                value={searchTerm}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-light-border dark:border-dark-border rounded bg-light-background dark:bg-dark-background text-light-onSurface dark:text-dark-onSurface focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary"
+              />
+            </div>
+
+            {/* Filtre Domicile/Extérieur */}
+            <div>
+              <label className="block text-xs font-medium mb-1.5">
+                Localisation
+              </label>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => onLocationFilterChange('all')}
+                  className={`flex-1 px-3 py-2 text-xs font-medium rounded transition-colors ${
+                    locationFilter === 'all'
+                      ? 'bg-light-primary dark:bg-dark-primary text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Tous
+                </button>
+                <button
+                  onClick={() => onLocationFilterChange('home')}
+                  className={`flex-1 px-3 py-2 text-xs font-medium rounded transition-colors ${
+                    locationFilter === 'home'
+                      ? 'bg-light-primary dark:bg-dark-primary text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  🏠 Domicile
+                </button>
+                <button
+                  onClick={() => onLocationFilterChange('away')}
+                  className={`flex-1 px-3 py-2 text-xs font-medium rounded transition-colors ${
+                    locationFilter === 'away'
+                      ? 'bg-light-primary dark:bg-dark-primary text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  ✈️ Extérieur
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Filtre Équipes (boutons cliquables) */}

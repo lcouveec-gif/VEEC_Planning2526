@@ -159,21 +159,29 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
                 <div className="flex flex-col gap-2">
                   {/* Ligne 1: Heure et badges */}
                   <div className="flex items-start justify-between gap-2">
-                    <span className="text-base sm:text-lg font-semibold text-light-primary dark:text-dark-primary">
-                      {formatTime(match.Heure)}
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-base sm:text-lg font-semibold text-light-primary dark:text-dark-primary">
+                        {formatTime(match.Heure)}
+                      </span>
+                      {/* Nom de la poule (championnat) - visible uniquement sur desktop */}
+                      {match.equipe?.POULE_NOM && (
+                        <span className="hidden sm:inline text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
+                          {match.equipe.POULE_NOM}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
                       {result && (
                         <span className={`px-2.5 py-1 rounded text-xs font-bold uppercase ${
                           result === 'victory'
-                            ? 'bg-green-500 dark:bg-green-600 text-white'
-                            : 'bg-red-500 dark:bg-red-600 text-white'
+                            ? 'bg-veec-green text-white'
+                            : 'bg-veec-red text-white'
                         }`}>
                           {result === 'victory' ? 'Victoire' : 'Défaite'}
                         </span>
                       )}
                       {match.Championnat && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-veec-blue/20 dark:bg-veec-yellow/30 text-veec-blue dark:text-veec-yellow border border-veec-blue/30 dark:border-veec-yellow/30">
                           {match.Championnat}
                         </span>
                       )}
@@ -183,39 +191,45 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
                   {/* Ligne 2: Équipes et score global */}
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm sm:text-base font-semibold truncate">
-                        {match.EQA_nom}
+                      <div className={`flex items-center gap-1.5 text-sm sm:text-base truncate ${isTeamA ? 'font-bold' : 'font-semibold'}`}>
+                        {isTeamA && (
+                          <img src="/logo.png" alt="VEEC" className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                        )}
+                        <span className="truncate">{match.EQA_nom}</span>
                       </div>
-                      <div className="text-sm sm:text-base font-semibold truncate mt-0.5">
-                        {match.EQB_nom}
+                      <div className={`flex items-center gap-1.5 text-sm sm:text-base truncate mt-0.5 ${isTeamB ? 'font-bold' : 'font-semibold'}`}>
+                        {isTeamB && (
+                          <img src="/logo.png" alt="VEEC" className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                        )}
+                        <span className="truncate">{match.EQB_nom}</span>
                       </div>
                     </div>
                     {score && (
                       <div className="flex flex-col items-center justify-center rounded px-3 py-1.5">
-                        {/* Score de l'équipe A - vert si elle a gagné ET que c'est le club, rouge sinon */}
+                        {/* Score de l'équipe A - vert VEEC si elle a gagné ET que c'est le club, rouge VEEC sinon */}
                         <span className={`text-xl sm:text-2xl font-bold ${
                           isTeamA && result === 'victory'
-                            ? 'text-green-600 dark:text-green-400'
+                            ? 'text-veec-green'
                             : isTeamA && result === 'defeat'
-                            ? 'text-red-600 dark:text-red-400'
+                            ? 'text-veec-red'
                             : isTeamB && result === 'defeat'
-                            ? 'text-green-600 dark:text-green-400'
+                            ? 'text-veec-green'
                             : isTeamB && result === 'victory'
-                            ? 'text-red-600 dark:text-red-400'
+                            ? 'text-veec-red'
                             : 'text-light-primary dark:text-dark-primary'
                         }`}>
                           {score.scoreA}
                         </span>
-                        {/* Score de l'équipe B - vert si elle a gagné ET que c'est le club, rouge sinon */}
+                        {/* Score de l'équipe B - vert VEEC si elle a gagné ET que c'est le club, rouge VEEC sinon */}
                         <span className={`text-xl sm:text-2xl font-bold ${
                           isTeamB && result === 'victory'
-                            ? 'text-green-600 dark:text-green-400'
+                            ? 'text-veec-green'
                             : isTeamB && result === 'defeat'
-                            ? 'text-red-600 dark:text-red-400'
+                            ? 'text-veec-red'
                             : isTeamA && result === 'defeat'
-                            ? 'text-green-600 dark:text-green-400'
+                            ? 'text-veec-green'
                             : isTeamA && result === 'victory'
-                            ? 'text-red-600 dark:text-red-400'
+                            ? 'text-veec-red'
                             : 'text-light-primary dark:text-dark-primary'
                         }`}>
                           {score.scoreB}
@@ -241,8 +255,8 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
                           if (setWinner && match.NOM_FFVB && (isTeamA || isTeamB)) {
                             const teamWonSet = (setWinner === 'A' && isTeamA) || (setWinner === 'B' && isTeamB);
                             colorClass = teamWonSet
-                              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold'
-                              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 font-semibold';
+                              ? 'bg-veec-green/20 text-veec-green border border-veec-green/40 font-semibold'
+                              : 'bg-veec-red/20 text-veec-red border border-veec-red/40 font-semibold';
                           }
 
                           return (

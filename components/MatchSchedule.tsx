@@ -14,6 +14,7 @@ const MatchSchedule: React.FC = () => {
   const [endDate, setEndDate] = useState<string>(defaultEndDate);
   const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [locationFilter, setLocationFilter] = useState<'all' | 'home' | 'away'>('all');
 
   // Dates utilisées pour la requête (avec debounce)
   const [debouncedStartDate, setDebouncedStartDate] = useState<string>(defaultStartDate);
@@ -45,6 +46,7 @@ const MatchSchedule: React.FC = () => {
     setEndDate(defaultEndDate);
     setSelectedTeamIds([]);
     setSearchTerm('');
+    setLocationFilter('all');
   };
 
   // Fonction de normalisation des chaînes (utilisée pour la comparaison)
@@ -93,7 +95,7 @@ const MatchSchedule: React.FC = () => {
   }, [matches, selectedTeamIds, teams]);
 
   // Filtrer les matchs selon le terme de recherche
-  const filteredMatches = React.useMemo(() => {
+  const filteredBySearch = React.useMemo(() => {
     if (!searchTerm.trim()) return filteredByTeam;
     const search = searchTerm.toUpperCase();
     return filteredByTeam.filter(match =>
@@ -102,6 +104,21 @@ const MatchSchedule: React.FC = () => {
       match.EQB_nom?.toUpperCase().includes(search)
     );
   }, [filteredByTeam, searchTerm]);
+
+  // Filtrer les matchs selon la localisation (Domicile/Extérieur)
+  const filteredMatches = React.useMemo(() => {
+    if (locationFilter === 'all') return filteredBySearch;
+
+    return filteredBySearch.filter(match => {
+      const isHome = match.EQA_no === '0775819'; // Notre club reçoit si EQA_no = 0775819
+
+      if (locationFilter === 'home') {
+        return isHome;
+      } else {
+        return !isHome;
+      }
+    });
+  }, [filteredBySearch, locationFilter]);
 
   // Calculer les statistiques pour les équipes sélectionnées
   const teamStats = React.useMemo(() => {
@@ -113,6 +130,7 @@ const MatchSchedule: React.FC = () => {
     let victories = 0;
     let defeats = 0;
     let upcoming = 0;
+    let totalCounted = 0; // Nombre de matchs réellement comptés
 
     filteredMatches.forEach(match => {
       // Ignorer les matchs avec équipe exempte
@@ -128,6 +146,7 @@ const MatchSchedule: React.FC = () => {
         // Match à venir (pas encore joué)
         if (!match.Set || match.Set.trim() === '') {
           upcoming++;
+          totalCounted++;
         } else {
           // Match joué (a un score)
           const scoreMatch = match.Set.match(/(\d+)\/(\d+)/);
@@ -142,6 +161,7 @@ const MatchSchedule: React.FC = () => {
             const won = isTeamA ? scoreA > scoreB : scoreB > scoreA;
             if (won) victories++;
             else defeats++;
+            totalCounted++;
           }
         }
       } else {
@@ -158,11 +178,12 @@ const MatchSchedule: React.FC = () => {
           const won = isTeamA ? scoreA > scoreB : scoreB > scoreA;
           if (won) victories++;
           else defeats++;
+          totalCounted++;
         }
       }
     });
 
-    return { victories, defeats, upcoming };
+    return { victories, defeats, upcoming, totalCounted };
   }, [filteredMatches]);
 
   const loading = loadingTeams || loadingMatches;
@@ -200,10 +221,12 @@ const MatchSchedule: React.FC = () => {
             selectedTeamIds={selectedTeamIds}
             teams={teams}
             searchTerm={searchTerm}
+            locationFilter={locationFilter}
             onStartDateChange={setStartDate}
             onEndDateChange={setEndDate}
             onTeamIdsChange={setSelectedTeamIds}
             onSearchChange={setSearchTerm}
+            onLocationFilterChange={setLocationFilter}
             onReset={handleReset}
           />
 
@@ -211,7 +234,7 @@ const MatchSchedule: React.FC = () => {
           {!loadingMatches && (
             <div className="mb-3 px-2 space-y-2">
               <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                {filteredMatches.length} match{filteredMatches.length > 1 ? 's' : ''}
+                {teamStats ? teamStats.totalCounted : filteredMatches.length} match{(teamStats ? teamStats.totalCounted : filteredMatches.length) > 1 ? 's' : ''}
                 {selectedTeamIds.length > 0 && (
                   <span className="font-medium"> • {selectedTeamIds.join(', ')}</span>
                 )}
@@ -223,13 +246,13 @@ const MatchSchedule: React.FC = () => {
               {/* Statistiques des équipes sélectionnées */}
               {teamStats && (
                 <div className="flex gap-2 items-center">
-                  <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                  <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-veec-green/20 dark:bg-veec-green/30 text-veec-green dark:text-veec-green border border-veec-green/30">
                     V: {teamStats.victories}
                   </span>
-                  <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+                  <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-veec-red/20 dark:bg-veec-red/30 text-veec-red dark:text-veec-red border border-veec-red/30">
                     D: {teamStats.defeats}
                   </span>
-                  <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                  <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-veec-blue/20 dark:bg-veec-yellow/30 text-veec-blue dark:text-veec-yellow border border-veec-blue/30 dark:border-veec-yellow/30">
                     P: {teamStats.upcoming}
                   </span>
                 </div>
