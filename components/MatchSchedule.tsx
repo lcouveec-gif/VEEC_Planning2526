@@ -5,14 +5,10 @@ import { useMatches } from '../hooks/useMatches';
 import { useTeams } from '../hooks/useTeams';
 
 const MatchSchedule: React.FC = () => {
-  // Dates par défaut : du début du mois en cours à la fin du mois suivant
+  // Dates par défaut : date du jour et pas de date de fin (tous les matchs à venir)
   const today = new Date();
-  const defaultStartDate = new Date(today.getFullYear(), today.getMonth(), 1)
-    .toISOString()
-    .split('T')[0];
-  const defaultEndDate = new Date(today.getFullYear(), today.getMonth() + 2, 0)
-    .toISOString()
-    .split('T')[0];
+  const defaultStartDate = today.toISOString().split('T')[0];
+  const defaultEndDate = ''; // Pas de date de fin par défaut
 
   const [startDate, setStartDate] = useState<string>(defaultStartDate);
   const [endDate, setEndDate] = useState<string>(defaultEndDate);
@@ -37,9 +33,10 @@ const MatchSchedule: React.FC = () => {
   const { teams, loading: loadingTeams, error: errorTeams } = useTeams();
 
   // Charger les matchs avec les filtres (utilise les dates debounced)
+  // Passer undefined si les dates sont vides pour permettre des plages ouvertes
   const { matches, loading: loadingMatches, error: errorMatches } = useMatches(
-    debouncedStartDate,
-    debouncedEndDate,
+    debouncedStartDate || undefined,
+    debouncedEndDate || undefined,
     selectedTeamIds.length > 0 ? selectedTeamIds : undefined
   );
 
@@ -50,16 +47,123 @@ const MatchSchedule: React.FC = () => {
     setSearchTerm('');
   };
 
+  // Fonction de normalisation des chaînes (utilisée pour la comparaison)
+  const normalizeString = (str: string | undefined): string => {
+    if (!str) return '';
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\u00A0/g, ' ')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/[\u2018\u2019\u201A\u201B']/g, "'")
+      .toUpperCase();
+  };
+
+  // Filtrer les matchs pour n'afficher que ceux où les équipes sélectionnées jouent réellement
+  const filteredByTeam = React.useMemo(() => {
+    // Étape 1 : Filtrer les matchs où NOM_FFVB correspond à EQA_nom ou EQB_nom
+    // Cela élimine les matchs erronés dans la base de données
+    const validMatches = matches.filter(match => {
+      if (!match.NOM_FFVB) return false;
+
+      const normalizedNomFFVB = normalizeString(match.NOM_FFVB);
+      const normalizedEQA = normalizeString(match.EQA_nom);
+      const normalizedEQB = normalizeString(match.EQB_nom);
+
+      // Le match est valide si NOM_FFVB correspond à l'une des deux équipes qui jouent
+      return normalizedNomFFVB === normalizedEQA || normalizedNomFFVB === normalizedEQB;
+    });
+
+    // Étape 2 : Si aucune équipe n'est sélectionnée, retourner tous les matchs valides
+    if (selectedTeamIds.length === 0) return validMatches;
+
+    // Étape 3 : Filtrer par équipes sélectionnées
+    const selectedTeamNames = teams
+      .filter(team => selectedTeamIds.includes(team.IDEQUIPE))
+      .map(team => normalizeString(team.NOM_FFVB));
+
+    const filtered = validMatches.filter(match => {
+      const matchTeamName = normalizeString(match.NOM_FFVB);
+      return selectedTeamNames.includes(matchTeamName);
+    });
+
+    return filtered;
+  }, [matches, selectedTeamIds, teams]);
+
   // Filtrer les matchs selon le terme de recherche
   const filteredMatches = React.useMemo(() => {
-    if (!searchTerm.trim()) return matches;
+    if (!searchTerm.trim()) return filteredByTeam;
     const search = searchTerm.toUpperCase();
-    return matches.filter(match =>
+    return filteredByTeam.filter(match =>
       match.equipe?.IDEQUIPE?.toUpperCase().includes(search) ||
       match.EQA_nom?.toUpperCase().includes(search) ||
       match.EQB_nom?.toUpperCase().includes(search)
     );
-  }, [matches, searchTerm]);
+  }, [filteredByTeam, searchTerm]);
+
+  // Calculer les statistiques pour les équipes sélectionnées
+  const teamStats = React.useMemo(() => {
+    if (selectedTeamIds.length === 0) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let victories = 0;
+    let defeats = 0;
+    let upcoming = 0;
+
+    filteredMatches.forEach(match => {
+      // Ignorer les matchs avec équipe exempte
+      if (!match.EQA_no || !match.EQB_no || match.EQA_no.trim() === '' || match.EQB_no.trim() === '') {
+        return;
+      }
+
+      const matchDate = match.Date ? new Date(match.Date) : null;
+      if (!matchDate) return;
+
+      // Déterminer si le match est à venir ou passé
+      if (matchDate >= today) {
+        // Match à venir (pas encore joué)
+        if (!match.Set || match.Set.trim() === '') {
+          upcoming++;
+        } else {
+          // Match joué (a un score)
+          const scoreMatch = match.Set.match(/(\d+)\/(\d+)/);
+          if (scoreMatch) {
+            const scoreA = parseInt(scoreMatch[1], 10);
+            const scoreB = parseInt(scoreMatch[2], 10);
+
+            const nomFFVB = normalizeString(match.NOM_FFVB);
+            const eqaName = normalizeString(match.EQA_nom);
+            const isTeamA = eqaName === nomFFVB;
+
+            const won = isTeamA ? scoreA > scoreB : scoreB > scoreA;
+            if (won) victories++;
+            else defeats++;
+          }
+        }
+      } else {
+        // Match passé
+        const scoreMatch = match.Set?.match(/(\d+)\/(\d+)/);
+        if (scoreMatch) {
+          const scoreA = parseInt(scoreMatch[1], 10);
+          const scoreB = parseInt(scoreMatch[2], 10);
+
+          const nomFFVB = normalizeString(match.NOM_FFVB);
+          const eqaName = normalizeString(match.EQA_nom);
+          const isTeamA = eqaName === nomFFVB;
+
+          const won = isTeamA ? scoreA > scoreB : scoreB > scoreA;
+          if (won) victories++;
+          else defeats++;
+        }
+      }
+    });
+
+    return { victories, defeats, upcoming };
+  }, [filteredMatches]);
 
   const loading = loadingTeams || loadingMatches;
   const error = errorTeams || errorMatches;
@@ -103,15 +207,32 @@ const MatchSchedule: React.FC = () => {
             onReset={handleReset}
           />
 
-          {/* Info sur le nombre de matchs */}
+          {/* Info sur le nombre de matchs et statistiques */}
           {!loadingMatches && (
-            <div className="mb-3 px-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-              {filteredMatches.length} match{filteredMatches.length > 1 ? 's' : ''}
-              {selectedTeamIds.length > 0 && (
-                <span className="font-medium"> • {selectedTeamIds.join(', ')}</span>
-              )}
-              {searchTerm && (
-                <span className="font-medium"> • "{searchTerm}"</span>
+            <div className="mb-3 px-2 space-y-2">
+              <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                {filteredMatches.length} match{filteredMatches.length > 1 ? 's' : ''}
+                {selectedTeamIds.length > 0 && (
+                  <span className="font-medium"> • {selectedTeamIds.join(', ')}</span>
+                )}
+                {searchTerm && (
+                  <span className="font-medium"> • "{searchTerm}"</span>
+                )}
+              </div>
+
+              {/* Statistiques des équipes sélectionnées */}
+              {teamStats && (
+                <div className="flex gap-2 items-center">
+                  <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                    V: {teamStats.victories}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+                    D: {teamStats.defeats}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                    P: {teamStats.upcoming}
+                  </span>
+                </div>
               )}
             </div>
           )}

@@ -37,10 +37,10 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
     return [...teams].sort((a, b) => a.IDEQUIPE.localeCompare(b.IDEQUIPE));
   }, [teams]);
 
-  // Appliquer les dates personnalisées
+  // Appliquer les dates personnalisées (permet les dates vides)
   const applyCustomDates = () => {
-    onStartDateChange(tempStartDate);
-    onEndDateChange(tempEndDate);
+    onStartDateChange(tempStartDate || '');
+    onEndDateChange(tempEndDate || '');
   };
 
   // Gérer la sélection/désélection d'équipes
@@ -55,11 +55,12 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
   // Fonctions pour les raccourcis de dates
   const setPreviousWeek = () => {
     const today = new Date();
-    const dayOfWeek = today.getDay();
+    const dayOfWeek = today.getDay(); // 0=Dimanche, 1=Lundi, ..., 6=Samedi
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convertir en jours depuis lundi
     const lastMonday = new Date(today);
-    lastMonday.setDate(today.getDate() - (dayOfWeek === 0 ? 13 : dayOfWeek + 6));
+    lastMonday.setDate(today.getDate() - daysFromMonday - 7); // Lundi de la semaine précédente
     const lastSunday = new Date(lastMonday);
-    lastSunday.setDate(lastMonday.getDate() + 6);
+    lastSunday.setDate(lastMonday.getDate() + 6); // Dimanche de la semaine précédente
 
     onStartDateChange(lastMonday.toISOString().split('T')[0]);
     onEndDateChange(lastSunday.toISOString().split('T')[0]);
@@ -67,11 +68,32 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
 
   const setThisWeek = () => {
     const today = new Date();
-    const dayOfWeek = today.getDay();
+    const dayOfWeek = today.getDay(); // 0=Dimanche, 1=Lundi, ..., 6=Samedi
+
+    // Calculer le lundi de cette semaine
+    // Si dimanche (0), c'est le dernier jour → lundi est 6 jours avant
+    // Si lundi (1), c'est le premier jour → lundi est 0 jour avant
+    // Si mardi (2), lundi est 1 jour avant, etc.
+    let daysFromMonday;
+    if (dayOfWeek === 0) {
+      // Dimanche : lundi est 6 jours avant
+      daysFromMonday = 6;
+    } else {
+      // Autres jours : lundi est (dayOfWeek - 1) jours avant
+      daysFromMonday = dayOfWeek - 1;
+    }
+
     const monday = new Date(today);
-    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
+    monday.setDate(today.getDate() - daysFromMonday);
+
+    const sunday = new Date(today);
+    if (dayOfWeek === 0) {
+      // Si on est dimanche, c'est le dernier jour de la semaine
+      sunday.setDate(today.getDate());
+    } else {
+      // Sinon, dimanche est dans (7 - dayOfWeek) jours
+      sunday.setDate(today.getDate() + (7 - dayOfWeek));
+    }
 
     onStartDateChange(monday.toISOString().split('T')[0]);
     onEndDateChange(sunday.toISOString().split('T')[0]);
@@ -79,11 +101,27 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
 
   const setNextWeek = () => {
     const today = new Date();
-    const dayOfWeek = today.getDay();
+    const dayOfWeek = today.getDay(); // 0=Dimanche, 1=Lundi, ..., 6=Samedi
+
+    // Calculer le lundi de la semaine prochaine
+    // Si on est dimanche (0), le lundi prochain est dans 1 jour
+    // Si on est lundi (1), le lundi prochain est dans 7 jours
+    // Si on est mardi (2), le lundi prochain est dans 6 jours
+    // etc.
+    let daysUntilNextMonday;
+    if (dayOfWeek === 0) {
+      // Si on est dimanche, lundi prochain est demain
+      daysUntilNextMonday = 1;
+    } else {
+      // Sinon, lundi prochain est dans (8 - dayOfWeek) jours
+      daysUntilNextMonday = 8 - dayOfWeek;
+    }
+
     const nextMonday = new Date(today);
-    nextMonday.setDate(today.getDate() + (8 - (dayOfWeek === 0 ? 7 : dayOfWeek)));
+    nextMonday.setDate(today.getDate() + daysUntilNextMonday);
+
     const nextSunday = new Date(nextMonday);
-    nextSunday.setDate(nextMonday.getDate() + 6);
+    nextSunday.setDate(nextMonday.getDate() + 6); // Lundi + 6 = Dimanche
 
     onStartDateChange(nextMonday.toISOString().split('T')[0]);
     onEndDateChange(nextSunday.toISOString().split('T')[0]);
@@ -203,29 +241,55 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
                 {/* Filtre Date de début */}
                 <div>
                   <label htmlFor="start-date" className="block text-xs font-medium mb-1 text-gray-600 dark:text-gray-400">
-                    Du
+                    Du (optionnel)
                   </label>
-                  <input
-                    type="date"
-                    id="start-date"
-                    value={tempStartDate}
-                    onChange={(e) => setTempStartDate(e.target.value)}
-                    className="w-full px-2 py-1.5 text-xs border border-light-border dark:border-dark-border rounded bg-light-background dark:bg-dark-background text-light-onSurface dark:text-dark-onSurface focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary"
-                  />
+                  <div className="relative">
+                    <input
+                      type="date"
+                      id="start-date"
+                      value={tempStartDate}
+                      onChange={(e) => setTempStartDate(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs border border-light-border dark:border-dark-border rounded bg-light-background dark:bg-dark-background text-light-onSurface dark:text-dark-onSurface focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary"
+                    />
+                    {tempStartDate && (
+                      <button
+                        onClick={() => setTempStartDate('')}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                        title="Vider la date de début"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Filtre Date de fin */}
                 <div>
                   <label htmlFor="end-date" className="block text-xs font-medium mb-1 text-gray-600 dark:text-gray-400">
-                    Au
+                    Au (optionnel)
                   </label>
-                  <input
-                    type="date"
-                    id="end-date"
-                    value={tempEndDate}
-                    onChange={(e) => setTempEndDate(e.target.value)}
-                    className="w-full px-2 py-1.5 text-xs border border-light-border dark:border-dark-border rounded bg-light-background dark:bg-dark-background text-light-onSurface dark:text-dark-onSurface focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary"
-                  />
+                  <div className="relative">
+                    <input
+                      type="date"
+                      id="end-date"
+                      value={tempEndDate}
+                      onChange={(e) => setTempEndDate(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs border border-light-border dark:border-dark-border rounded bg-light-background dark:bg-dark-background text-light-onSurface dark:text-dark-onSurface focus:outline-none focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary"
+                    />
+                    {tempEndDate && (
+                      <button
+                        onClick={() => setTempEndDate('')}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                        title="Vider la date de fin"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 

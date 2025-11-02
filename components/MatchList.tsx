@@ -37,17 +37,41 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
     return null;
   };
 
+  // Normaliser les chaînes pour la comparaison (espaces et apostrophes)
+  const normalizeString = (str: string | undefined): string => {
+    if (!str) return '';
+    return str
+      .normalize('NFD') // Normalisation Unicode (décomposition)
+      .replace(/[\u0300-\u036f]/g, '') // Supprimer les diacritiques
+      .replace(/[\u200B-\u200D\uFEFF]/g, '') // Supprimer les caractères zero-width
+      .replace(/\u00A0/g, ' ') // Remplacer les espaces insécables par des espaces normaux
+      .trim()
+      .replace(/\s+/g, ' ') // Remplacer tous les espaces multiples/invisibles par un seul espace
+      .replace(/[\u2018\u2019\u201A\u201B']/g, "'") // Remplacer toutes les apostrophes typographiques (', ', ‚, ‛, ') par des apostrophes simples
+      .toUpperCase(); // Convertir en majuscules pour ignorer la casse
+  };
+
   // Déterminer le résultat pour l'équipe (victoire/défaite)
   const getMatchResult = (match: Match): 'victory' | 'defeat' | null => {
     const score = parseSetScore(match.Set);
     if (!score || !match.NOM_FFVB) return null;
 
-    // Comparer avec NOM_FFVB pour identifier l'équipe du club
-    const isTeamA = match.EQA_nom === match.NOM_FFVB;
-    const isTeamB = match.EQB_nom === match.NOM_FFVB;
+    // Ignorer les matchs avec équipe exempte (EQA_no ou EQB_no vide)
+    if (!match.EQA_no || !match.EQB_no || match.EQA_no.trim() === '' || match.EQB_no.trim() === '') {
+      return null;
+    }
+
+    // Comparer NOM_FFVB avec EQA_nom et EQB_nom pour identifier notre équipe
+    const nomFFVB = normalizeString(match.NOM_FFVB);
+    const eqaName = normalizeString(match.EQA_nom);
+    const eqbName = normalizeString(match.EQB_nom);
+    const isTeamA = eqaName === nomFFVB;
+    const isTeamB = eqbName === nomFFVB;
 
     if (!isTeamA && !isTeamB) return null;
 
+    // Si notre équipe est A, on gagne si scoreA > scoreB
+    // Si notre équipe est B, on gagne si scoreB > scoreA
     const teamWon = isTeamA ? score.scoreA > score.scoreB : score.scoreB > score.scoreA;
     return teamWon ? 'victory' : 'defeat';
   };
@@ -67,6 +91,11 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
   const groupMatchesByDate = (matches: Match[]) => {
     const grouped: { [key: string]: Match[] } = {};
     matches.forEach((match) => {
+      // Ignorer les matchs avec équipe exempte (EQA_no ou EQB_no vide)
+      if (!match.EQA_no || !match.EQB_no || match.EQA_no.trim() === '' || match.EQB_no.trim() === '') {
+        return; // Skip ce match
+      }
+
       const dateKey = match.Date || '';
       if (!grouped[dateKey]) {
         grouped[dateKey] = [];
@@ -101,8 +130,26 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
               const score = parseSetScore(match.Set);
               const result = getMatchResult(match);
               // Identifier si l'équipe du club est A ou B en comparant avec NOM_FFVB
-              const isTeamA = match.EQA_nom === match.NOM_FFVB;
-              const isTeamB = match.EQB_nom === match.NOM_FFVB;
+              const nomFFVB = normalizeString(match.NOM_FFVB);
+              const isTeamA = normalizeString(match.EQA_nom) === nomFFVB;
+              const isTeamB = normalizeString(match.EQB_nom) === nomFFVB;
+
+              // Debug logs
+              console.log('Match data:', {
+                id: match.id,
+                NOM_FFVB: match.NOM_FFVB,
+                NOM_FFVB_normalized: nomFFVB,
+                EQA_nom: match.EQA_nom,
+                EQA_nom_normalized: normalizeString(match.EQA_nom),
+                EQB_nom: match.EQB_nom,
+                EQB_nom_normalized: normalizeString(match.EQB_nom),
+                Set: match.Set,
+                Score: match.Score,
+                isTeamA,
+                isTeamB,
+                result,
+                score
+              });
 
               return (
               <div
