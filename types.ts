@@ -16,6 +16,7 @@ export interface Team {
   NOM_FFVB: string;
   NOM_CAL?: string;
   POULE_TEAM?: string;
+  POULE_NOM?: string; // Nom du championnat/poule
   CURL_TEAM?: string;
   CALDAV_URL?: string;
   QRCODE_URL?: string;
