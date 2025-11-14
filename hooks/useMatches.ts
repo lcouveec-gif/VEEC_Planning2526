@@ -62,7 +62,8 @@ export function useMatches(startDate?: string, endDate?: string, teamIds?: strin
 
   useEffect(() => {
     fetchMatches();
-  }, [startDate, endDate, teamIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, JSON.stringify(teamIds)]);
 
   return {
     matches,

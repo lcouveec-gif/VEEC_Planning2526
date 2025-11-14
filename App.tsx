@@ -3,11 +3,13 @@ import Header from './components/Header';
 import FilterControls from './components/FilterControls';
 import ScheduleGrid from './components/ScheduleGrid';
 import MatchSchedule from './components/MatchSchedule';
+import PositionTracker from './components/PositionTracker';
+import Admin from './components/Admin';
 import { useTrainingSessions } from './hooks/useTrainingSessions';
 import type { TrainingSession } from './types';
 import { GYMS, DAYS } from './constants';
 
-type PageType = 'training' | 'matches';
+type PageType = 'training' | 'matches' | 'position' | 'admin';
 
 // For PDF export libraries from CDN
 declare const html2canvas: any;
@@ -235,8 +237,12 @@ const App: React.FC = () => {
             </>
           )}
         </main>
-      ) : (
+      ) : currentPage === 'matches' ? (
         <MatchSchedule />
+      ) : currentPage === 'position' ? (
+        <PositionTracker />
+      ) : (
+        <Admin />
       )}
     </div>
   );

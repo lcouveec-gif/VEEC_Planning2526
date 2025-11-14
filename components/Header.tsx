@@ -5,7 +5,7 @@ import ThemeSwitcher from './ThemeSwitcher';
 import { PdfIcon, SpinnerIcon, BellIcon } from './icons/ThemeIcons';
 import Logo from './Logo';
 
-type PageType = 'training' | 'matches';
+type PageType = 'training' | 'matches' | 'position' | 'admin';
 
 interface HeaderProps {
   theme: 'dark' | 'light';
@@ -55,10 +55,6 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                   <span className="sm:hidden">VEEC</span>
                   <span className="hidden sm:inline">FS VAL D'EUROPE ESBLY COUPVRAY VOLLEYBALL</span>
                 </h1>
-                {/* Sous-titre uniquement sur desktop */}
-                <p className="hidden sm:block text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                  {currentPage === 'training' ? 'Planning des entraînements Saison 25-26' : 'Planning des matchs Saison 25-26'}
-                </p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -68,7 +64,12 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary hover:opacity-90 transition-all"
               >
-                <span>{currentPage === 'training' ? 'Entraînements' : 'Matchs'}</span>
+                <span>
+                  {currentPage === 'training' ? 'Entraînements' :
+                   currentPage === 'matches' ? 'Matchs' :
+                   currentPage === 'position' ? 'Position' :
+                   'Admin'}
+                </span>
                 <svg
                   className={`w-4 h-4 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`}
                   fill="none"
@@ -83,6 +84,16 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
               {isMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden z-20">
                   <button
+                    onClick={() => handlePageChange('training')}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                      currentPage === 'training'
+                        ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Entraînements
+                  </button>
+                  <button
                     onClick={() => handlePageChange('matches')}
                     className={`w-full text-left px-4 py-3 text-sm transition-colors ${
                       currentPage === 'matches'
@@ -93,14 +104,24 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                     Matchs
                   </button>
                   <button
-                    onClick={() => handlePageChange('training')}
+                    onClick={() => handlePageChange('position')}
                     className={`w-full text-left px-4 py-3 text-sm transition-colors ${
-                      currentPage === 'training'
+                      currentPage === 'position'
                         ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
                   >
-                    Entraînements
+                    Position
+                  </button>
+                  <button
+                    onClick={() => handlePageChange('admin')}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                      currentPage === 'admin'
+                        ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Admin
                   </button>
                 </div>
               )}
