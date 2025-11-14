@@ -1,0 +1,500 @@
+import React, { useState, useEffect } from 'react';
+import { useLicencies } from '../../hooks/useLicencies';
+import { useMatchPositions } from '../../hooks/useMatchPositions';
+import { useCollectifs, type CollectifPlayer } from '../../hooks/useCollectifs';
+import type { Match, Player, PlayerPosition, Licencie } from '../../types';
+
+interface PlayerRosterProps {
+  match: Match;
+  onRosterComplete: (players: Player[]) => void;
+  onBack: () => void;
+}
+
+const PLAYER_POSITIONS: PlayerPosition[] = ['Passeur', 'Libéro', 'R4', 'Pointu', 'Central'];
+
+type PlayerSource = 'collectif' | 'all';
+
+const PlayerRoster: React.FC<PlayerRosterProps> = ({ match, onRosterComplete, onBack }) => {
+  const { licencies, loading: loadingLicencies, error: errorLicencies } = useLicencies();
+  const { loading: loadingSave, error: errorSave, getMatchPosition, saveMatchPosition, deleteMatchPosition } = useMatchPositions();
+  const { getTeamPlayers, loading: loadingCollectif } = useCollectifs();
+
+  const [players, setPlayers] = useState<Player[]>(
+    Array.from({ length: 12 }, (_, i) => ({
+      prenom: '',
+      nom: '',
+      numero_licence: '',
+      numero_maillot: i + 1, // Numéro par défaut de 1 à 12
+      defaultPosition: 'Central' as PlayerPosition,
+    }))
+  );
+  const [hasLoadedData, setHasLoadedData] = useState<boolean>(false);
+  const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [playerSource, setPlayerSource] = useState<PlayerSource>('collectif');
+  const [collectifPlayers, setCollectifPlayers] = useState<CollectifPlayer[]>([]);
+
+  // Charger le collectif de l'équipe
+  useEffect(() => {
+    const loadCollectif = async () => {
+      const isHome = match.EQA_no === '0775819';
+      const teamId = isHome ? match.EQA_no : match.EQB_no;
+
+      if (teamId) {
+        const collectif = await getTeamPlayers(teamId);
+        setCollectifPlayers(collectif);
+      }
+    };
+
+    loadCollectif();
+  }, [match.EQA_no, match.EQB_no, getTeamPlayers]);
+
+  // Charger la composition existante au montage du composant
+  useEffect(() => {
+    const loadExistingPosition = async () => {
+      if (!match.id || hasLoadedData) return;
+
+      const existingData = await getMatchPosition(match.id);
+      if (existingData && existingData.players.length > 0) {
+        // Restaurer les joueurs sauvegardés
+        const savedPlayers = [...existingData.players];
+        // Compléter avec des joueurs vides jusqu'à 12
+        while (savedPlayers.length < 12) {
+          savedPlayers.push({
+            prenom: '',
+            nom: '',
+            numero_licence: '',
+            numero_maillot: savedPlayers.length + 1,
+            defaultPosition: 'Central' as PlayerPosition,
+          });
+        }
+        setPlayers(savedPlayers);
+        setHasLoadedData(true);
+      }
+    };
+
+    loadExistingPosition();
+  }, [match.id, getMatchPosition, hasLoadedData]);
+
+  // Fonction pour formater l'affichage dans la liste de sélection : Nom - Prénom - Catégorie - Numéro licence
+  const formatPlayerListDisplay = (licencie: Licencie): string => {
+    const parts: string[] = [];
+
+    if (licencie.Nom_Licencie?.trim()) {
+      parts.push(licencie.Nom_Licencie.trim());
+    }
+
+    if (licencie.Prenom_Licencie?.trim()) {
+      parts.push(licencie.Prenom_Licencie.trim());
+    }
+
+    if (licencie.Categorie_licencie?.trim()) {
+      parts.push(licencie.Categorie_licencie.trim());
+    }
+
+    // Num_Licencie peut être un nombre ou une string
+    if (licencie.Num_Licencie) {
+      const numLicence = String(licencie.Num_Licencie).trim();
+      if (numLicence) {
+        parts.push(`(${numLicence})`);
+      }
+    }
+
+    return parts.join(' - ');
+  };
+
+  const handleSelectPlayer = (index: number, licencieId: string) => {
+    if (licencieId === '') {
+      setEditingIndex(null);
+      return;
+    }
+
+    const licencie = licencies.find(l => l.id === licencieId);
+    if (!licencie) return;
+
+    const updatedPlayers = [...players];
+    const currentPlayer = updatedPlayers[index];
+
+    // Chercher le joueur dans le collectif pour récupérer son poste
+    const collectifInfo = collectifPlayers.find(cp => cp.licencie_id === licencieId);
+
+    updatedPlayers[index] = {
+      prenom: licencie.Prenom_Licencie,
+      nom: licencie.Nom_Licencie || '',
+      numero_licence: licencie.Num_Licencie ? String(licencie.Num_Licencie) : '',
+      numero_maillot: collectifInfo?.numero_maillot || currentPlayer.numero_maillot,
+      licencieId: licencie.id,
+      defaultPosition: collectifInfo?.poste || 'Central',
+    };
+
+    setPlayers(updatedPlayers);
+    setEditingIndex(null);
+  };
+
+  const handleManualInput = (index: number, field: keyof Player, value: string | number) => {
+    const updatedPlayers = [...players];
+    if (field === 'defaultPosition') {
+      updatedPlayers[index][field] = value as PlayerPosition;
+    } else if (field === 'numero_maillot') {
+      updatedPlayers[index][field] = Number(value);
+    } else {
+      // Retirer l'association au licencié si on modifie manuellement
+      updatedPlayers[index] = {
+        ...updatedPlayers[index],
+        [field]: value,
+        licencieId: undefined,
+      };
+    }
+    setPlayers(updatedPlayers);
+  };
+
+  const handleSave = async () => {
+    // Validation : au moins 6 joueurs avec prénom
+    const filledPlayers = players.filter(p => p.prenom.trim() !== '');
+
+    if (filledPlayers.length < 6) {
+      alert('Vous devez renseigner au minimum 6 joueurs pour sauvegarder.');
+      return;
+    }
+
+    // Déterminer l'ID de l'équipe et la date du match
+    const isHome = match.EQA_no === '0775819';
+    const teamId = isHome ? match.EQA_no : match.EQB_no;
+    const matchDate = match.Date || new Date().toISOString();
+
+    // Préparer les données à sauvegarder (avec setLineups vide pour cette étape)
+    const matchPositionData = {
+      matchId: match.id,
+      teamId: teamId,
+      startDate: matchDate,
+      players: filledPlayers,
+      setLineups: [], // Pas encore de positions par set
+    };
+
+    // Sauvegarder dans Supabase
+    const success = await saveMatchPosition(matchPositionData);
+
+    if (success) {
+      alert('Liste des joueurs sauvegardée avec succès !');
+    } else {
+      alert(`Erreur lors de la sauvegarde : ${errorSave || 'Erreur inconnue'}`);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validation : seul le prénom est obligatoire
+    const filledPlayers = players.filter(p => p.prenom.trim() !== '');
+
+    if (filledPlayers.length < 6) {
+      alert('Vous devez renseigner au minimum 6 joueurs pour continuer.');
+      return;
+    }
+
+    onRosterComplete(filledPlayers);
+  };
+
+  const handleResetClick = () => {
+    setShowResetConfirm(true);
+  };
+
+  const handleResetConfirm = async () => {
+    if (!match.id) {
+      setShowResetConfirm(false);
+      return;
+    }
+
+    const success = await deleteMatchPosition(match.id);
+
+    if (success) {
+      // Réinitialiser l'état local
+      setPlayers(
+        Array.from({ length: 12 }, (_, i) => ({
+          prenom: '',
+          nom: '',
+          numero_licence: '',
+          numero_maillot: i + 1,
+          defaultPosition: 'Central' as PlayerPosition,
+        }))
+      );
+      setHasLoadedData(false);
+      alert('Composition et positions supprimées avec succès !');
+    } else {
+      alert('Erreur lors de la suppression.');
+    }
+
+    setShowResetConfirm(false);
+  };
+
+  const handleResetCancel = () => {
+    setShowResetConfirm(false);
+  };
+
+  const isHome = match.EQA_no === '0775819';
+  const teamName = isHome ? match.EQA_nom : match.EQB_nom;
+  const opponentName = isHome ? match.EQB_nom : match.EQA_nom;
+
+  return (
+    <div className="max-w-6xl mx-auto">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-light-onSurface dark:text-dark-onSurface mb-2">
+          Composition de l'équipe
+        </h2>
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="font-medium text-lg mb-1">
+            {teamName} vs {opponentName}
+          </div>
+          <div>
+            {match.Date ? new Date(match.Date).toLocaleDateString('fr-FR') : ''}
+            {match.Heure && ` • ${match.Heure}`}
+          </div>
+        </div>
+        {hasLoadedData && (
+          <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
+            <p className="text-sm text-blue-600 dark:text-blue-400">
+              ℹ️ Composition existante chargée depuis la base de données
+            </p>
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <div className="bg-light-surface dark:bg-dark-surface rounded-lg p-6 shadow-md">
+          {errorLicencies && (
+            <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+              <p className="text-sm text-orange-600 dark:text-orange-400">
+                ⚠️ Impossible de charger la liste des licenciés : {errorLicencies}
+              </p>
+              <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                Vous pouvez toujours saisir manuellement les joueurs.
+              </p>
+            </div>
+          )}
+          <div className="mb-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Renseignez les joueurs du match (minimum 6, maximum 12).
+              <span className="text-red-500 font-medium"> Seul le prénom est obligatoire.</span>
+            </p>
+            {!errorLicencies && licencies.length === 0 && !loadingLicencies && (
+              <p className="text-sm text-orange-600 dark:text-orange-400 mt-2">
+                ℹ️ Aucun licencié trouvé dans la base de données.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {players.map((player, index) => (
+              <div
+                key={index}
+                className="grid grid-cols-1 md:grid-cols-12 gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+              >
+                {/* Sélection rapide d'un licencié */}
+                <div className="md:col-span-5">
+                  <label className="block text-xs font-medium mb-1">
+                    Sélection rapide (licencié) {index === 0 && <span className="text-red-500">*</span>}
+                  </label>
+                  <select
+                    value={player.licencieId || ''}
+                    onChange={(e) => handleLicencieSelect(index, e.target.value)}
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary focus:border-transparent text-sm"
+                    disabled={loadingLicencies || errorLicencies !== null}
+                  >
+                    <option value="">-- Sélectionner ou saisir --</option>
+                    {licencies.map((licencie) => (
+                      <option key={licencie.id} value={licencie.id}>
+                        {formatPlayerListDisplay(licencie)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* N° Maillot */}
+                <div className="md:col-span-1">
+                  <label className="block text-xs font-medium mb-1">N° Maillot</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="99"
+                    value={player.numero_maillot}
+                    onChange={(e) => handleManualInput(index, 'numero_maillot', e.target.value)}
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary focus:border-transparent text-sm"
+                  />
+                </div>
+
+                {/* Prénom */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium mb-1">
+                    Prénom <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={player.prenom}
+                    onChange={(e) => handleManualInput(index, 'prenom', e.target.value)}
+                    placeholder="Prénom"
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary focus:border-transparent text-sm"
+                  />
+                </div>
+
+                {/* Nom */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium mb-1">Nom</label>
+                  <input
+                    type="text"
+                    value={player.nom || ''}
+                    onChange={(e) => handleManualInput(index, 'nom', e.target.value)}
+                    placeholder="Nom"
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary focus:border-transparent text-sm"
+                  />
+                </div>
+
+                {/* Numéro de licence */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium mb-1">N° Licence</label>
+                  <input
+                    type="text"
+                    value={player.numero_licence || ''}
+                    onChange={(e) => handleManualInput(index, 'numero_licence', e.target.value)}
+                    placeholder="N° Licence"
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary focus:border-transparent text-sm"
+                  />
+                </div>
+
+                {/* Poste - prend toute la largeur sur une nouvelle ligne */}
+                <div className="md:col-span-12">
+                  <label className="block text-xs font-medium mb-1">Poste par défaut</label>
+                  <select
+                    value={player.defaultPosition}
+                    onChange={(e) => handleManualInput(index, 'defaultPosition', e.target.value)}
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary focus:border-transparent text-sm"
+                    required={player.prenom.trim() !== ''}
+                  >
+                    {PLAYER_POSITIONS.map((position) => (
+                      <option key={position} value={position}>
+                        {position}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={onBack}
+                disabled={loadingSave}
+                className="px-6 py-2.5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                ← Retour
+              </button>
+
+              {hasLoadedData && (
+                <button
+                  type="button"
+                  onClick={handleResetClick}
+                  disabled={loadingSave}
+                  className="px-6 py-2.5 rounded-md bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Reset
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                {players.filter(p => p.prenom.trim() !== '').length} joueur(s) renseigné(s)
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={loadingSave}
+                className="px-6 py-2.5 rounded-md bg-green-600 dark:bg-green-700 text-white hover:bg-green-700 dark:hover:bg-green-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {loadingSave ? (
+                  <>
+                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Sauvegarde...
+                  </>
+                ) : (
+                  'Sauvegarder'
+                )}
+              </button>
+
+              <button
+                type="submit"
+                disabled={loadingSave}
+                className="px-6 py-2.5 rounded-md bg-light-primary dark:bg-dark-primary text-white hover:opacity-90 transition-opacity font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Continuer →
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      {/* Modale de confirmation de suppression */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
+                  Confirmer la suppression
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Êtes-vous sûr de vouloir supprimer la composition d'équipe et toutes les positions de sets associées à ce match ?
+                </p>
+                <p className="text-sm text-red-600 dark:text-red-400 mt-2 font-medium">
+                  ⚠️ Cette action est irréversible.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={handleResetCancel}
+                disabled={loadingSave}
+                className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleResetConfirm}
+                disabled={loadingSave}
+                className="px-4 py-2 rounded-md bg-red-600 dark:bg-red-700 text-white hover:bg-red-700 dark:hover:bg-red-600 transition-colors font-medium disabled:opacity-50 flex items-center gap-2"
+              >
+                {loadingSave ? (
+                  <>
+                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Suppression...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Supprimer définitivement
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PlayerRoster;
