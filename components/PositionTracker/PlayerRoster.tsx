@@ -520,11 +520,20 @@ const PlayerRoster: React.FC<PlayerRosterProps> = ({ match, onRosterComplete, on
                           <>
                             <div className="flex items-center gap-2">
                               <PlayerNumberBadge numero={player.numero_maillot} size="sm" position={player.defaultPosition} />
-                              <span className="font-medium text-sm">
-                                {player.nom} {player.prenom}
-                              </span>
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium text-sm">
+                                  {player.nom} {player.prenom}
+                                </span>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">{player.defaultPosition}</span>
+                                  {player.numero_licence && (
+                                    <span className="text-xs px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium">
+                                      Lic: {player.numero_licence}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">{player.defaultPosition}</div>
                           </>
                         )}
                       </div>
