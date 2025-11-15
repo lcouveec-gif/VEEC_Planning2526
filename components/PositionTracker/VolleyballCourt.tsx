@@ -357,6 +357,15 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
     const isSelected = selectedPlayer && isSamePlayer(selectedPlayer, player);
     const canReceivePlayer = selectedPlayer && !isSamePlayer(selectedPlayer, player) && position !== undefined;
 
+    const handleCardClick = (e: React.MouseEvent) => {
+      // Si un joueur est sélectionné et qu'on clique sur une autre position
+      if (canReceivePlayer) {
+        e.preventDefault();
+        e.stopPropagation();
+        handlePlaceSelectedPlayer(position!);
+      }
+    };
+
     return (
       <div
         draggable
@@ -368,11 +377,12 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
         onTouchMove={handleTouchMove}
         onTouchEnd={(e) => handleTouchEnd(e, player, position)}
         onTouchCancel={handleTouchCancel}
+        onClick={handleCardClick}
         className={`relative group bg-white dark:bg-gray-700 border-2 rounded-lg p-3 cursor-move hover:shadow-lg transition-all flex flex-col items-center justify-center min-h-[80px] ${
           isSelected
             ? 'border-blue-500 dark:border-blue-400 shadow-lg ring-2 ring-blue-300 dark:ring-blue-600'
             : canReceivePlayer
-            ? 'border-green-400 dark:border-green-500 animate-pulse'
+            ? 'border-green-400 dark:border-green-500 animate-pulse cursor-pointer'
             : 'border-gray-300 dark:border-gray-600'
         }`}
       >
@@ -380,6 +390,11 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
           <button
             onClick={(e) => {
               e.stopPropagation();
+              handleRemovePlayer(player);
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
               handleRemovePlayer(player);
             }}
             className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10"
@@ -391,6 +406,11 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
           <button
             onClick={(e) => {
               e.stopPropagation();
+              handlePlaceSelectedPlayer('Bench');
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
               handlePlaceSelectedPlayer('Bench');
             }}
             className="absolute -top-2 -right-2 bg-orange-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold z-10 shadow-lg"

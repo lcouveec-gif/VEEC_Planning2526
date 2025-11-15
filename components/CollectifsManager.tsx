@@ -267,9 +267,11 @@ const CollectifsManager: React.FC = () => {
                             {playerInfo.licencie!.Nom_Licencie} {playerInfo.licencie!.Prenom_Licencie}
                           </p>
                           {playerInfo.licencie!.Num_Licencie && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              Licence: {playerInfo.licencie!.Num_Licencie}
-                            </p>
+                            <div className="mt-1">
+                              <span className="inline-block px-3 py-1 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-base font-semibold">
+                                Licence: {playerInfo.licencie!.Num_Licencie}
+                              </span>
+                            </div>
                           )}
 
                           {isEditing ? (
