@@ -24,6 +24,62 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null);
 
+  // Rotation visuelle du terrain (0 = normal, 90 = quart de tour droite, 180 = demi-tour, 270 = quart de tour gauche)
+  const [visualRotation, setVisualRotation] = useState<0 | 90 | 180 | 270>(0);
+
+  const rotateVisualRight = () => {
+    setVisualRotation((prev) => ((prev + 90) % 360) as 0 | 90 | 180 | 270);
+  };
+
+  const rotateVisualLeft = () => {
+    setVisualRotation((prev) => ((prev + 270) % 360) as 0 | 90 | 180 | 270);
+  };
+
+  // Rotation des joueurs selon les règles du volley
+  const rotatePlayersClockwise = () => {
+    // +1: P2->P1, P1->P6, P6->P5, P5->P4, P4->P3, P3->P2
+    const rotationMap: { [key: number]: number } = {
+      2: 1,
+      1: 6,
+      6: 5,
+      5: 4,
+      4: 3,
+      3: 2
+    };
+
+    const newLineup = currentLineup.map(cp => {
+      if (typeof cp.position === 'number') {
+        const newPosition = rotationMap[cp.position];
+        return { ...cp, position: newPosition as CourtPosition };
+      }
+      return cp;
+    });
+
+    onLineupChange(newLineup);
+  };
+
+  const rotatePlayersCounterClockwise = () => {
+    // -1: P1->P2, P2->P3, P3->P4, P4->P5, P5->P6, P6->P1
+    const rotationMap: { [key: number]: number } = {
+      1: 2,
+      2: 3,
+      3: 4,
+      4: 5,
+      5: 6,
+      6: 1
+    };
+
+    const newLineup = currentLineup.map(cp => {
+      if (typeof cp.position === 'number') {
+        const newPosition = rotationMap[cp.position];
+        return { ...cp, position: newPosition as CourtPosition };
+      }
+      return cp;
+    });
+
+    onLineupChange(newLineup);
+  };
+
   // Obtenir le joueur à une position donnée
   const getPlayerAtPosition = (position: CourtPosition): Player | undefined => {
     const courtPlayer = currentLineup.find(cp => cp.position === position);
@@ -223,11 +279,17 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
   }, [contextMenu]);
 
   // Gestionnaires tactiles pour iOS
-  const handleTouchStart = (e: React.TouchEvent, player: Player) => {
+  const handleTouchStart = (e: React.TouchEvent, player: Player, position?: CourtPosition) => {
     const touch = e.touches[0];
     setTouchStartPos({ x: touch.clientX, y: touch.clientY });
 
-    // Appui long de 500ms pour sélectionner
+    // Si un joueur est déjà sélectionné et qu'on tape sur une position
+    if (selectedPlayer && !isSamePlayer(selectedPlayer, player) && position !== undefined) {
+      // C'est un tap pour placer, pas besoin d'appui long
+      return;
+    }
+
+    // Appui long de 500ms pour sélectionner un nouveau joueur
     touchTimerRef.current = setTimeout(() => {
       setSelectedPlayer(player);
       // Vibration tactile si supportée
@@ -251,11 +313,27 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e: React.TouchEvent, player?: Player, position?: CourtPosition) => {
+    // Nettoyer le timer d'appui long
     if (touchTimerRef.current) {
       clearTimeout(touchTimerRef.current);
       touchTimerRef.current = null;
     }
+
+    // Si un joueur est sélectionné et qu'on tape sur une position différente
+    if (selectedPlayer && player && !isSamePlayer(selectedPlayer, player) && position !== undefined && touchStartPos) {
+      const touch = e.changedTouches[0];
+      const deltaX = Math.abs(touch.clientX - touchStartPos.x);
+      const deltaY = Math.abs(touch.clientY - touchStartPos.y);
+
+      // Si le doigt n'a pas bougé (tap simple)
+      if (deltaX < 10 && deltaY < 10) {
+        e.preventDefault();
+        e.stopPropagation();
+        handlePlaceSelectedPlayer(position);
+      }
+    }
+
     setTouchStartPos(null);
   };
 
@@ -335,6 +413,42 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
     const isSelected = selectedPlayer && isSamePlayer(selectedPlayer, player);
     const canReceivePlayer = selectedPlayer && !isSamePlayer(selectedPlayer, player) && position !== undefined;
 
+    const handleCardClick = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Si un joueur est sélectionné et qu'on clique sur une autre position
+      if (canReceivePlayer) {
+        handlePlaceSelectedPlayer(position!);
+      } else if (!isSelected) {
+        // Si aucun joueur sélectionné ou si on clique sur un autre joueur, sélectionner celui-ci
+        setSelectedPlayer(player);
+      } else if (isSelected) {
+        // Si on reclique sur le joueur déjà sélectionné, le désélectionner
+        setSelectedPlayer(null);
+      }
+    };
+
+    const handleCardTouchEnd = (e: React.TouchEvent) => {
+      // Gérer le touchEnd de la carte elle-même pour les échanges
+      if (canReceivePlayer && touchStartPos) {
+        const touch = e.changedTouches[0];
+        const deltaX = Math.abs(touch.clientX - touchStartPos.x);
+        const deltaY = Math.abs(touch.clientY - touchStartPos.y);
+
+        // Si le doigt n'a pas bougé (tap simple)
+        if (deltaX < 10 && deltaY < 10) {
+          e.preventDefault();
+          e.stopPropagation();
+          handlePlaceSelectedPlayer(position!);
+          return;
+        }
+      }
+
+      // Sinon, appeler le handleTouchEnd normal
+      handleTouchEnd(e, player, position);
+    };
+
     return (
       <div
         draggable
@@ -342,16 +456,16 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
         onDragOver={position !== undefined ? handleDragOver : undefined}
         onDrop={position !== undefined ? (e) => handleDrop(e, position) : undefined}
         onContextMenu={position !== undefined ? (e) => handleContextMenu(e, position, player) : undefined}
-        onTouchStart={(e) => handleTouchStart(e, player)}
+        onTouchStart={(e) => handleTouchStart(e, player, position)}
         onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onTouchEnd={handleCardTouchEnd}
         onTouchCancel={handleTouchCancel}
-        onClick={canReceivePlayer ? () => handlePlaceSelectedPlayer(position!) : undefined}
+        onClick={handleCardClick}
         className={`relative group bg-white dark:bg-gray-700 border-2 rounded-lg p-3 cursor-move hover:shadow-lg transition-all flex flex-col items-center justify-center min-h-[80px] ${
           isSelected
             ? 'border-blue-500 dark:border-blue-400 shadow-lg ring-2 ring-blue-300 dark:ring-blue-600'
             : canReceivePlayer
-            ? 'border-green-400 dark:border-green-500 animate-pulse'
+            ? 'border-green-400 dark:border-green-500 animate-pulse cursor-pointer'
             : 'border-gray-300 dark:border-gray-600'
         }`}
       >
@@ -361,9 +475,31 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
               e.stopPropagation();
               handleRemovePlayer(player);
             }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              handleRemovePlayer(player);
+            }}
             className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10"
           >
             ×
+          </button>
+        )}
+        {isSelected && position !== undefined && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePlaceSelectedPlayer('Bench');
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              handlePlaceSelectedPlayer('Bench');
+            }}
+            className="absolute -top-2 -right-2 bg-orange-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold z-10 shadow-lg"
+            title="Remettre sur le banc"
+          >
+            🔄
           </button>
         )}
         {canReceivePlayer && (
@@ -406,7 +542,7 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
         )}
         <div className="text-lg font-bold text-gray-400 dark:text-gray-500">{label}</div>
         <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-          {canReceivePlayer ? 'Tap pour placer' : 'Tap ou clic droit'}
+          {canReceivePlayer ? 'Cliquez pour placer' : 'Clic ou clic droit'}
         </div>
       </div>
     );
@@ -419,10 +555,10 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
 
   return (
     <div className="space-y-6">
-      {/* Indicateur de joueur sélectionné (pour tactile) */}
+      {/* Indicateur de joueur sélectionné */}
       {selectedPlayer && (
         <div className="bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-500 dark:border-blue-400 rounded-lg p-4 shadow-lg">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3">
               <PlayerNumberBadge numero={selectedPlayer.numero_maillot} size="md" position={selectedPlayer.defaultPosition} />
               <div>
@@ -430,16 +566,30 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
                   {formatPlayerDisplay(selectedPlayer)}
                 </div>
                 <div className="text-sm text-blue-700 dark:text-blue-300">
-                  Tap sur une position pour placer
+                  Cliquez sur une position pour placer ou échanger
                 </div>
               </div>
             </div>
-            <button
-              onClick={() => setSelectedPlayer(null)}
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
-            >
-              Annuler
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Vérifier si le joueur est sur le terrain */}
+              {currentLineup.find(cp => isSamePlayer(cp.player, selectedPlayer) && cp.position !== 'Bench') && (
+                <button
+                  onClick={() => {
+                    handlePlaceSelectedPlayer('Bench');
+                  }}
+                  className="px-3 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors font-medium text-sm"
+                  title="Remettre sur le banc"
+                >
+                  🔄 Banc
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedPlayer(null)}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+              >
+                Annuler
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -470,74 +620,172 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
         {/* Terrain de volley */}
         <div className="lg:col-span-2">
           <div className="bg-light-surface dark:bg-dark-surface rounded-lg p-6 shadow-md">
-            <h3 className="text-lg font-semibold mb-4">Terrain</h3>
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+              <h3 className="text-lg font-semibold">Terrain</h3>
 
-            {/* Filet */}
-            <div className="mb-4">
-              <div className="h-2 bg-gray-800 dark:bg-gray-300 rounded-full relative">
-                <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-300 px-2 py-0.5 rounded text-xs text-white dark:text-gray-800 font-bold">
-                  FILET
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Rotation visuelle du terrain */}
+                <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 rounded-md">
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Vue:</span>
+                  <button
+                    onClick={rotateVisualLeft}
+                    className="p-1.5 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-lg"
+                    title="Tourner la vue à gauche"
+                  >
+                    ↶
+                  </button>
+                  <button
+                    onClick={rotateVisualRight}
+                    className="p-1.5 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-lg"
+                    title="Tourner la vue à droite"
+                  >
+                    ↷
+                  </button>
+                </div>
+
+                {/* Rotation des joueurs */}
+                <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-md">
+                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Rotation:</span>
+                  <button
+                    onClick={rotatePlayersCounterClockwise}
+                    className="px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors text-sm font-bold"
+                    title="Rotation -1 (sens anti-horaire)"
+                  >
+                    -1
+                  </button>
+                  <button
+                    onClick={rotatePlayersClockwise}
+                    className="px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors text-sm font-bold"
+                    title="Rotation +1 (sens horaire)"
+                  >
+                    +1
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* Positions avant (4, 3, 2) */}
-            <div className="mb-4">
-              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">
-                AVANT
+            {/* Affichage du terrain en fonction de la rotation */}
+            {visualRotation === 0 ? (
+              // Rotation 0° : Filet en haut, Avant en haut, Arrière en bas
+              <>
+                {/* Filet horizontal en haut */}
+                <div className="mb-4">
+                  <div className="h-2 bg-gray-800 dark:bg-gray-300 rounded-full relative">
+                    <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-300 px-2 py-0.5 rounded text-xs text-white dark:text-gray-800 font-bold">
+                      FILET
+                    </div>
+                  </div>
+                </div>
+
+                {/* AVANT en haut (P4, P3, P2) */}
+                <div className="mb-4">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">AVANT</div>
+                  <div className="grid grid-cols-3 gap-4">
+                    {getPlayerAtPosition(4) ? <PlayerCard player={getPlayerAtPosition(4)!} canRemove position={4} /> : <EmptyPosition position={4} label="P4" />}
+                    {getPlayerAtPosition(3) ? <PlayerCard player={getPlayerAtPosition(3)!} canRemove position={3} /> : <EmptyPosition position={3} label="P3" />}
+                    {getPlayerAtPosition(2) ? <PlayerCard player={getPlayerAtPosition(2)!} canRemove position={2} /> : <EmptyPosition position={2} label="P2" />}
+                  </div>
+                </div>
+
+                {/* ARRIÈRE en bas (P5, P6, P1) */}
+                <div>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">ARRIÈRE</div>
+                  <div className="grid grid-cols-3 gap-4">
+                    {getPlayerAtPosition(5) ? <PlayerCard player={getPlayerAtPosition(5)!} canRemove position={5} /> : <EmptyPosition position={5} label="P5" />}
+                    {getPlayerAtPosition(6) ? <PlayerCard player={getPlayerAtPosition(6)!} canRemove position={6} /> : <EmptyPosition position={6} label="P6" />}
+                    {getPlayerAtPosition(1) ? <PlayerCard player={getPlayerAtPosition(1)!} canRemove position={1} /> : <EmptyPosition position={1} label="P1" />}
+                  </div>
+                </div>
+              </>
+            ) : visualRotation === 90 ? (
+              // Rotation 90° : Filet vertical à gauche, Avant à gauche, Arrière à droite
+              <div className="flex gap-4">
+                {/* Filet vertical à gauche */}
+                <div className="flex flex-col items-center justify-center px-2">
+                  <div className="h-full w-2 bg-gray-800 dark:bg-gray-300 rounded-full relative flex items-center justify-center">
+                    <div className="absolute transform -rotate-90 bg-gray-800 dark:bg-gray-300 px-2 py-0.5 rounded text-xs text-white dark:text-gray-800 font-bold whitespace-nowrap">
+                      FILET
+                    </div>
+                  </div>
+                </div>
+
+                {/* AVANT à gauche */}
+                <div className="flex-1 space-y-4">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">AVANT</div>
+                  {getPlayerAtPosition(4) ? <PlayerCard player={getPlayerAtPosition(4)!} canRemove position={4} /> : <EmptyPosition position={4} label="P4" />}
+                  {getPlayerAtPosition(3) ? <PlayerCard player={getPlayerAtPosition(3)!} canRemove position={3} /> : <EmptyPosition position={3} label="P3" />}
+                  {getPlayerAtPosition(2) ? <PlayerCard player={getPlayerAtPosition(2)!} canRemove position={2} /> : <EmptyPosition position={2} label="P2" />}
+                </div>
+
+                {/* ARRIÈRE à droite */}
+                <div className="flex-1 space-y-4">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">ARRIÈRE</div>
+                  {getPlayerAtPosition(5) ? <PlayerCard player={getPlayerAtPosition(5)!} canRemove position={5} /> : <EmptyPosition position={5} label="P5" />}
+                  {getPlayerAtPosition(6) ? <PlayerCard player={getPlayerAtPosition(6)!} canRemove position={6} /> : <EmptyPosition position={6} label="P6" />}
+                  {getPlayerAtPosition(1) ? <PlayerCard player={getPlayerAtPosition(1)!} canRemove position={1} /> : <EmptyPosition position={1} label="P1" />}
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                {/* Position 4 (avant gauche) */}
-                {getPlayerAtPosition(4) ? (
-                  <PlayerCard player={getPlayerAtPosition(4)!} canRemove position={4} />
-                ) : (
-                  <EmptyPosition position={4} label="P4" />
-                )}
+            ) : visualRotation === 180 ? (
+              // Rotation 180° : Arrière en haut, Avant en bas, Filet en bas
+              <>
+                {/* ARRIÈRE en haut (P5, P6, P1) */}
+                <div className="mb-4">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">ARRIÈRE</div>
+                  <div className="grid grid-cols-3 gap-4">
+                    {getPlayerAtPosition(5) ? <PlayerCard player={getPlayerAtPosition(5)!} canRemove position={5} /> : <EmptyPosition position={5} label="P5" />}
+                    {getPlayerAtPosition(6) ? <PlayerCard player={getPlayerAtPosition(6)!} canRemove position={6} /> : <EmptyPosition position={6} label="P6" />}
+                    {getPlayerAtPosition(1) ? <PlayerCard player={getPlayerAtPosition(1)!} canRemove position={1} /> : <EmptyPosition position={1} label="P1" />}
+                  </div>
+                </div>
 
-                {/* Position 3 (centre avant) */}
-                {getPlayerAtPosition(3) ? (
-                  <PlayerCard player={getPlayerAtPosition(3)!} canRemove position={3} />
-                ) : (
-                  <EmptyPosition position={3} label="P3" />
-                )}
+                {/* AVANT en bas (P4, P3, P2) */}
+                <div className="mb-4">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">AVANT</div>
+                  <div className="grid grid-cols-3 gap-4">
+                    {getPlayerAtPosition(4) ? <PlayerCard player={getPlayerAtPosition(4)!} canRemove position={4} /> : <EmptyPosition position={4} label="P4" />}
+                    {getPlayerAtPosition(3) ? <PlayerCard player={getPlayerAtPosition(3)!} canRemove position={3} /> : <EmptyPosition position={3} label="P3" />}
+                    {getPlayerAtPosition(2) ? <PlayerCard player={getPlayerAtPosition(2)!} canRemove position={2} /> : <EmptyPosition position={2} label="P2" />}
+                  </div>
+                </div>
 
-                {/* Position 2 (avant droit) */}
-                {getPlayerAtPosition(2) ? (
-                  <PlayerCard player={getPlayerAtPosition(2)!} canRemove position={2} />
-                ) : (
-                  <EmptyPosition position={2} label="P2" />
-                )}
+                {/* Filet horizontal en bas */}
+                <div>
+                  <div className="h-2 bg-gray-800 dark:bg-gray-300 rounded-full relative">
+                    <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-300 px-2 py-0.5 rounded text-xs text-white dark:text-gray-800 font-bold">
+                      FILET
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              // Rotation 270° : Arrière à gauche, Avant à droite, Filet vertical à droite
+              <div className="flex gap-4">
+                {/* ARRIÈRE à gauche */}
+                <div className="flex-1 space-y-4">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">ARRIÈRE</div>
+                  {getPlayerAtPosition(5) ? <PlayerCard player={getPlayerAtPosition(5)!} canRemove position={5} /> : <EmptyPosition position={5} label="P5" />}
+                  {getPlayerAtPosition(6) ? <PlayerCard player={getPlayerAtPosition(6)!} canRemove position={6} /> : <EmptyPosition position={6} label="P6" />}
+                  {getPlayerAtPosition(1) ? <PlayerCard player={getPlayerAtPosition(1)!} canRemove position={1} /> : <EmptyPosition position={1} label="P1" />}
+                </div>
+
+                {/* AVANT à droite */}
+                <div className="flex-1 space-y-4">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">AVANT</div>
+                  {getPlayerAtPosition(4) ? <PlayerCard player={getPlayerAtPosition(4)!} canRemove position={4} /> : <EmptyPosition position={4} label="P4" />}
+                  {getPlayerAtPosition(3) ? <PlayerCard player={getPlayerAtPosition(3)!} canRemove position={3} /> : <EmptyPosition position={3} label="P3" />}
+                  {getPlayerAtPosition(2) ? <PlayerCard player={getPlayerAtPosition(2)!} canRemove position={2} /> : <EmptyPosition position={2} label="P2" />}
+                </div>
+
+                {/* Filet vertical à droite */}
+                <div className="flex flex-col items-center justify-center px-2">
+                  <div className="h-full w-2 bg-gray-800 dark:bg-gray-300 rounded-full relative flex items-center justify-center">
+                    <div className="absolute transform -rotate-90 bg-gray-800 dark:bg-gray-300 px-2 py-0.5 rounded text-xs text-white dark:text-gray-800 font-bold whitespace-nowrap">
+                      FILET
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-
-            {/* Positions arrière (5, 6, 1) */}
-            <div>
-              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">
-                ARRIÈRE
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                {/* Position 5 (arrière gauche) */}
-                {getPlayerAtPosition(5) ? (
-                  <PlayerCard player={getPlayerAtPosition(5)!} canRemove position={5} />
-                ) : (
-                  <EmptyPosition position={5} label="P5" />
-                )}
-
-                {/* Position 6 (centre arrière) */}
-                {getPlayerAtPosition(6) ? (
-                  <PlayerCard player={getPlayerAtPosition(6)!} canRemove position={6} />
-                ) : (
-                  <EmptyPosition position={6} label="P6" />
-                )}
-
-                {/* Position 1 (arrière droit / serveur) */}
-                {getPlayerAtPosition(1) ? (
-                  <PlayerCard player={getPlayerAtPosition(1)!} canRemove position={1} />
-                ) : (
-                  <EmptyPosition position={1} label="P1" />
-                )}
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -556,11 +804,13 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
           {/* Banc */}
           <div className="bg-light-surface dark:bg-dark-surface rounded-lg p-4 shadow-md">
             <h3 className="text-lg font-semibold mb-3">Banc ({benchPlayers.length})</h3>
-            <div className="space-y-2 max-h-[500px] overflow-y-auto">
+            <div className="max-h-[500px] overflow-y-auto">
               {benchPlayers.length > 0 ? (
-                benchPlayers.map((player, index) => (
-                  <PlayerCard key={player.licencieId || `${player.prenom}-${player.nom}-${index}`} player={player} />
-                ))
+                <div className="grid grid-cols-2 gap-2">
+                  {benchPlayers.map((player, index) => (
+                    <PlayerCard key={player.licencieId || `${player.prenom}-${player.nom}-${index}`} player={player} />
+                  ))}
+                </div>
               ) : (
                 <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">
                   Tous les joueurs sont sur le terrain

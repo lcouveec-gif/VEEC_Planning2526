@@ -187,12 +187,13 @@ const CollectifsManager: React.FC = () => {
           id="team-select"
           value={selectedTeam}
           onChange={e => setSelectedTeam(e.target.value)}
-          className="w-full px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary focus:border-transparent"
+          className="w-full px-4 py-3 md:py-2 rounded-md border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface text-base md:text-sm focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary focus:border-transparent appearance-none cursor-pointer"
+          style={{ minHeight: '44px' }}
           disabled={loadingTeams}
         >
           <option value="">-- Sélectionner une équipe --</option>
           {sortedTeams.map(team => (
-            <option key={team.IDEQUIPE} value={team.IDEQUIPE}>
+            <option key={team.IDEQUIPE} value={team.IDEQUIPE} className="py-2">
               {team.IDEQUIPE} - {team.NOM_FFVB}
             </option>
           ))}
@@ -266,9 +267,11 @@ const CollectifsManager: React.FC = () => {
                             {playerInfo.licencie!.Nom_Licencie} {playerInfo.licencie!.Prenom_Licencie}
                           </p>
                           {playerInfo.licencie!.Num_Licencie && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              Licence: {playerInfo.licencie!.Num_Licencie}
-                            </p>
+                            <div className="mt-1">
+                              <span className="inline-block px-3 py-1 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-base font-semibold">
+                                Licence: {playerInfo.licencie!.Num_Licencie}
+                              </span>
+                            </div>
                           )}
 
                           {isEditing ? (
