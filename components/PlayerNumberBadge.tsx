@@ -1,19 +1,23 @@
 import React from 'react';
+import type { PlayerPosition } from '../types';
 
 interface PlayerNumberBadgeProps {
   numero: number;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  position?: PlayerPosition;
 }
 
 /**
  * Composant pour afficher le numéro d'un joueur du club VEEC
- * Style: Blanc sur fond noir (mode sombre) / Noir sur fond gris clair (mode clair)
+ * Style standard: Noir sur fond gris clair (mode clair) / Blanc sur fond noir (mode sombre)
+ * Style libéro: Blanc sur fond noir (mode clair) / Noir sur fond blanc (mode sombre)
  */
 const PlayerNumberBadge: React.FC<PlayerNumberBadgeProps> = ({
   numero,
   size = 'md',
-  className = ''
+  className = '',
+  position
 }) => {
   // Définir les tailles
   const sizeClasses = {
@@ -23,6 +27,13 @@ const PlayerNumberBadge: React.FC<PlayerNumberBadgeProps> = ({
     xl: 'w-16 h-16 text-2xl'
   };
 
+  const isLibero = position === 'Libéro';
+
+  // Couleurs inversées pour les libéros
+  const colorClasses = isLibero
+    ? 'bg-black dark:bg-white text-white dark:text-black'
+    : 'bg-gray-300 dark:bg-black text-black dark:text-white';
+
   return (
     <div
       className={`
@@ -30,8 +41,7 @@ const PlayerNumberBadge: React.FC<PlayerNumberBadgeProps> = ({
         rounded-full
         flex items-center justify-center
         font-bold
-        bg-gray-300 dark:bg-black
-        text-black dark:text-white
+        ${colorClasses}
         ${className}
       `}
     >

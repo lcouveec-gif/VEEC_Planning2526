@@ -519,7 +519,7 @@ const PlayerRoster: React.FC<PlayerRosterProps> = ({ match, onRosterComplete, on
                         ) : (
                           <>
                             <div className="flex items-center gap-2">
-                              <PlayerNumberBadge numero={player.numero_maillot} size="sm" />
+                              <PlayerNumberBadge numero={player.numero_maillot} size="sm" position={player.defaultPosition} />
                               <span className="font-medium text-sm">
                                 {player.nom} {player.prenom}
                               </span>

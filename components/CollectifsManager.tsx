@@ -312,7 +312,7 @@ const CollectifsManager: React.FC = () => {
                           ) : (
                             <div className="mt-2 flex gap-2 items-center text-sm">
                               {playerInfo.numero_maillot && (
-                                <PlayerNumberBadge numero={playerInfo.numero_maillot} size="sm" />
+                                <PlayerNumberBadge numero={playerInfo.numero_maillot} size="sm" position={playerInfo.poste} />
                               )}
                               {playerInfo.poste && (
                                 <span className="px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">

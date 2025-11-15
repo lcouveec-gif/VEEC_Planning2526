@@ -19,6 +19,11 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
   } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
+  // Support tactile pour iOS
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null);
+
   // Obtenir le joueur à une position donnée
   const getPlayerAtPosition = (position: CourtPosition): Player | undefined => {
     const courtPlayer = currentLineup.find(cp => cp.position === position);
@@ -217,6 +222,103 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
     }
   }, [contextMenu]);
 
+  // Gestionnaires tactiles pour iOS
+  const handleTouchStart = (e: React.TouchEvent, player: Player) => {
+    const touch = e.touches[0];
+    setTouchStartPos({ x: touch.clientX, y: touch.clientY });
+
+    // Appui long de 500ms pour sélectionner
+    touchTimerRef.current = setTimeout(() => {
+      setSelectedPlayer(player);
+      // Vibration tactile si supportée
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, 500);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    // Annuler la sélection si l'utilisateur bouge son doigt
+    if (touchTimerRef.current && touchStartPos) {
+      const touch = e.touches[0];
+      const deltaX = Math.abs(touch.clientX - touchStartPos.x);
+      const deltaY = Math.abs(touch.clientY - touchStartPos.y);
+
+      if (deltaX > 10 || deltaY > 10) {
+        clearTimeout(touchTimerRef.current);
+        touchTimerRef.current = null;
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+    }
+    setTouchStartPos(null);
+  };
+
+  const handleTouchCancel = () => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+    }
+    setTouchStartPos(null);
+  };
+
+  // Placer le joueur sélectionné à une position
+  const handlePlaceSelectedPlayer = (position: CourtPosition) => {
+    if (!selectedPlayer) return;
+
+    // Créer une nouvelle composition
+    let newLineup = [...currentLineup];
+
+    // Trouver la position actuelle du joueur sélectionné
+    const selectedPlayerPosition = currentLineup.find(cp => isSamePlayer(cp.player, selectedPlayer))?.position;
+
+    // Vérifier s'il y a déjà un joueur à la position cible
+    const existingPlayerAtTarget = newLineup.find(cp => cp.position === position);
+
+    if (existingPlayerAtTarget && selectedPlayerPosition) {
+      // ÉCHANGE : Les deux joueurs échangent leurs positions
+      newLineup = newLineup.map(cp => {
+        if (isSamePlayer(cp.player, selectedPlayer)) {
+          return { ...cp, position };
+        } else if (isSamePlayer(cp.player, existingPlayerAtTarget.player)) {
+          return { ...cp, position: selectedPlayerPosition };
+        }
+        return cp;
+      });
+    } else if (existingPlayerAtTarget) {
+      // Il y a un joueur à la position cible mais le joueur sélectionné vient du banc
+      newLineup = newLineup.filter(cp => !isSamePlayer(cp.player, existingPlayerAtTarget.player));
+      newLineup.push({ player: selectedPlayer, position });
+    } else if (selectedPlayerPosition) {
+      // Déplacer le joueur de son ancienne position vers la nouvelle
+      newLineup = newLineup.map(cp =>
+        isSamePlayer(cp.player, selectedPlayer) ? { ...cp, position } : cp
+      );
+    } else {
+      // Ajouter le joueur du banc
+      newLineup.push({ player: selectedPlayer, position });
+    }
+
+    onLineupChange(newLineup);
+    setSelectedPlayer(null);
+  };
+
+  // Tap sur une position vide pour ouvrir le menu
+  const handleTapEmptyPosition = (e: React.TouchEvent | React.MouseEvent, position: CourtPosition) => {
+    e.preventDefault();
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    setContextMenu({
+      position,
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2
+    });
+  };
+
   // Fonction pour formater l'affichage : Prénom + 3 premières lettres du nom
   const formatPlayerDisplay = (player: Player): string => {
     if (!player.prenom.trim()) return '';
@@ -229,45 +331,86 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
     player,
     canRemove = false,
     position
-  }) => (
-    <div
-      draggable
-      onDragStart={(e) => handleDragStart(e, player)}
-      onDragOver={position !== undefined ? handleDragOver : undefined}
-      onDrop={position !== undefined ? (e) => handleDrop(e, position) : undefined}
-      onContextMenu={position !== undefined ? (e) => handleContextMenu(e, position, player) : undefined}
-      className="relative group bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-lg p-3 cursor-move hover:shadow-lg transition-all flex flex-col items-center justify-center min-h-[80px]"
-    >
-      {canRemove && (
-        <button
-          onClick={() => handleRemovePlayer(player)}
-          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          ×
-        </button>
-      )}
-      <PlayerNumberBadge numero={player.numero_maillot} size="xl" />
-      <div className="text-sm font-medium text-center mt-1 line-clamp-2">
-        {formatPlayerDisplay(player)}
+  }) => {
+    const isSelected = selectedPlayer && isSamePlayer(selectedPlayer, player);
+    const canReceivePlayer = selectedPlayer && !isSamePlayer(selectedPlayer, player) && position !== undefined;
+
+    return (
+      <div
+        draggable
+        onDragStart={(e) => handleDragStart(e, player)}
+        onDragOver={position !== undefined ? handleDragOver : undefined}
+        onDrop={position !== undefined ? (e) => handleDrop(e, position) : undefined}
+        onContextMenu={position !== undefined ? (e) => handleContextMenu(e, position, player) : undefined}
+        onTouchStart={(e) => handleTouchStart(e, player)}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
+        onClick={canReceivePlayer ? () => handlePlaceSelectedPlayer(position!) : undefined}
+        className={`relative group bg-white dark:bg-gray-700 border-2 rounded-lg p-3 cursor-move hover:shadow-lg transition-all flex flex-col items-center justify-center min-h-[80px] ${
+          isSelected
+            ? 'border-blue-500 dark:border-blue-400 shadow-lg ring-2 ring-blue-300 dark:ring-blue-600'
+            : canReceivePlayer
+            ? 'border-green-400 dark:border-green-500 animate-pulse'
+            : 'border-gray-300 dark:border-gray-600'
+        }`}
+      >
+        {canRemove && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRemovePlayer(player);
+            }}
+            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          >
+            ×
+          </button>
+        )}
+        {canReceivePlayer && (
+          <div className="absolute -top-2 -left-2 bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold z-10">
+            ↓
+          </div>
+        )}
+        <PlayerNumberBadge numero={player.numero_maillot} size="xl" position={player.defaultPosition} />
+        <div className="text-sm font-medium text-center mt-1 line-clamp-2">
+          {formatPlayerDisplay(player)}
+        </div>
+        <div className="text-base font-semibold text-gray-600 dark:text-gray-300 mt-1">
+          {player.defaultPosition}
+        </div>
       </div>
-      <div className="text-base font-semibold text-gray-600 dark:text-gray-300 mt-1">
-        {player.defaultPosition}
-      </div>
-    </div>
-  );
+    );
+  };
 
   // Composant pour une position vide
-  const EmptyPosition: React.FC<{ position: CourtPosition; label: string }> = ({ position, label }) => (
-    <div
-      onDragOver={handleDragOver}
-      onDrop={(e) => handleDrop(e, position)}
-      onContextMenu={(e) => handleContextMenu(e, position)}
-      className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-3 flex flex-col items-center justify-center min-h-[80px] bg-gray-50 dark:bg-gray-800 hover:border-light-primary dark:hover:border-dark-primary hover:bg-gray-100 dark:hover:bg-gray-750 transition-all cursor-pointer"
-    >
-      <div className="text-lg font-bold text-gray-400 dark:text-gray-500">{label}</div>
-      <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">Clic droit pour placer</div>
-    </div>
-  );
+  const EmptyPosition: React.FC<{ position: CourtPosition; label: string }> = ({ position, label }) => {
+    const canReceivePlayer = selectedPlayer !== null;
+
+    return (
+      <div
+        onDragOver={handleDragOver}
+        onDrop={(e) => handleDrop(e, position)}
+        onContextMenu={(e) => handleContextMenu(e, position)}
+        onClick={canReceivePlayer ? () => handlePlaceSelectedPlayer(position) : (e) => handleTapEmptyPosition(e, position)}
+        onTouchEnd={canReceivePlayer ? () => handlePlaceSelectedPlayer(position) : undefined}
+        className={`relative border-2 border-dashed rounded-lg p-3 flex flex-col items-center justify-center min-h-[80px] transition-all cursor-pointer ${
+          canReceivePlayer
+            ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse'
+            : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:border-light-primary dark:hover:border-dark-primary hover:bg-gray-100 dark:hover:bg-gray-750'
+        }`}
+      >
+        {canReceivePlayer && (
+          <div className="absolute -top-2 -left-2 bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold z-10">
+            ↓
+          </div>
+        )}
+        <div className="text-lg font-bold text-gray-400 dark:text-gray-500">{label}</div>
+        <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+          {canReceivePlayer ? 'Tap pour placer' : 'Tap ou clic droit'}
+        </div>
+      </div>
+    );
+  };
 
   // Statistiques
   const courtPlayersCount = currentLineup.filter(cp => typeof cp.position === 'number').length;
@@ -276,6 +419,31 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
 
   return (
     <div className="space-y-6">
+      {/* Indicateur de joueur sélectionné (pour tactile) */}
+      {selectedPlayer && (
+        <div className="bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-500 dark:border-blue-400 rounded-lg p-4 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <PlayerNumberBadge numero={selectedPlayer.numero_maillot} size="md" position={selectedPlayer.defaultPosition} />
+              <div>
+                <div className="font-bold text-blue-900 dark:text-blue-100">
+                  {formatPlayerDisplay(selectedPlayer)}
+                </div>
+                <div className="text-sm text-blue-700 dark:text-blue-300">
+                  Tap sur une position pour placer
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setSelectedPlayer(null)}
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Statistiques */}
       <div className="bg-light-surface dark:bg-dark-surface rounded-lg p-4 shadow-md">
         <div className="flex items-center justify-between text-sm">
@@ -459,7 +627,7 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
                         className="w-full px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
                       >
                         <div className="flex-shrink-0">
-                          <PlayerNumberBadge numero={player.numero_maillot} size="md" />
+                          <PlayerNumberBadge numero={player.numero_maillot} size="md" position={player.defaultPosition} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">
