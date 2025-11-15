@@ -223,11 +223,17 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
   }, [contextMenu]);
 
   // Gestionnaires tactiles pour iOS
-  const handleTouchStart = (e: React.TouchEvent, player: Player) => {
+  const handleTouchStart = (e: React.TouchEvent, player: Player, position?: CourtPosition) => {
     const touch = e.touches[0];
     setTouchStartPos({ x: touch.clientX, y: touch.clientY });
 
-    // Appui long de 500ms pour sélectionner
+    // Si un joueur est déjà sélectionné et qu'on tape sur une position
+    if (selectedPlayer && !isSamePlayer(selectedPlayer, player) && position !== undefined) {
+      // C'est un tap pour placer, pas besoin d'appui long
+      return;
+    }
+
+    // Appui long de 500ms pour sélectionner un nouveau joueur
     touchTimerRef.current = setTimeout(() => {
       setSelectedPlayer(player);
       // Vibration tactile si supportée
@@ -251,11 +257,27 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e: React.TouchEvent, player?: Player, position?: CourtPosition) => {
+    // Nettoyer le timer d'appui long
     if (touchTimerRef.current) {
       clearTimeout(touchTimerRef.current);
       touchTimerRef.current = null;
     }
+
+    // Si un joueur est sélectionné et qu'on tape sur une position différente
+    if (selectedPlayer && player && !isSamePlayer(selectedPlayer, player) && position !== undefined && touchStartPos) {
+      const touch = e.changedTouches[0];
+      const deltaX = Math.abs(touch.clientX - touchStartPos.x);
+      const deltaY = Math.abs(touch.clientY - touchStartPos.y);
+
+      // Si le doigt n'a pas bougé (tap simple)
+      if (deltaX < 10 && deltaY < 10) {
+        e.preventDefault();
+        e.stopPropagation();
+        handlePlaceSelectedPlayer(position);
+      }
+    }
+
     setTouchStartPos(null);
   };
 
@@ -342,11 +364,10 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
         onDragOver={position !== undefined ? handleDragOver : undefined}
         onDrop={position !== undefined ? (e) => handleDrop(e, position) : undefined}
         onContextMenu={position !== undefined ? (e) => handleContextMenu(e, position, player) : undefined}
-        onTouchStart={(e) => handleTouchStart(e, player)}
+        onTouchStart={(e) => handleTouchStart(e, player, position)}
         onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onTouchEnd={(e) => handleTouchEnd(e, player, position)}
         onTouchCancel={handleTouchCancel}
-        onClick={canReceivePlayer ? () => handlePlaceSelectedPlayer(position!) : undefined}
         className={`relative group bg-white dark:bg-gray-700 border-2 rounded-lg p-3 cursor-move hover:shadow-lg transition-all flex flex-col items-center justify-center min-h-[80px] ${
           isSelected
             ? 'border-blue-500 dark:border-blue-400 shadow-lg ring-2 ring-blue-300 dark:ring-blue-600'
@@ -364,6 +385,18 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
             className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10"
           >
             ×
+          </button>
+        )}
+        {isSelected && position !== undefined && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePlaceSelectedPlayer('Bench');
+            }}
+            className="absolute -top-2 -right-2 bg-orange-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold z-10 shadow-lg"
+            title="Remettre sur le banc"
+          >
+            🔄
           </button>
         )}
         {canReceivePlayer && (
@@ -422,7 +455,7 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
       {/* Indicateur de joueur sélectionné (pour tactile) */}
       {selectedPlayer && (
         <div className="bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-500 dark:border-blue-400 rounded-lg p-4 shadow-lg">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3">
               <PlayerNumberBadge numero={selectedPlayer.numero_maillot} size="md" position={selectedPlayer.defaultPosition} />
               <div>
@@ -434,12 +467,26 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
                 </div>
               </div>
             </div>
-            <button
-              onClick={() => setSelectedPlayer(null)}
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
-            >
-              Annuler
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Vérifier si le joueur est sur le terrain */}
+              {currentLineup.find(cp => isSamePlayer(cp.player, selectedPlayer) && cp.position !== 'Bench') && (
+                <button
+                  onClick={() => {
+                    handlePlaceSelectedPlayer('Bench');
+                  }}
+                  className="px-3 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors font-medium text-sm"
+                  title="Remettre sur le banc"
+                >
+                  🔄 Banc
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedPlayer(null)}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+              >
+                Annuler
+              </button>
+            </div>
           </div>
         </div>
       )}
