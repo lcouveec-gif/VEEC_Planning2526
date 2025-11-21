@@ -155,6 +155,47 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
     onEndDateChange('');
   };
 
+  // Ouvrir le planning FFVB
+  const openFFVBPlanning = () => {
+    // Utiliser la date de début (startDate) si elle existe, sinon utiliser aujourd'hui
+    const referenceDate = startDate ? new Date(startDate) : new Date();
+
+    // Reculer de 3 jours (X-3)
+    const dateMinusThree = new Date(referenceDate);
+    dateMinusThree.setDate(referenceDate.getDate() - 3);
+
+    // Trouver le jeudi précédent cette date (ou le même jour si c'est déjà jeudi)
+    // Jeudi = 4 (0=Dimanche, 1=Lundi, ..., 6=Samedi)
+    const dayOfWeek = dateMinusThree.getDay();
+    let daysToSubtract;
+
+    if (dayOfWeek === 4) {
+      // Si c'est déjà jeudi, on garde ce jeudi
+      daysToSubtract = 0;
+    } else if (dayOfWeek > 4) {
+      // Si on est après jeudi (vendredi ou samedi), on remonte au jeudi de la même semaine
+      daysToSubtract = dayOfWeek - 4;
+    } else {
+      // Si on est avant jeudi (dimanche à mercredi), on remonte au jeudi précédent
+      daysToSubtract = dayOfWeek === 0 ? 3 : (dayOfWeek + 3);
+    }
+
+    const targetThursday = new Date(dateMinusThree);
+    targetThursday.setDate(dateMinusThree.getDate() - daysToSubtract);
+
+    // Mettre à 00:00:00 en heure locale Europe/Paris
+    targetThursday.setHours(0, 0, 0, 0);
+
+    // Convertir en timestamp Unix (secondes)
+    const timestamp = Math.floor(targetThursday.getTime() / 1000);
+
+    // Construire l'URL
+    const url = `https://www.ffvbbeach.org/ffvbapp/resu/planning_club.php?aff_semaine=SUI&date_jour=${timestamp}&cnclub=0775819`;
+
+    // Ouvrir dans un nouvel onglet
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-md mb-4">
       {/* En-tête avec bouton collapse */}
@@ -225,6 +266,19 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
                 Toutes
               </button>
             </div>
+          </div>
+
+          {/* Bouton FFVB */}
+          <div className="mb-4">
+            <button
+              onClick={openFFVBPlanning}
+              className="w-full px-4 py-3 text-sm font-medium bg-blue-600 dark:bg-blue-700 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors border-2 border-blue-500 dark:border-blue-600 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              Ouvrir Planning FFVB
+            </button>
           </div>
 
         {/* Filtres détaillés */}

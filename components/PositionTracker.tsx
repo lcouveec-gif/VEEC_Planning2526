@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTeams } from '../hooks/useTeams';
 import { useMatches } from '../hooks/useMatches';
 import MatchSelection from './PositionTracker/MatchSelection';
@@ -8,10 +8,21 @@ import type { Player, Match, MatchPositionData } from '../types';
 
 type PositionStep = 'selection' | 'roster' | 'lineup';
 
-const PositionTracker: React.FC = () => {
+interface PositionTrackerProps {
+  selectedTeamId?: string;
+}
+
+const PositionTracker: React.FC<PositionTrackerProps> = ({ selectedTeamId: propSelectedTeamId }) => {
   const [currentStep, setCurrentStep] = useState<PositionStep>('selection');
-  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(propSelectedTeamId || '');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  // Pré-sélectionner l'équipe si selectedTeamId est fourni
+  useEffect(() => {
+    if (propSelectedTeamId && propSelectedTeamId !== selectedTeamId) {
+      setSelectedTeamId(propSelectedTeamId);
+    }
+  }, [propSelectedTeamId]);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [matchPositionData, setMatchPositionData] = useState<MatchPositionData | null>(null);

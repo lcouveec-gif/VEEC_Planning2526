@@ -13,9 +13,9 @@ const SetLineupManager: React.FC<SetLineupManagerProps> = ({ match, players, onB
   const [currentSet, setCurrentSet] = useState<number>(1);
   const [numberOfSets, setNumberOfSets] = useState<number>(3);
   const [setLineups, setSetLineups] = useState<SetLineup[]>([
-    { setNumber: 1, players: [] },
-    { setNumber: 2, players: [] },
-    { setNumber: 3, players: [] },
+    { setNumber: 1, players: [], startsServing: true },
+    { setNumber: 2, players: [], startsServing: false },
+    { setNumber: 3, players: [], startsServing: true },
   ]);
   const [hasLoadedData, setHasLoadedData] = useState<boolean>(false);
 
@@ -35,9 +35,9 @@ const SetLineupManager: React.FC<SetLineupManagerProps> = ({ match, players, onB
           console.log('⚠️ DEBUG - No set lineups found, initializing with 3 default sets');
           setNumberOfSets(3);
           setSetLineups([
-            { setNumber: 1, players: [] },
-            { setNumber: 2, players: [] },
-            { setNumber: 3, players: [] },
+            { setNumber: 1, players: [], startsServing: true },
+            { setNumber: 2, players: [], startsServing: false },
+            { setNumber: 3, players: [], startsServing: true },
           ]);
         } else {
           // Restaurer le nombre de sets
@@ -55,9 +55,20 @@ const SetLineupManager: React.FC<SetLineupManagerProps> = ({ match, players, onB
   const handleAddSet = () => {
     if (numberOfSets < 5) {
       const newSetNumber = numberOfSets + 1;
+      // Alterne le service : si le dernier set commençait au service, le nouveau commence en réception
+      const lastSetServing = setLineups[setLineups.length - 1]?.startsServing ?? true;
       setNumberOfSets(newSetNumber);
-      setSetLineups([...setLineups, { setNumber: newSetNumber, players: [] }]);
+      setSetLineups([...setLineups, { setNumber: newSetNumber, players: [], startsServing: !lastSetServing }]);
     }
+  };
+
+  const handleToggleServing = () => {
+    const updatedLineups = setLineups.map(sl =>
+      sl.setNumber === currentSet
+        ? { ...sl, startsServing: !sl.startsServing }
+        : sl
+    );
+    setSetLineups(updatedLineups);
   };
 
   const handleRemoveSet = () => {
@@ -164,7 +175,7 @@ const SetLineupManager: React.FC<SetLineupManagerProps> = ({ match, players, onB
 
       {/* Sélecteur de set */}
       <div className="bg-light-surface dark:bg-dark-surface rounded-lg p-4 shadow-md mb-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <span className="font-medium">Sets :</span>
             <div className="flex gap-2">
@@ -183,6 +194,22 @@ const SetLineupManager: React.FC<SetLineupManagerProps> = ({ match, players, onB
               ))}
             </div>
           </div>
+
+          {/* Toggle Service/Réception */}
+          <button
+            onClick={handleToggleServing}
+            className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center gap-2 ${
+              currentSetLineup?.startsServing
+                ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-2 border-orange-400'
+                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-2 border-blue-400'
+            }`}
+          >
+            {currentSetLineup?.startsServing ? (
+              <>🏐 Service</>
+            ) : (
+              <>🛡️ Réception</>
+            )}
+          </button>
 
           <div className="flex items-center gap-2">
             <button
@@ -208,6 +235,7 @@ const SetLineupManager: React.FC<SetLineupManagerProps> = ({ match, players, onB
         players={players}
         currentLineup={currentSetLineup?.players || []}
         onLineupChange={handleLineupChange}
+        startsServing={currentSetLineup?.startsServing ?? true}
       />
 
       {/* Boutons d'action */}

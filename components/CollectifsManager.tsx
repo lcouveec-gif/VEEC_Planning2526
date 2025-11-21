@@ -10,8 +10,12 @@ const POSTES: PlayerPosition[] = ['Passeur', 'Libéro', 'R4', 'Pointu', 'Central
 type SortField = 'name' | 'number';
 type SortDirection = 'asc' | 'desc';
 
-const CollectifsManager: React.FC = () => {
-  const [selectedTeam, setSelectedTeam] = useState<string>('');
+interface CollectifsManagerProps {
+  selectedTeamId?: string;
+}
+
+const CollectifsManager: React.FC<CollectifsManagerProps> = ({ selectedTeamId }) => {
+  const [selectedTeam, setSelectedTeam] = useState<string>(selectedTeamId || '');
   const [teamPlayers, setTeamPlayers] = useState<CollectifPlayer[]>([]);
   const [searchPlayer, setSearchPlayer] = useState<string>('');
   const [editingPlayer, setEditingPlayer] = useState<string | null>(null);
@@ -38,6 +42,13 @@ const CollectifsManager: React.FC = () => {
   const sortedTeams = useMemo(() => {
     return [...teams].sort((a, b) => a.IDEQUIPE.localeCompare(b.IDEQUIPE));
   }, [teams]);
+
+  // Pré-sélectionner l'équipe si selectedTeamId est fourni
+  useEffect(() => {
+    if (selectedTeamId && selectedTeamId !== selectedTeam) {
+      setSelectedTeam(selectedTeamId);
+    }
+  }, [selectedTeamId]);
 
   // Charger les joueurs de l'équipe sélectionnée
   useEffect(() => {

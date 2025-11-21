@@ -20,6 +20,7 @@ export interface Team {
   CURL_TEAM?: string;
   CALDAV_URL?: string;
   QRCODE_URL?: string;
+  image_url?: string; // URL de l'image stockée dans Supabase Storage
 }
 
 export interface Match {
@@ -81,6 +82,7 @@ export interface CourtPlayer {
 export interface SetLineup {
   setNumber: number;
   players: CourtPlayer[];
+  startsServing: boolean; // true = service, false = réception
 }
 
 export interface MatchPositionData {
