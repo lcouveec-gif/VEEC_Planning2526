@@ -4,12 +4,14 @@ import FilterControls from './components/FilterControls';
 import ScheduleGrid from './components/ScheduleGrid';
 import MatchSchedule from './components/MatchSchedule';
 import PositionTracker from './components/PositionTracker';
+import TeamView from './components/TeamView';
 import Admin from './components/Admin';
+// import AuthModal from './components/Auth/AuthModal';
 import { useTrainingSessions } from './hooks/useTrainingSessions';
 import type { TrainingSession } from './types';
 import { GYMS, DAYS } from './constants';
 
-type PageType = 'training' | 'matches' | 'position' | 'admin';
+type PageType = 'training' | 'matches' | 'position' | 'team' | 'admin';
 
 // For PDF export libraries from CDN
 declare const html2canvas: any;
@@ -31,13 +33,16 @@ function urlBase64ToUint8Array(base64String: string) {
 }
 
 const App: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState<PageType>('training');
+  const [currentPage, setCurrentPage] = useState<PageType>('team');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [dayFilter, setDayFilter] = useState<string[]>([]);
   const [gymFilter, setGymFilter] = useState<string[]>([]);
   const [teamSearch, setTeamSearch] = useState<string>('');
-  const [highlightedTeam, setHighlightedTeam] = useState<string>('');
+  const [selectedTeam, setSelectedTeam] = useState<string>('');
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | undefined>(undefined);
+  const [adminSection, setAdminSection] = useState<string | undefined>(undefined);
+  // const [authModalOpen, setAuthModalOpen] = useState(false);
 
   // Charger les données depuis Supabase
   const { sessions: scheduleData, loading, error } = useTrainingSessions();
@@ -98,7 +103,17 @@ const App: React.FC = () => {
     setDayFilter([]);
     setGymFilter([]);
     setTeamSearch('');
-    setHighlightedTeam('');
+    setSelectedTeam('');
+  };
+
+  const handleTeamNavigation = (page: 'matches' | 'position' | 'admin' | 'training', teamId?: string, section?: string) => {
+    setSelectedTeamId(teamId);
+    setAdminSection(section);
+    // Pour la page training, définir aussi selectedTeam pour le filtrage
+    if (page === 'training' && teamId) {
+      setSelectedTeam(teamId);
+    }
+    setCurrentPage(page);
   };
   
   const handleExportPdf = async () => {
@@ -163,9 +178,10 @@ const App: React.FC = () => {
       const dayMatch = dayFilter.length === 0 || dayFilter.includes(session.day.toLowerCase());
       const gymMatch = gymFilter.length === 0 || gymFilter.includes(session.gym.toLowerCase());
       const teamMatch = teamSearch === '' || session.team.toLowerCase().includes(teamSearch.toLowerCase()) || session.coach.toLowerCase().includes(teamSearch.toLowerCase());
-      return dayMatch && gymMatch && teamMatch;
+      const selectedTeamMatch = selectedTeam === '' || session.team === selectedTeam;
+      return dayMatch && gymMatch && teamMatch && selectedTeamMatch;
     });
-  }, [scheduleData, dayFilter, gymFilter, teamSearch]);
+  }, [scheduleData, dayFilter, gymFilter, teamSearch, selectedTeam]);
   
   const daysWithEvents = useMemo(() => {
     const uniqueDays = [...new Set(filteredSchedule.map(s => s.day))];
@@ -183,7 +199,13 @@ const App: React.FC = () => {
         onSubscribeToNotifications={handleSubscribe}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
+        // onOpenAuth={() => setAuthModalOpen(true)}
       />
+
+      {/* <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+      /> */}
       {currentPage === 'training' ? (
         <main className="p-4 sm:p-6 lg:p-8">
           {loading ? (
@@ -207,8 +229,8 @@ const App: React.FC = () => {
                 setGymFilter={setGymFilter}
                 teamSearch={teamSearch}
                 setTeamSearch={setTeamSearch}
-                highlightedTeam={highlightedTeam}
-                setHighlightedTeam={setHighlightedTeam}
+                selectedTeam={selectedTeam}
+                setSelectedTeam={setSelectedTeam}
                 allTeams={allTeams}
                 gyms={GYMS}
                 days={DAYS}
@@ -224,7 +246,6 @@ const App: React.FC = () => {
                               <ScheduleGrid
                                   schedule={filteredSchedule.filter(s => s.day === day)}
                                   gymFilter={gymFilter}
-                                  highlightedTeam={highlightedTeam}
                               />
                           </div>
                       ))
@@ -238,11 +259,13 @@ const App: React.FC = () => {
           )}
         </main>
       ) : currentPage === 'matches' ? (
-        <MatchSchedule />
+        <MatchSchedule selectedTeamId={selectedTeamId} />
       ) : currentPage === 'position' ? (
-        <PositionTracker />
+        <PositionTracker selectedTeamId={selectedTeamId} />
+      ) : currentPage === 'team' ? (
+        <TeamView onNavigate={handleTeamNavigation} />
       ) : (
-        <Admin />
+        <Admin initialSection={adminSection} selectedTeamId={selectedTeamId} />
       )}
     </div>
   );

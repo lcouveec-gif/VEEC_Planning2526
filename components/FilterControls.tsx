@@ -8,8 +8,8 @@ interface FilterControlsProps {
   setGymFilter: (gyms: string[]) => void;
   teamSearch: string;
   setTeamSearch: (search: string) => void;
-  highlightedTeam: string;
-  setHighlightedTeam: (team: string) => void;
+  selectedTeam: string;
+  setSelectedTeam: (team: string) => void;
   allTeams: string[];
   days: string[];
   gyms: string[];
@@ -23,8 +23,8 @@ const FilterControls: React.FC<FilterControlsProps> = ({
   setGymFilter,
   teamSearch,
   setTeamSearch,
-  highlightedTeam,
-  setHighlightedTeam,
+  selectedTeam,
+  setSelectedTeam,
   allTeams,
   days,
   gyms,
@@ -108,15 +108,15 @@ const FilterControls: React.FC<FilterControlsProps> = ({
             />
         </div>
         <div className="w-full">
-            <label htmlFor="highlight-team" className="sr-only">Mettre en avant une équipe</label>
+            <label htmlFor="select-team" className="sr-only">Filtrer par équipe</label>
             <select
-                id="highlight-team"
-                value={highlightedTeam}
-                onChange={(e) => setHighlightedTeam(e.target.value)}
+                id="select-team"
+                value={selectedTeam}
+                onChange={(e) => setSelectedTeam(e.target.value)}
                 className={commonInputClasses}
-                aria-label="Mettre en avant une équipe"
+                aria-label="Filtrer par équipe"
             >
-                <option value="">Mettre en avant une équipe...</option>
+                <option value="">Toutes les équipes</option>
                 {allTeams.map(team => (
                     <option key={team} value={team}>{team}</option>
                 ))}

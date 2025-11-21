@@ -4,7 +4,11 @@ import MatchList from './MatchList';
 import { useMatches } from '../hooks/useMatches';
 import { useTeams } from '../hooks/useTeams';
 
-const MatchSchedule: React.FC = () => {
+interface MatchScheduleProps {
+  selectedTeamId?: string;
+}
+
+const MatchSchedule: React.FC<MatchScheduleProps> = ({ selectedTeamId }) => {
   // Dates par défaut : date du jour et pas de date de fin (tous les matchs à venir)
   const today = new Date();
   const defaultStartDate = today.toISOString().split('T')[0];
@@ -32,6 +36,13 @@ const MatchSchedule: React.FC = () => {
 
   // Charger les équipes
   const { teams, loading: loadingTeams, error: errorTeams } = useTeams();
+
+  // Pré-sélectionner l'équipe si selectedTeamId est fourni
+  useEffect(() => {
+    if (selectedTeamId && !selectedTeamIds.includes(selectedTeamId)) {
+      setSelectedTeamIds([selectedTeamId]);
+    }
+  }, [selectedTeamId]);
 
   // Charger les matchs avec les filtres (utilise les dates debounced)
   // Passer undefined si les dates sont vides pour permettre des plages ouvertes

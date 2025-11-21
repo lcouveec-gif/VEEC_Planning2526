@@ -4,8 +4,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import ThemeSwitcher from './ThemeSwitcher';
 import { PdfIcon, SpinnerIcon, BellIcon } from './icons/ThemeIcons';
 import Logo from './Logo';
+// import UserMenu from './UserMenu';
 
-type PageType = 'training' | 'matches' | 'position' | 'admin';
+type PageType = 'training' | 'matches' | 'position' | 'team' | 'admin';
 
 interface HeaderProps {
   theme: 'dark' | 'light';
@@ -15,6 +16,7 @@ interface HeaderProps {
   onSubscribeToNotifications: () => void;
   currentPage: PageType;
   onPageChange: (page: PageType) => void;
+  // onOpenAuth: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExporting, onSubscribeToNotifications, currentPage, onPageChange }) => {
@@ -68,6 +70,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                   {currentPage === 'training' ? 'Entraînements' :
                    currentPage === 'matches' ? 'Matchs' :
                    currentPage === 'position' ? 'Position' :
+                   currentPage === 'team' ? 'Équipes' :
                    'Admin'}
                 </span>
                 <svg
@@ -114,6 +117,16 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                     Position
                   </button>
                   <button
+                    onClick={() => handlePageChange('team')}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                      currentPage === 'team'
+                        ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Équipes
+                  </button>
+                  <button
                     onClick={() => handlePageChange('admin')}
                     className={`w-full text-left px-4 py-3 text-sm transition-colors ${
                       currentPage === 'admin'
@@ -142,6 +155,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
               {isExporting ? <SpinnerIcon className="w-6 h-6" /> : <PdfIcon className="w-6 h-6" />}
             </button>
             <ThemeSwitcher theme={theme} toggleTheme={toggleTheme} />
+            {/* <UserMenu onOpenAuth={onOpenAuth} /> */}
           </div>
         </div>
       </div>

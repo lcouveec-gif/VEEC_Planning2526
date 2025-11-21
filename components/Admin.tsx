@@ -1,11 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CollectifsManager from './CollectifsManager';
 import TeamsManager from './TeamsManager';
 
 type AdminSection = 'menu' | 'teams' | 'collectifs' | 'planning';
 
-const Admin: React.FC = () => {
-  const [currentSection, setCurrentSection] = useState<AdminSection>('menu');
+interface AdminProps {
+  initialSection?: string;
+  selectedTeamId?: string;
+}
+
+const Admin: React.FC<AdminProps> = ({ initialSection, selectedTeamId }) => {
+  const [currentSection, setCurrentSection] = useState<AdminSection>(
+    (initialSection as AdminSection) || 'menu'
+  );
+
+  // Pré-sélectionner la section si initialSection est fourni
+  useEffect(() => {
+    if (initialSection && initialSection !== currentSection) {
+      setCurrentSection(initialSection as AdminSection);
+    }
+  }, [initialSection]);
 
   const renderMenu = () => (
     <div className="max-w-4xl mx-auto">
@@ -135,7 +149,7 @@ const Admin: React.FC = () => {
                 Gestion des collectifs
               </h2>
             </div>
-            <CollectifsManager />
+            <CollectifsManager selectedTeamId={selectedTeamId} />
           </div>
         );
 
