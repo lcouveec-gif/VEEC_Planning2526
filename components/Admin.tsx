@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import CollectifsManager from './CollectifsManager';
+import TeamsManager from './TeamsManager';
 
 type AdminSection = 'menu' | 'teams' | 'collectifs' | 'planning';
 
@@ -116,11 +117,7 @@ const Admin: React.FC = () => {
                 Gestion des équipes
               </h2>
             </div>
-            <div className="bg-light-surface dark:bg-dark-surface rounded-lg p-6 shadow-md">
-              <p className="text-gray-600 dark:text-gray-400">
-                Fonctionnalité en cours de développement...
-              </p>
-            </div>
+            <TeamsManager />
           </div>
         );
 

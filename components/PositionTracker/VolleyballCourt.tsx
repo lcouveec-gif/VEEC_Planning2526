@@ -6,9 +6,10 @@ interface VolleyballCourtProps {
   players: Player[];
   currentLineup: CourtPlayer[];
   onLineupChange: (lineup: CourtPlayer[]) => void;
+  startsServing?: boolean; // true = service, false = réception
 }
 
-const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineup, onLineupChange }) => {
+const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineup, onLineupChange, startsServing = true }) => {
   const [draggedPlayer, setDraggedPlayer] = useState<Player | null>(null);
   const draggedPlayerRef = useRef<Player | null>(null);
   const [contextMenu, setContextMenu] = useState<{
@@ -28,11 +29,11 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
   const [visualRotation, setVisualRotation] = useState<0 | 90 | 180 | 270>(0);
 
   const rotateVisualRight = () => {
-    setVisualRotation((prev) => ((prev + 90) % 360) as 0 | 90 | 180 | 270);
+    setVisualRotation((prev) => ((prev + 270) % 360) as 0 | 90 | 180 | 270);
   };
 
   const rotateVisualLeft = () => {
-    setVisualRotation((prev) => ((prev + 270) % 360) as 0 | 90 | 180 | 270);
+    setVisualRotation((prev) => ((prev + 90) % 360) as 0 | 90 | 180 | 270);
   };
 
   // Rotation des joueurs selon les règles du volley
@@ -449,6 +450,14 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
       handleTouchEnd(e, player, position);
     };
 
+    // Afficher le label de position (P1-P6 ou Libéro)
+    const positionLabel = position === 'Libéro' ? 'L' : typeof position === 'number' ? `P${position}` : null;
+
+    // Vérifier si ce joueur est le serveur (P1 quand startsServing est true)
+    const isServer = startsServing && position === 1;
+    // Vérifier si ce joueur est le réceptionneur principal (P1 quand startsServing est false) - indication visuelle différente
+    const isReceiver = !startsServing && position === 1;
+
     return (
       <div
         draggable
@@ -461,11 +470,19 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
         onTouchEnd={handleCardTouchEnd}
         onTouchCancel={handleTouchCancel}
         onClick={handleCardClick}
-        className={`relative group bg-white dark:bg-gray-700 border-2 rounded-lg p-3 cursor-move hover:shadow-lg transition-all flex flex-col items-center justify-center min-h-[80px] ${
+        className={`relative group border-2 rounded-lg p-3 cursor-move hover:shadow-lg transition-all flex flex-col items-center justify-center min-h-[80px] ${
+          isServer
+            ? 'bg-orange-50 dark:bg-orange-900/30 border-orange-400 dark:border-orange-500 ring-2 ring-orange-300 dark:ring-orange-600'
+            : isReceiver
+            ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-400 dark:border-blue-500 ring-2 ring-blue-300 dark:ring-blue-600'
+            : 'bg-white dark:bg-gray-700'
+        } ${
           isSelected
             ? 'border-blue-500 dark:border-blue-400 shadow-lg ring-2 ring-blue-300 dark:ring-blue-600'
             : canReceivePlayer
             ? 'border-green-400 dark:border-green-500 animate-pulse cursor-pointer'
+            : isServer || isReceiver
+            ? ''
             : 'border-gray-300 dark:border-gray-600'
         }`}
       >
@@ -507,6 +524,21 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
             ↓
           </div>
         )}
+        {positionLabel && (
+          <div className="absolute top-1 left-1 bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-800 text-xs font-bold px-1.5 py-0.5 rounded">
+            {positionLabel}
+          </div>
+        )}
+        {isServer && (
+          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap z-10">
+            🏐 SERVICE
+          </div>
+        )}
+        {isReceiver && (
+          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap z-10">
+            🛡️ RÉCEPTION
+          </div>
+        )}
         <PlayerNumberBadge numero={player.numero_maillot} size="xl" position={player.defaultPosition} />
         <div className="text-sm font-medium text-center mt-1 line-clamp-2">
           {formatPlayerDisplay(player)}
@@ -521,6 +553,8 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
   // Composant pour une position vide
   const EmptyPosition: React.FC<{ position: CourtPosition; label: string }> = ({ position, label }) => {
     const canReceivePlayer = selectedPlayer !== null;
+    const isServerPosition = startsServing && position === 1;
+    const isReceiverPosition = !startsServing && position === 1;
 
     return (
       <div
@@ -532,6 +566,10 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
         className={`relative border-2 border-dashed rounded-lg p-3 flex flex-col items-center justify-center min-h-[80px] transition-all cursor-pointer ${
           canReceivePlayer
             ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/20 animate-pulse'
+            : isServerPosition
+            ? 'border-orange-400 dark:border-orange-500 bg-orange-50 dark:bg-orange-900/20'
+            : isReceiverPosition
+            ? 'border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20'
             : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:border-light-primary dark:hover:border-dark-primary hover:bg-gray-100 dark:hover:bg-gray-750'
         }`}
       >
@@ -544,6 +582,16 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
         <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
           {canReceivePlayer ? 'Cliquez pour placer' : 'Clic ou clic droit'}
         </div>
+        {isServerPosition && (
+          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap z-10">
+            🏐 SERVICE
+          </div>
+        )}
+        {isReceiverPosition && (
+          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap z-10">
+            🛡️ RÉCEPTION
+          </div>
+        )}
       </div>
     );
   };
@@ -709,42 +757,42 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
                   </div>
                 </div>
 
-                {/* AVANT à gauche */}
+                {/* AVANT à gauche (P2, P3, P4 de haut en bas) */}
                 <div className="flex-1 space-y-4">
                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">AVANT</div>
-                  {getPlayerAtPosition(4) ? <PlayerCard player={getPlayerAtPosition(4)!} canRemove position={4} /> : <EmptyPosition position={4} label="P4" />}
-                  {getPlayerAtPosition(3) ? <PlayerCard player={getPlayerAtPosition(3)!} canRemove position={3} /> : <EmptyPosition position={3} label="P3" />}
                   {getPlayerAtPosition(2) ? <PlayerCard player={getPlayerAtPosition(2)!} canRemove position={2} /> : <EmptyPosition position={2} label="P2" />}
+                  {getPlayerAtPosition(3) ? <PlayerCard player={getPlayerAtPosition(3)!} canRemove position={3} /> : <EmptyPosition position={3} label="P3" />}
+                  {getPlayerAtPosition(4) ? <PlayerCard player={getPlayerAtPosition(4)!} canRemove position={4} /> : <EmptyPosition position={4} label="P4" />}
                 </div>
 
-                {/* ARRIÈRE à droite */}
+                {/* ARRIÈRE à droite (P1, P6, P5 de haut en bas) */}
                 <div className="flex-1 space-y-4">
                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">ARRIÈRE</div>
-                  {getPlayerAtPosition(5) ? <PlayerCard player={getPlayerAtPosition(5)!} canRemove position={5} /> : <EmptyPosition position={5} label="P5" />}
-                  {getPlayerAtPosition(6) ? <PlayerCard player={getPlayerAtPosition(6)!} canRemove position={6} /> : <EmptyPosition position={6} label="P6" />}
                   {getPlayerAtPosition(1) ? <PlayerCard player={getPlayerAtPosition(1)!} canRemove position={1} /> : <EmptyPosition position={1} label="P1" />}
+                  {getPlayerAtPosition(6) ? <PlayerCard player={getPlayerAtPosition(6)!} canRemove position={6} /> : <EmptyPosition position={6} label="P6" />}
+                  {getPlayerAtPosition(5) ? <PlayerCard player={getPlayerAtPosition(5)!} canRemove position={5} /> : <EmptyPosition position={5} label="P5" />}
                 </div>
               </div>
             ) : visualRotation === 180 ? (
-              // Rotation 180° : Arrière en haut, Avant en bas, Filet en bas
+              // Rotation 180° : Arrière en haut, Avant en bas, Filet en bas (miroir horizontal)
               <>
-                {/* ARRIÈRE en haut (P5, P6, P1) */}
+                {/* ARRIÈRE en haut (P1, P6, P5) - inversé */}
                 <div className="mb-4">
                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">ARRIÈRE</div>
                   <div className="grid grid-cols-3 gap-4">
-                    {getPlayerAtPosition(5) ? <PlayerCard player={getPlayerAtPosition(5)!} canRemove position={5} /> : <EmptyPosition position={5} label="P5" />}
-                    {getPlayerAtPosition(6) ? <PlayerCard player={getPlayerAtPosition(6)!} canRemove position={6} /> : <EmptyPosition position={6} label="P6" />}
                     {getPlayerAtPosition(1) ? <PlayerCard player={getPlayerAtPosition(1)!} canRemove position={1} /> : <EmptyPosition position={1} label="P1" />}
+                    {getPlayerAtPosition(6) ? <PlayerCard player={getPlayerAtPosition(6)!} canRemove position={6} /> : <EmptyPosition position={6} label="P6" />}
+                    {getPlayerAtPosition(5) ? <PlayerCard player={getPlayerAtPosition(5)!} canRemove position={5} /> : <EmptyPosition position={5} label="P5" />}
                   </div>
                 </div>
 
-                {/* AVANT en bas (P4, P3, P2) */}
+                {/* AVANT en bas (P2, P3, P4) - inversé */}
                 <div className="mb-4">
                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">AVANT</div>
                   <div className="grid grid-cols-3 gap-4">
-                    {getPlayerAtPosition(4) ? <PlayerCard player={getPlayerAtPosition(4)!} canRemove position={4} /> : <EmptyPosition position={4} label="P4" />}
-                    {getPlayerAtPosition(3) ? <PlayerCard player={getPlayerAtPosition(3)!} canRemove position={3} /> : <EmptyPosition position={3} label="P3" />}
                     {getPlayerAtPosition(2) ? <PlayerCard player={getPlayerAtPosition(2)!} canRemove position={2} /> : <EmptyPosition position={2} label="P2" />}
+                    {getPlayerAtPosition(3) ? <PlayerCard player={getPlayerAtPosition(3)!} canRemove position={3} /> : <EmptyPosition position={3} label="P3" />}
+                    {getPlayerAtPosition(4) ? <PlayerCard player={getPlayerAtPosition(4)!} canRemove position={4} /> : <EmptyPosition position={4} label="P4" />}
                   </div>
                 </div>
 
@@ -760,7 +808,7 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
             ) : (
               // Rotation 270° : Arrière à gauche, Avant à droite, Filet vertical à droite
               <div className="flex gap-4">
-                {/* ARRIÈRE à gauche */}
+                {/* ARRIÈRE à gauche (P5, P6, P1 de haut en bas) */}
                 <div className="flex-1 space-y-4">
                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">ARRIÈRE</div>
                   {getPlayerAtPosition(5) ? <PlayerCard player={getPlayerAtPosition(5)!} canRemove position={5} /> : <EmptyPosition position={5} label="P5" />}
@@ -768,7 +816,7 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
                   {getPlayerAtPosition(1) ? <PlayerCard player={getPlayerAtPosition(1)!} canRemove position={1} /> : <EmptyPosition position={1} label="P1" />}
                 </div>
 
-                {/* AVANT à droite */}
+                {/* AVANT à droite (P4, P3, P2 de haut en bas) */}
                 <div className="flex-1 space-y-4">
                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">AVANT</div>
                   {getPlayerAtPosition(4) ? <PlayerCard player={getPlayerAtPosition(4)!} canRemove position={4} /> : <EmptyPosition position={4} label="P4" />}
@@ -804,15 +852,40 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
           {/* Banc */}
           <div className="bg-light-surface dark:bg-dark-surface rounded-lg p-4 shadow-md">
             <h3 className="text-lg font-semibold mb-3">Banc ({benchPlayers.length})</h3>
-            <div className="max-h-[500px] overflow-y-auto">
+            <div className="max-h-[300px] lg:max-h-[500px] overflow-y-auto">
               {benchPlayers.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {benchPlayers.map((player, index) => (
-                    <PlayerCard key={player.licencieId || `${player.prenom}-${player.nom}-${index}`} player={player} />
-                  ))}
+                <div className="grid grid-cols-3 lg:grid-cols-2 gap-1 lg:gap-2">
+                  {benchPlayers.map((player, index) => {
+                    const isSelected = selectedPlayer && isSamePlayer(selectedPlayer, player);
+                    return (
+                      <div
+                        key={player.licencieId || `${player.prenom}-${player.nom}-${index}`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, player)}
+                        onTouchStart={(e) => handleTouchStart(e, player, undefined)}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={(e) => handleTouchEnd(e, player, undefined)}
+                        onTouchCancel={handleTouchCancel}
+                        onClick={() => setSelectedPlayer(isSelected ? null : player)}
+                        className={`relative bg-white dark:bg-gray-700 border-2 rounded-md p-1.5 lg:p-3 cursor-move hover:shadow-md transition-all flex flex-col items-center justify-center min-h-[60px] lg:min-h-[80px] ${
+                          isSelected
+                            ? 'border-blue-500 dark:border-blue-400 shadow-lg ring-2 ring-blue-300 dark:ring-blue-600'
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}
+                      >
+                        <PlayerNumberBadge numero={player.numero_maillot} size="md" position={player.defaultPosition} />
+                        <div className="text-xs lg:text-sm font-medium text-center mt-0.5 lg:mt-1 line-clamp-1 lg:line-clamp-2">
+                          {player.prenom}
+                        </div>
+                        <div className="hidden lg:block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                          {player.defaultPosition}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">
+                <div className="text-center py-4 lg:py-8 text-gray-400 dark:text-gray-500 text-sm">
                   Tous les joueurs sont sur le terrain
                 </div>
               )}
