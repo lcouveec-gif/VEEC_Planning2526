@@ -127,7 +127,7 @@ const App: React.FC = () => {
             return;
         }
 
-        const themeBackgroundColor = theme === 'dark' ? '#121212' : '#F7F9FC';
+        const themeBackgroundColor = theme === 'dark' ? '#0d0d0d' : '#f5f5f5';
 
         const canvas = await html2canvas(content, {
             scale: 2,

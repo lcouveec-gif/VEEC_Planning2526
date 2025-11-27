@@ -85,7 +85,7 @@ const PositionTracker: React.FC<PositionTrackerProps> = ({ selectedTeamId: propS
             onClick={() => currentStep !== 'selection' && handleReset()}
             className={`px-3 py-1.5 rounded-md transition-colors ${
               currentStep === 'selection'
-                ? 'bg-light-primary dark:bg-dark-primary text-white font-medium'
+                ? 'bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary font-medium'
                 : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
           >
@@ -96,7 +96,7 @@ const PositionTracker: React.FC<PositionTrackerProps> = ({ selectedTeamId: propS
             onClick={() => currentStep === 'lineup' && handleBack()}
             className={`px-3 py-1.5 rounded-md transition-colors ${
               currentStep === 'roster'
-                ? 'bg-light-primary dark:bg-dark-primary text-white font-medium'
+                ? 'bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary font-medium'
                 : currentStep === 'lineup'
                 ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed'
@@ -109,7 +109,7 @@ const PositionTracker: React.FC<PositionTrackerProps> = ({ selectedTeamId: propS
           <div
             className={`px-3 py-1.5 rounded-md ${
               currentStep === 'lineup'
-                ? 'bg-light-primary dark:bg-dark-primary text-white font-medium'
+                ? 'bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary font-medium'
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
             }`}
           >
@@ -153,8 +153,8 @@ const PositionTracker: React.FC<PositionTrackerProps> = ({ selectedTeamId: propS
               onBack={handleBack}
             />
           ) : currentStep === 'roster' ? (
-            <div className="text-center py-8 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-              <p className="text-yellow-600 dark:text-yellow-400">
+            <div className="text-center py-8 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+              <p className="text-gray-600 dark:text-gray-300">
                 ⚠️ Match non sélectionné (currentStep: {currentStep}, selectedMatch: {selectedMatch ? 'Oui' : 'Non'})
               </p>
             </div>

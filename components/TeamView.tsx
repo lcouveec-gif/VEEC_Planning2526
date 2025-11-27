@@ -92,7 +92,7 @@ const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position'
               disabled={!team.URL_FFVB}
               className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 team.URL_FFVB
-                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 cursor-pointer'
+                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 cursor-default'
               }`}
             >
@@ -196,7 +196,7 @@ const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position'
               e.stopPropagation();
               onNavigate?.('admin', team.IDEQUIPE, 'collectifs');
             }}
-            className="flex flex-col items-center gap-1 px-2 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+            className="flex flex-col items-center gap-1 px-2 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             title="Gérer le collectif"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

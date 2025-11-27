@@ -272,7 +272,7 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
           <div className="mb-4">
             <button
               onClick={openFFVBPlanning}
-              className="w-full px-4 py-3 text-sm font-medium bg-blue-600 dark:bg-blue-700 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors border-2 border-blue-500 dark:border-blue-600 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+              className="w-full px-4 py-3 text-sm font-medium bg-gray-800 dark:bg-gray-700 text-white rounded hover:bg-gray-900 dark:hover:bg-gray-600 transition-colors border-2 border-gray-700 dark:border-gray-600 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -351,7 +351,7 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
               {/* Bouton de validation */}
               <button
                 onClick={applyCustomDates}
-                className="w-full px-3 py-2 text-xs font-medium bg-light-primary dark:bg-dark-primary text-white rounded hover:bg-light-primary/90 dark:hover:bg-dark-primary/90 transition-colors"
+                className="w-full px-3 py-2 text-xs font-medium bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary rounded hover:bg-light-primary/90 dark:hover:bg-dark-primary/90 transition-colors"
               >
                 Appliquer les dates
               </button>
@@ -385,7 +385,7 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
                   onClick={() => onLocationFilterChange('all')}
                   className={`flex-1 px-3 py-2 text-xs font-medium rounded transition-colors ${
                     locationFilter === 'all'
-                      ? 'bg-light-primary dark:bg-dark-primary text-white'
+                      ? 'bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary'
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
@@ -395,7 +395,7 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
                   onClick={() => onLocationFilterChange('home')}
                   className={`flex-1 px-3 py-2 text-xs font-medium rounded transition-colors ${
                     locationFilter === 'home'
-                      ? 'bg-light-primary dark:bg-dark-primary text-white'
+                      ? 'bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary'
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
@@ -405,7 +405,7 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
                   onClick={() => onLocationFilterChange('away')}
                   className={`flex-1 px-3 py-2 text-xs font-medium rounded transition-colors ${
                     locationFilter === 'away'
-                      ? 'bg-light-primary dark:bg-dark-primary text-white'
+                      ? 'bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary'
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
@@ -427,7 +427,7 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
                   onClick={() => handleTeamToggle(team.IDEQUIPE)}
                   className={`px-2 py-1 text-xs rounded transition-colors ${
                     selectedTeamIds.includes(team.IDEQUIPE)
-                      ? 'bg-light-primary dark:bg-dark-primary text-white font-medium'
+                      ? 'bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary font-medium'
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >

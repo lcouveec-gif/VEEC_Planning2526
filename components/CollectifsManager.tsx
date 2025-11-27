@@ -229,7 +229,7 @@ const CollectifsManager: React.FC<CollectifsManagerProps> = ({ selectedTeamId })
                   onClick={() => handleSortChange('number')}
                   className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
                     sortField === 'number'
-                      ? 'bg-light-primary dark:bg-dark-primary text-white'
+                      ? 'bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary'
                       : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                   }`}
                 >
@@ -242,7 +242,7 @@ const CollectifsManager: React.FC<CollectifsManagerProps> = ({ selectedTeamId })
                   onClick={() => handleSortChange('name')}
                   className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
                     sortField === 'name'
-                      ? 'bg-light-primary dark:bg-dark-primary text-white'
+                      ? 'bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary'
                       : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                   }`}
                 >
@@ -279,7 +279,7 @@ const CollectifsManager: React.FC<CollectifsManagerProps> = ({ selectedTeamId })
                           </p>
                           {playerInfo.licencie!.Num_Licencie && (
                             <div className="mt-1">
-                              <span className="inline-block px-3 py-1 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-base font-semibold">
+                              <span className="inline-block px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 text-base font-semibold">
                                 Licence: {playerInfo.licencie!.Num_Licencie}
                               </span>
                             </div>
@@ -341,7 +341,7 @@ const CollectifsManager: React.FC<CollectifsManagerProps> = ({ selectedTeamId })
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleEditPlayer(playerInfo.licencie_id, playerInfo.numero_maillot, playerInfo.poste)}
-                              className="px-3 py-1 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors text-sm font-medium"
+                              className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
                               disabled={collectifsLoading}
                             >
                               Modifier

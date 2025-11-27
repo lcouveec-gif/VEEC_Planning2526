@@ -474,11 +474,11 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
           isServer
             ? 'bg-orange-50 dark:bg-orange-900/30 border-orange-400 dark:border-orange-500 ring-2 ring-orange-300 dark:ring-orange-600'
             : isReceiver
-            ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-400 dark:border-blue-500 ring-2 ring-blue-300 dark:ring-blue-600'
+            ? 'bg-gray-100 dark:bg-gray-800 border-gray-400 dark:border-gray-500 ring-2 ring-gray-300 dark:ring-gray-600'
             : 'bg-white dark:bg-gray-700'
         } ${
           isSelected
-            ? 'border-blue-500 dark:border-blue-400 shadow-lg ring-2 ring-blue-300 dark:ring-blue-600'
+            ? 'border-gray-500 dark:border-gray-400 shadow-lg ring-2 ring-gray-300 dark:ring-gray-600'
             : canReceivePlayer
             ? 'border-green-400 dark:border-green-500 animate-pulse cursor-pointer'
             : isServer || isReceiver
@@ -535,7 +535,7 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
           </div>
         )}
         {isReceiver && (
-          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap z-10">
+          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap z-10">
             🛡️ RÉCEPTION
           </div>
         )}
@@ -569,7 +569,7 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
             : isServerPosition
             ? 'border-orange-400 dark:border-orange-500 bg-orange-50 dark:bg-orange-900/20'
             : isReceiverPosition
-            ? 'border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+            ? 'border-gray-400 dark:border-gray-500 bg-gray-100 dark:bg-gray-800'
             : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:border-light-primary dark:hover:border-dark-primary hover:bg-gray-100 dark:hover:bg-gray-750'
         }`}
       >
@@ -588,7 +588,7 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
           </div>
         )}
         {isReceiverPosition && (
-          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap z-10">
+          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap z-10">
             🛡️ RÉCEPTION
           </div>
         )}
@@ -605,15 +605,15 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
     <div className="space-y-6">
       {/* Indicateur de joueur sélectionné */}
       {selectedPlayer && (
-        <div className="bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-500 dark:border-blue-400 rounded-lg p-4 shadow-lg">
+        <div className="bg-gray-200 dark:bg-gray-700 border-2 border-gray-500 dark:border-gray-400 rounded-lg p-4 shadow-lg">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3">
               <PlayerNumberBadge numero={selectedPlayer.numero_maillot} size="md" position={selectedPlayer.defaultPosition} />
               <div>
-                <div className="font-bold text-blue-900 dark:text-blue-100">
+                <div className="font-bold text-gray-900 dark:text-gray-100">
                   {formatPlayerDisplay(selectedPlayer)}
                 </div>
-                <div className="text-sm text-blue-700 dark:text-blue-300">
+                <div className="text-sm text-gray-800 dark:text-gray-100">
                   Cliquez sur une position pour placer ou échanger
                 </div>
               </div>
@@ -633,7 +633,7 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
               )}
               <button
                 onClick={() => setSelectedPlayer(null)}
-                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors font-medium"
+                className="px-4 py-2 bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-900 rounded-md hover:bg-gray-900 dark:hover:bg-gray-300 transition-colors font-medium"
               >
                 Annuler
               </button>
@@ -692,18 +692,18 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
                 </div>
 
                 {/* Rotation des joueurs */}
-                <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-md">
-                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Rotation:</span>
+                <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-md">
+                  <span className="text-xs font-medium text-gray-800 dark:text-gray-100">Rotation:</span>
                   <button
                     onClick={rotatePlayersCounterClockwise}
-                    className="px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors text-sm font-bold"
+                    className="px-2 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm font-bold"
                     title="Rotation -1 (sens anti-horaire)"
                   >
                     -1
                   </button>
                   <button
                     onClick={rotatePlayersClockwise}
-                    className="px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors text-sm font-bold"
+                    className="px-2 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm font-bold"
                     title="Rotation +1 (sens horaire)"
                   >
                     +1
@@ -869,7 +869,7 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
                         onClick={() => setSelectedPlayer(isSelected ? null : player)}
                         className={`relative bg-white dark:bg-gray-700 border-2 rounded-md p-1.5 lg:p-3 cursor-move hover:shadow-md transition-all flex flex-col items-center justify-center min-h-[60px] lg:min-h-[80px] ${
                           isSelected
-                            ? 'border-blue-500 dark:border-blue-400 shadow-lg ring-2 ring-blue-300 dark:ring-blue-600'
+                            ? 'border-gray-500 dark:border-gray-400 shadow-lg ring-2 ring-gray-300 dark:ring-gray-600'
                             : 'border-gray-300 dark:border-gray-600'
                         }`}
                       >
@@ -920,13 +920,13 @@ const VolleyballCourt: React.FC<VolleyballCourtProps> = ({ players, currentLineu
                     onClick={() => handleChangePlayerPosition(contextMenu.player!, poste)}
                     className={`w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-b-0 ${
                       contextMenu.player!.defaultPosition === poste
-                        ? 'bg-blue-50 dark:bg-blue-900/20 font-semibold'
+                        ? 'bg-gray-100 dark:bg-gray-800 font-semibold'
                         : ''
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       {contextMenu.player!.defaultPosition === poste && (
-                        <span className="text-blue-600 dark:text-blue-400">✓</span>
+                        <span className="text-gray-800 dark:text-gray-100">✓</span>
                       )}
                       <span className="text-sm">{poste}</span>
                     </div>
