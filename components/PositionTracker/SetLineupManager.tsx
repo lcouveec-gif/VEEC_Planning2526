@@ -165,8 +165,8 @@ const SetLineupManager: React.FC<SetLineupManagerProps> = ({ match, players, onB
           </div>
         </div>
         {hasLoadedData && (
-          <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
-            <p className="text-sm text-blue-600 dark:text-blue-400">
+          <div className="mt-3 p-2 bg-gray-100 dark:bg-gray-800 rounded-md border border-gray-300 dark:border-gray-700">
+            <p className="text-sm text-gray-800 dark:text-gray-100">
               ℹ️ Composition existante chargée depuis la base de données
             </p>
           </div>
@@ -185,7 +185,7 @@ const SetLineupManager: React.FC<SetLineupManagerProps> = ({ match, players, onB
                   onClick={() => setCurrentSet(sl.setNumber)}
                   className={`px-4 py-2 rounded-md font-medium transition-colors ${
                     currentSet === sl.setNumber
-                      ? 'bg-light-primary dark:bg-dark-primary text-white'
+                      ? 'bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary'
                       : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                   }`}
                 >
@@ -201,7 +201,7 @@ const SetLineupManager: React.FC<SetLineupManagerProps> = ({ match, players, onB
             className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center gap-2 ${
               currentSetLineup?.startsServing
                 ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-2 border-orange-400'
-                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-2 border-blue-400'
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-2 border-gray-400'
             }`}
           >
             {currentSetLineup?.startsServing ? (

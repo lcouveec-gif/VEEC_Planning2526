@@ -211,8 +211,8 @@ const Register: React.FC<RegisterProps> = ({ onSwitchToLogin, onClose }) => {
         </p>
       </div>
 
-      <div className="mt-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-        <p className="text-xs text-blue-600 dark:text-blue-400">
+      <div className="mt-6 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <p className="text-xs text-gray-800 dark:text-gray-100">
           <strong>Note :</strong> Les nouveaux comptes sont créés avec le rôle "Public" par défaut.
           Contactez un administrateur pour modifier votre rôle.
         </p>

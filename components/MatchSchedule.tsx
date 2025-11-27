@@ -263,7 +263,7 @@ const MatchSchedule: React.FC<MatchScheduleProps> = ({ selectedTeamId }) => {
                   <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-veec-red/20 dark:bg-veec-red/30 text-veec-red dark:text-veec-red border border-veec-red/30">
                     D: {teamStats.defeats}
                   </span>
-                  <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-veec-blue/20 dark:bg-veec-yellow/30 text-veec-blue dark:text-veec-yellow border border-veec-blue/30 dark:border-veec-yellow/30">
+                  <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600">
                     P: {teamStats.upcoming}
                   </span>
                 </div>

@@ -122,7 +122,7 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
     <div className="space-y-4 sm:space-y-6">
       {sortedDates.map((date) => (
         <div key={date} className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-md overflow-hidden">
-          <div className="bg-light-primary dark:bg-dark-primary text-white px-3 sm:px-4 py-2">
+          <div className="bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary px-3 sm:px-4 py-2">
             <h2 className="text-sm sm:text-base font-bold capitalize">{formatDate(date)}</h2>
           </div>
           <div className="divide-y divide-light-border dark:divide-dark-border">
@@ -181,7 +181,7 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
                         </span>
                       )}
                       {match.Championnat && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-veec-blue/20 dark:bg-veec-yellow/30 text-veec-blue dark:text-veec-yellow border border-veec-blue/30 dark:border-veec-yellow/30">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600">
                           {match.Championnat}
                         </span>
                       )}

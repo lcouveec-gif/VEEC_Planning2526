@@ -33,9 +33,9 @@ const Admin: React.FC<AdminProps> = ({ initialSection, selectedTeamId }) => {
           onClick={() => setCurrentSection('teams')}
           className="bg-light-surface dark:bg-dark-surface rounded-lg p-6 shadow-md hover:shadow-lg transition-all border-2 border-transparent hover:border-light-primary dark:hover:border-dark-primary text-left group"
         >
-          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 mb-4 group-hover:scale-110 transition-transform">
+          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 mb-4 group-hover:scale-110 transition-transform">
             <svg
-              className="w-8 h-8 text-blue-600 dark:text-blue-400"
+              className="w-8 h-8 text-gray-700 dark:text-gray-200"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

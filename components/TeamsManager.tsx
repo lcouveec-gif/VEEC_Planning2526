@@ -297,7 +297,7 @@ const TeamsManager: React.FC = () => {
                             disabled={!team.QRCODE_URL}
                             className={`text-sm text-left ${
                               team.QRCODE_URL
-                                ? 'text-blue-600 dark:text-blue-400 hover:underline cursor-pointer'
+                                ? 'text-gray-800 dark:text-gray-100 hover:underline cursor-pointer'
                                 : 'text-gray-600 dark:text-gray-400 cursor-default'
                             }`}
                           >
@@ -315,7 +315,7 @@ const TeamsManager: React.FC = () => {
                             disabled={!team.URL_FFVB}
                             className={`text-sm text-left ${
                               team.URL_FFVB
-                                ? 'text-blue-600 dark:text-blue-400 hover:underline cursor-pointer'
+                                ? 'text-gray-800 dark:text-gray-100 hover:underline cursor-pointer'
                                 : 'text-gray-600 dark:text-gray-400 cursor-default'
                             }`}
                           >
@@ -340,7 +340,7 @@ const TeamsManager: React.FC = () => {
                           )}
                           <button
                             onClick={() => handleEdit(team)}
-                            className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                            className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                             title="Modifier"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -388,7 +388,7 @@ const TeamsManager: React.FC = () => {
                           disabled={!team.QRCODE_URL}
                           className={`text-xs truncate block text-left ${
                             team.QRCODE_URL
-                              ? 'text-blue-600 dark:text-blue-400 hover:underline'
+                              ? 'text-gray-800 dark:text-gray-100 hover:underline'
                               : 'text-gray-600 dark:text-gray-400'
                           }`}
                         >
@@ -404,7 +404,7 @@ const TeamsManager: React.FC = () => {
                           disabled={!team.URL_FFVB}
                           className={`inline-block mt-2 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs ${
                             team.URL_FFVB
-                              ? 'text-blue-600 dark:text-blue-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                              ? 'text-gray-800 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600'
                               : 'text-gray-600 dark:text-gray-400'
                           }`}
                         >
@@ -425,7 +425,7 @@ const TeamsManager: React.FC = () => {
                       )}
                       <button
                         onClick={() => handleEdit(team)}
-                        className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                        className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -602,7 +602,7 @@ const TeamsManager: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handlePouleClick(formData.URL_FFVB)}
-                  className="px-4 py-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors font-medium"
+                  className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
                 >
                   Ouvrir
                 </button>
@@ -655,7 +655,7 @@ const TeamsManager: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleCalendarClick(formData.QRCODE_URL)}
-                  className="px-4 py-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors font-medium"
+                  className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
                 >
                   Ouvrir
                 </button>
@@ -698,7 +698,7 @@ const TeamsManager: React.FC = () => {
 
             {/* Input pour sélectionner une image */}
             <div className="flex items-center gap-3">
-              <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors font-medium">
+              <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
