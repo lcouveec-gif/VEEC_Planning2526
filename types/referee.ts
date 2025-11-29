@@ -39,6 +39,12 @@ export interface SetScore {
   teamB: number;
 }
 
+export interface LiberoExchange {
+  liberoNumber: string;
+  replacedPlayerNumber: string;
+  replacedAtPosition: PlayerPosition;
+}
+
 export interface SetData {
   number: number; // 1, 2, 3, 4, 5
   lineupA: SetLineup;
@@ -47,6 +53,8 @@ export interface SetData {
   servingTeam: 'A' | 'B';
   started: boolean;
   finished: boolean;
+  liberoExchangeA?: LiberoExchange;
+  liberoExchangeB?: LiberoExchange;
 }
 
 export interface MatchData {

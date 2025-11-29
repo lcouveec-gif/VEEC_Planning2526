@@ -66,6 +66,42 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
 
     if (!position) return;
 
+    // Vérifier si c'est un échange de libéro
+    const playerOutInfo = getPlayerInfo(team, playerOut);
+    const playerInInfo = getPlayerInfo(team, playerIn);
+    const isBackRow = position === 'P1' || position === 'P5' || position === 'P6';
+
+    // Si un libéro entre ou sort en position arrière, c'est un échange (pas un remplacement)
+    const isLiberoExchange = isBackRow && (playerOutInfo?.isLibero || playerInInfo?.isLibero);
+
+    if (isLiberoExchange) {
+      // Stocker l'échange de libéro
+      if (playerInInfo?.isLibero) {
+        // Libéro entre, remplace un joueur arrière
+        if (team === 'A') {
+          currentSet.liberoExchangeA = {
+            liberoNumber: playerIn,
+            replacedPlayerNumber: playerOut,
+            replacedAtPosition: position,
+          };
+        } else {
+          currentSet.liberoExchangeB = {
+            liberoNumber: playerIn,
+            replacedPlayerNumber: playerOut,
+            replacedAtPosition: position,
+          };
+        }
+      } else if (playerOutInfo?.isLibero) {
+        // Libéro sort, le joueur qu'il avait remplacé rentre
+        // On efface l'échange enregistré
+        if (team === 'A') {
+          currentSet.liberoExchangeA = undefined;
+        } else {
+          currentSet.liberoExchangeB = undefined;
+        }
+      }
+    }
+
     // Effectuer le changement
     if (team === 'A') {
       currentSet.lineupA[position] = playerIn;
@@ -139,6 +175,35 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
       }
     }
 
+    // Vérifier si un libéro se retrouve en position avant après rotation
+    // Si oui, échanger automatiquement avec le joueur qu'il avait remplacé
+    let newLiberoExchangeA = currentSet.liberoExchangeA;
+    let newLiberoExchangeB = currentSet.liberoExchangeB;
+
+    if (needsRotation && team === 'A' && currentSet.liberoExchangeA) {
+      // Chercher si le libéro de l'équipe A est maintenant en position avant
+      const liberoNumber = currentSet.liberoExchangeA.liberoNumber;
+      const liberoPosition = Object.entries(newLineupA).find(([_, num]) => num === liberoNumber)?.[0] as keyof SetLineup;
+
+      if (liberoPosition && (liberoPosition === 'P2' || liberoPosition === 'P3' || liberoPosition === 'P4')) {
+        // Le libéro est passé à l'avant, on doit le remplacer par le joueur qu'il avait échangé
+        newLineupA[liberoPosition] = currentSet.liberoExchangeA.replacedPlayerNumber;
+        newLiberoExchangeA = undefined; // L'échange est terminé
+      }
+    }
+
+    if (needsRotation && team === 'B' && currentSet.liberoExchangeB) {
+      // Chercher si le libéro de l'équipe B est maintenant en position avant
+      const liberoNumber = currentSet.liberoExchangeB.liberoNumber;
+      const liberoPosition = Object.entries(newLineupB).find(([_, num]) => num === liberoNumber)?.[0] as keyof SetLineup;
+
+      if (liberoPosition && (liberoPosition === 'P2' || liberoPosition === 'P3' || liberoPosition === 'P4')) {
+        // Le libéro est passé à l'avant, on doit le remplacer par le joueur qu'il avait échangé
+        newLineupB[liberoPosition] = currentSet.liberoExchangeB.replacedPlayerNumber;
+        newLiberoExchangeB = undefined; // L'échange est terminé
+      }
+    }
+
     // Vérifier si le set est terminé (25 points avec 2 points d'écart, ou 15 pour le 5e set)
     const isSet5 = matchData.currentSet === 5;
     const winningScore = isSet5 ? 15 : 25;
@@ -155,6 +220,8 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
       lineupB: newLineupB,
       servingTeam: newServingTeam,
       finished: setFinished,
+      liberoExchangeA: newLiberoExchangeA,
+      liberoExchangeB: newLiberoExchangeB,
     };
 
     // Si le set est terminé, calculer qui a gagné
@@ -555,6 +622,8 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
             substitutionMode={substitutionMode}
             onStartSubstitution={(team, playerOut) => setSubstitutionMode({ team, playerOut })}
             onCancelSubstitution={() => setSubstitutionMode(null)}
+            liberoExchangeA={currentSetData.liberoExchangeA}
+            liberoExchangeB={currentSetData.liberoExchangeB}
           />
         </div>
       )}

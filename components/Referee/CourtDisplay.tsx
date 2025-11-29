@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TeamInfo, SetLineup, RefereePlayer } from '../../types/referee';
+import type { TeamInfo, SetLineup, RefereePlayer, LiberoExchange } from '../../types/referee';
 
 interface CourtDisplayProps {
   teamA: TeamInfo;
@@ -14,6 +14,8 @@ interface CourtDisplayProps {
   substitutionMode: { team: 'A' | 'B'; playerOut: string } | null;
   onStartSubstitution: (team: 'A' | 'B', playerOut: string) => void;
   onCancelSubstitution: () => void;
+  liberoExchangeA?: LiberoExchange;
+  liberoExchangeB?: LiberoExchange;
 }
 
 const CourtDisplay: React.FC<CourtDisplayProps> = ({
@@ -29,6 +31,8 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
   substitutionMode,
   onStartSubstitution,
   onCancelSubstitution,
+  liberoExchangeA,
+  liberoExchangeB,
 }) => {
   const renderPlayer = (team: 'A' | 'B', position: keyof SetLineup) => {
     const lineup = team === 'A' ? lineupA : lineupB;
@@ -129,6 +133,12 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
     const playerOut = substitutionMode?.team === team ? getPlayerInfo(team, substitutionMode.playerOut) : null;
     const isLiberoGoingOut = playerOut?.isLibero;
 
+    // Si un libéro sort, on doit automatiquement faire entrer le joueur qu'il avait remplacé
+    const liberoExchange = team === 'A' ? liberoExchangeA : liberoExchangeB;
+    const autoReplacementPlayer = isLiberoGoingOut && liberoExchange?.liberoNumber === substitutionMode?.playerOut
+      ? liberoExchange.replacedPlayerNumber
+      : null;
+
     return (
       <div className={`mt-3 p-3 rounded-lg border-2 transition-all ${
         isSubstitutionActive
@@ -158,24 +168,30 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
               const bgColor = player.isLibero ? teamData.colorSecondary : teamData.colorPrimary;
               const textColor = player.isLibero ? teamData.colorPrimary : teamData.colorSecondary;
 
+              // Vérifier si c'est le joueur qui doit automatiquement remplacer le libéro
+              const isAutoReplacement = autoReplacementPlayer === player.number;
+
               // Le libéro peut entrer SI le joueur sortant est en ligne arrière
-              // OU un joueur normal peut toujours entrer en remplacement (sauf si c'est un libéro qui sort)
+              // OU un joueur normal peut toujours entrer en remplacement (sauf si c'est un libéro qui sort, sauf si c'est le remplacement automatique)
               const canSubstitute = isSubstitutionActive && (
                 (player.isLibero && isBackRowSubstitution) || // Libéro peut entrer pour joueur arrière
-                (!player.isLibero && !isLiberoGoingOut)        // Joueur normal peut entrer (sauf pour libéro)
+                (!player.isLibero && !isLiberoGoingOut) ||     // Joueur normal peut entrer (sauf pour libéro)
+                isAutoReplacement                               // Le joueur qui doit remplacer le libéro
               );
 
-              const tooltipText = player.isLibero
-                ? isSubstitutionActive
-                  ? isBackRowSubstitution
-                    ? `Échanger libéro avec joueur arrière #${substitutionMode?.playerOut}`
-                    : 'Le libéro ne peut échanger qu\'avec un joueur arrière (P1, P5, P6)'
-                  : 'Libéro'
-                : isSubstitutionActive
-                  ? isLiberoGoingOut
-                    ? 'Seul un libéro peut remplacer un libéro'
-                    : `Faire entrer ${player.role} #${player.number}`
-                  : `${player.role}`;
+              const tooltipText = isAutoReplacement
+                ? `Remettre #${player.number} pour remplacer le libéro #${substitutionMode?.playerOut}`
+                : player.isLibero
+                  ? isSubstitutionActive
+                    ? isBackRowSubstitution
+                      ? `Échanger libéro avec joueur arrière #${substitutionMode?.playerOut}`
+                      : 'Le libéro ne peut échanger qu\'avec un joueur arrière (P1, P5, P6)'
+                    : 'Libéro'
+                  : isSubstitutionActive
+                    ? isLiberoGoingOut
+                      ? 'Seul le joueur échangé peut remplacer le libéro'
+                      : `Faire entrer ${player.role} #${player.number}`
+                    : `${player.role}`;
 
               return (
                 <div
@@ -185,11 +201,13 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
                 >
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center shadow transition-all ${
-                      canSubstitute
-                        ? player.isLibero
-                          ? 'cursor-pointer hover:scale-125 hover:ring-2 hover:ring-blue-500'
-                          : 'cursor-pointer hover:scale-125 hover:ring-2 hover:ring-green-500'
-                        : 'opacity-50 cursor-not-allowed'
+                      isAutoReplacement
+                        ? 'cursor-pointer hover:scale-125 ring-2 ring-purple-500 animate-pulse'
+                        : canSubstitute
+                          ? player.isLibero
+                            ? 'cursor-pointer hover:scale-125 hover:ring-2 hover:ring-blue-500'
+                            : 'cursor-pointer hover:scale-125 hover:ring-2 hover:ring-green-500'
+                          : 'opacity-50 cursor-not-allowed'
                     }`}
                     style={{ backgroundColor: bgColor }}
                     onClick={() => {
