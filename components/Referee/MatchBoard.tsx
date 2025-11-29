@@ -11,6 +11,7 @@ interface MatchBoardProps {
 
 const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack, onNeedCoinTossForSet5 }) => {
   const [showLineupSetup, setShowLineupSetup] = useState(true);
+  const [substitutionMode, setSubstitutionMode] = useState<{ team: 'A' | 'B'; playerOut: string } | null>(null);
   const currentSetData = matchData.sets[matchData.currentSet - 1];
 
   // Rotation des joueurs (sens horaire vue de dessus)
@@ -53,6 +54,43 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
     }
 
     setMatchData({ ...matchData, sets: updatedSets });
+  };
+
+  const handleSubstitution = (team: 'A' | 'B', playerOut: string, playerIn: string) => {
+    const updatedSets = [...matchData.sets];
+    const currentSet = updatedSets[matchData.currentSet - 1];
+
+    // Trouver la position du joueur sortant
+    const lineup = team === 'A' ? currentSet.lineupA : currentSet.lineupB;
+    const position = Object.entries(lineup).find(([_, num]) => num === playerOut)?.[0] as keyof SetLineup;
+
+    if (!position) return;
+
+    // Effectuer le changement
+    if (team === 'A') {
+      currentSet.lineupA[position] = playerIn;
+    } else {
+      currentSet.lineupB[position] = playerIn;
+    }
+
+    setMatchData({ ...matchData, sets: updatedSets });
+    setSubstitutionMode(null);
+  };
+
+  const handleResetSet = () => {
+    if (!window.confirm('Voulez-vous vraiment recommencer ce set ? Le score sera remis à 0-0 et les positions initiales seront restaurées.')) {
+      return;
+    }
+
+    const updatedSets = [...matchData.sets];
+    const currentSet = updatedSets[matchData.currentSet - 1];
+
+    // Réinitialiser le score
+    currentSet.score = { teamA: 0, teamB: 0 };
+    currentSet.started = false;
+
+    setMatchData({ ...matchData, sets: updatedSets });
+    setShowLineupSetup(true);
   };
 
   const handleRemovePoint = (team: 'A' | 'B') => {
@@ -255,7 +293,7 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
                         <option value="">-</option>
                         {availablePlayers.map(p => (
                           <option key={p.number} value={p.number}>
-                            #{p.number} {p.isLibero ? '(L)' : ''} {p.isCaptain ? '(C)' : ''}
+                            #{p.number} - {p.role} {p.isLibero ? '(L)' : ''} {p.isCaptain ? '(C)' : ''}
                           </option>
                         ))}
                       </select>
@@ -286,7 +324,7 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
                         <option value="">-</option>
                         {availablePlayers.map(p => (
                           <option key={p.number} value={p.number}>
-                            #{p.number} {p.isLibero ? '(L)' : ''} {p.isCaptain ? '(C)' : ''}
+                            #{p.number} - {p.role} {p.isLibero ? '(L)' : ''} {p.isCaptain ? '(C)' : ''}
                           </option>
                         ))}
                       </select>
@@ -329,7 +367,7 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
                         <option value="">-</option>
                         {availablePlayers.map(p => (
                           <option key={p.number} value={p.number}>
-                            #{p.number} {p.isLibero ? '(L)' : ''} {p.isCaptain ? '(C)' : ''}
+                            #{p.number} - {p.role} {p.isLibero ? '(L)' : ''} {p.isCaptain ? '(C)' : ''}
                           </option>
                         ))}
                       </select>
@@ -360,7 +398,7 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
                         <option value="">-</option>
                         {availablePlayers.map(p => (
                           <option key={p.number} value={p.number}>
-                            #{p.number} {p.isLibero ? '(L)' : ''} {p.isCaptain ? '(C)' : ''}
+                            #{p.number} - {p.role} {p.isLibero ? '(L)' : ''} {p.isCaptain ? '(C)' : ''}
                           </option>
                         ))}
                       </select>
@@ -513,7 +551,41 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
             onRotateA={handleManualRotation.bind(null, 'A')}
             onRotateB={handleManualRotation.bind(null, 'B')}
             getPlayerInfo={getPlayerInfo}
+            onSubstitute={handleSubstitution}
+            substitutionMode={substitutionMode}
+            onStartSubstitution={(team, playerOut) => setSubstitutionMode({ team, playerOut })}
+            onCancelSubstitution={() => setSubstitutionMode(null)}
           />
+        </div>
+      )}
+
+      {/* Set terminé - Bouton pour lancer le set suivant */}
+      {!matchFinished && currentSetData.finished && (
+        <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-600 rounded-lg shadow-lg p-4 sm:p-6 text-center">
+          <h3 className="text-xl sm:text-2xl font-bold mb-2 text-green-800 dark:text-green-200">
+            Set {matchData.currentSet} terminé !
+          </h3>
+          <p className="text-lg mb-4 text-green-700 dark:text-green-300">
+            Score: {currentSetData.score.teamA} - {currentSetData.score.teamB}
+          </p>
+          <button
+            onClick={() => setShowLineupSetup(true)}
+            className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors shadow-md"
+          >
+            Configurer le set suivant
+          </button>
+        </div>
+      )}
+
+      {/* Boutons d'action */}
+      {!matchFinished && !currentSetData.finished && (
+        <div className="flex gap-2 sm:gap-3">
+          <button
+            onClick={handleResetSet}
+            className="flex-1 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition-colors shadow"
+          >
+            🔄 Recommencer ce set
+          </button>
         </div>
       )}
 

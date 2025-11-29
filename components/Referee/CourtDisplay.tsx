@@ -10,7 +10,10 @@ interface CourtDisplayProps {
   onRotateA: (direction: 'clockwise' | 'counter') => void;
   onRotateB: (direction: 'clockwise' | 'counter') => void;
   getPlayerInfo: (team: 'A' | 'B', playerNumber: string) => RefereePlayer | undefined;
-  onSubstitute?: (team: 'A' | 'B', playerOut: string, playerIn: string) => void;
+  onSubstitute: (team: 'A' | 'B', playerOut: string, playerIn: string) => void;
+  substitutionMode: { team: 'A' | 'B'; playerOut: string } | null;
+  onStartSubstitution: (team: 'A' | 'B', playerOut: string) => void;
+  onCancelSubstitution: () => void;
 }
 
 const CourtDisplay: React.FC<CourtDisplayProps> = ({
@@ -23,6 +26,9 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
   onRotateB,
   getPlayerInfo,
   onSubstitute,
+  substitutionMode,
+  onStartSubstitution,
+  onCancelSubstitution,
 }) => {
   const renderPlayer = (team: 'A' | 'B', position: keyof SetLineup) => {
     const lineup = team === 'A' ? lineupA : lineupB;
@@ -31,6 +37,7 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
     const player = getPlayerInfo(team, playerNum);
 
     const isServing = servingTeam === team && position === 'P1';
+    const isBeingSubstituted = substitutionMode?.team === team && substitutionMode?.playerOut === playerNum;
 
     // Couleurs pour le cercle du numéro
     const bgColor = player?.isLibero ? teamData.colorSecondary : teamData.colorPrimary;
@@ -38,15 +45,24 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
 
     return (
       <div
-        className={`relative bg-white dark:bg-gray-800 rounded-lg p-2 border-2 transition-all ${
+        className={`relative bg-white dark:bg-gray-800 rounded-lg p-2 border-2 transition-all cursor-pointer hover:shadow-lg ${
           isServing ? 'ring-4 ring-yellow-400 ring-opacity-70 shadow-lg' : ''
-        }`}
+        } ${isBeingSubstituted ? 'ring-4 ring-red-500 ring-opacity-70' : ''}`}
         style={{ borderColor: teamData.colorPrimary }}
+        onClick={() => !player?.isLibero && onStartSubstitution(team, playerNum)}
+        title={player?.isLibero ? 'Le libéro ne peut pas être remplacé' : 'Cliquer pour remplacer'}
       >
         {/* Badge Service */}
         {isServing && (
           <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 text-[8px] sm:text-[9px] font-bold px-2 py-0.5 rounded-full shadow-md whitespace-nowrap">
             SERVICE
+          </div>
+        )}
+
+        {/* Badge Remplacement */}
+        {isBeingSubstituted && (
+          <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-[8px] sm:text-[9px] font-bold px-2 py-0.5 rounded-full shadow-md whitespace-nowrap">
+            À REMPLACER
           </div>
         )}
 
@@ -90,34 +106,76 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
     const onCourtNumbers = Object.values(lineup);
     const benchPlayers = teamData.players.filter(p => !onCourtNumbers.includes(p.number));
 
-    return (
-      <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-600">
-        <h4 className="text-xs font-bold mb-2 text-gray-700 dark:text-gray-300">Banc</h4>
-        <div className="flex flex-wrap gap-2">
-          {benchPlayers.map(player => {
-            const bgColor = player.isLibero ? teamData.colorSecondary : teamData.colorPrimary;
-            const textColor = player.isLibero ? teamData.colorPrimary : teamData.colorSecondary;
+    const isSubstitutionActive = substitutionMode?.team === team;
 
-            return (
-              <div
-                key={player.number}
-                className="flex flex-col items-center"
-                title={`${player.role} - Clic pour remplacer`}
-              >
+    return (
+      <div className={`mt-3 p-3 rounded-lg border-2 transition-all ${
+        isSubstitutionActive
+          ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-600'
+          : 'bg-gray-50 dark:bg-gray-900 border-gray-300 dark:border-gray-600'
+      }`}>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300">
+            Banc {isSubstitutionActive && '- Sélectionner remplaçant'}
+          </h4>
+          {isSubstitutionActive && (
+            <button
+              onClick={onCancelSubstitution}
+              className="text-xs bg-red-500 text-white px-2 py-0.5 rounded hover:bg-red-600 transition-colors"
+            >
+              Annuler
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {benchPlayers.length === 0 ? (
+            <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+              Tous les joueurs sont sur le terrain
+            </div>
+          ) : (
+            benchPlayers.map(player => {
+              const bgColor = player.isLibero ? teamData.colorSecondary : teamData.colorPrimary;
+              const textColor = player.isLibero ? teamData.colorPrimary : teamData.colorSecondary;
+              const canSubstitute = isSubstitutionActive && !player.isLibero;
+
+              return (
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center shadow cursor-pointer hover:scale-110 transition-transform"
-                  style={{ backgroundColor: bgColor }}
+                  key={player.number}
+                  className="flex flex-col items-center"
+                  title={
+                    player.isLibero
+                      ? 'Le libéro ne peut pas entrer en remplacement'
+                      : isSubstitutionActive
+                        ? `Faire entrer ${player.role} #${player.number}`
+                        : `${player.role}`
+                  }
                 >
-                  <span className="text-sm font-bold" style={{ color: textColor }}>
-                    {player.number}
-                  </span>
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center shadow transition-all ${
+                      canSubstitute
+                        ? 'cursor-pointer hover:scale-125 hover:ring-2 hover:ring-green-500'
+                        : player.isLibero
+                          ? 'opacity-50 cursor-not-allowed'
+                          : ''
+                    }`}
+                    style={{ backgroundColor: bgColor }}
+                    onClick={() => {
+                      if (canSubstitute && substitutionMode) {
+                        onSubstitute(team, substitutionMode.playerOut, player.number);
+                      }
+                    }}
+                  >
+                    <span className="text-sm font-bold" style={{ color: textColor }}>
+                      {player.number}
+                    </span>
+                  </div>
+                  <div className="text-[8px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">
+                    {player.role}
+                  </div>
                 </div>
-                <div className="text-[8px] text-gray-600 dark:text-gray-400 mt-0.5">
-                  {player.role}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
     );

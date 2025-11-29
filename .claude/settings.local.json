@@ -4,7 +4,11 @@
       "Bash(npm install:*)",
       "Bash(npm run dev:*)",
       "Bash(npm run build:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git checkout:*)",
+      "Bash(taskkill:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Module Arbitre complet avec UX/UI améliorée\n\n- Ajout couleurs principale et secondaire pour chaque équipe\n- Numéros de joueurs dans cercles colorés (primaire/secondaire)\n- Libéros avec couleurs inversées (secondaire bg, primaire text)\n- Indication service sur case P1 + badge \"SERVICE\"\n- Rôles de joueurs plus visibles (Passeur, R4, Central, etc.)\n- Bancs de remplaçants avec tous les joueurs hors terrain\n- Boutons +Point et -Point pour gérer le score\n- Score simplifié : sets gagnés au centre, détail par set en bas\n- Configuration positions réorganisée (Arrière/Avant, ordre terrain)\n- Changement de service automatique entre sets 2,3,4\n- Tirage au sort automatique pour le 5ème set\n- Design harmonieux et ergonomique sur mobile et desktop\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []
