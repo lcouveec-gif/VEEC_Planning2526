@@ -39,6 +39,10 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
     const isServing = servingTeam === team && position === 'P1';
     const isBeingSubstituted = substitutionMode?.team === team && substitutionMode?.playerOut === playerNum;
 
+    // Le libéro peut échanger avec les joueurs arrière (P1, P5, P6)
+    const isBackRow = position === 'P1' || position === 'P5' || position === 'P6';
+    const canBeReplacedByLibero = isBackRow && !player?.isLibero;
+
     // Couleurs pour le cercle du numéro
     const bgColor = player?.isLibero ? teamData.colorSecondary : teamData.colorPrimary;
     const textColor = player?.isLibero ? teamData.colorPrimary : teamData.colorSecondary;
@@ -49,8 +53,14 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
           isServing ? 'ring-4 ring-yellow-400 ring-opacity-70 shadow-lg' : ''
         } ${isBeingSubstituted ? 'ring-4 ring-red-500 ring-opacity-70' : ''}`}
         style={{ borderColor: teamData.colorPrimary }}
-        onClick={() => !player?.isLibero && onStartSubstitution(team, playerNum)}
-        title={player?.isLibero ? 'Le libéro ne peut pas être remplacé' : 'Cliquer pour remplacer'}
+        onClick={() => onStartSubstitution(team, playerNum)}
+        title={
+          player?.isLibero
+            ? 'Cliquer pour échanger le libéro avec un joueur arrière'
+            : canBeReplacedByLibero
+              ? 'Cliquer pour remplacer (ou échanger avec libéro)'
+              : 'Cliquer pour remplacer'
+        }
       >
         {/* Badge Service */}
         {isServing && (
@@ -108,6 +118,17 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
 
     const isSubstitutionActive = substitutionMode?.team === team;
 
+    // Vérifier si le joueur à remplacer est en ligne arrière pour permettre échange libéro
+    let playerOutPosition: keyof SetLineup | null = null;
+    if (substitutionMode?.team === team) {
+      playerOutPosition = Object.entries(lineup).find(([_, num]) => num === substitutionMode.playerOut)?.[0] as keyof SetLineup || null;
+    }
+    const isBackRowSubstitution = playerOutPosition && (playerOutPosition === 'P1' || playerOutPosition === 'P5' || playerOutPosition === 'P6');
+
+    // Vérifier si c'est un libéro qui sort (il peut échanger avec n'importe quel joueur arrière)
+    const playerOut = substitutionMode?.team === team ? getPlayerInfo(team, substitutionMode.playerOut) : null;
+    const isLiberoGoingOut = playerOut?.isLibero;
+
     return (
       <div className={`mt-3 p-3 rounded-lg border-2 transition-all ${
         isSubstitutionActive
@@ -136,27 +157,39 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
             benchPlayers.map(player => {
               const bgColor = player.isLibero ? teamData.colorSecondary : teamData.colorPrimary;
               const textColor = player.isLibero ? teamData.colorPrimary : teamData.colorSecondary;
-              const canSubstitute = isSubstitutionActive && !player.isLibero;
+
+              // Le libéro peut entrer SI le joueur sortant est en ligne arrière
+              // OU un joueur normal peut toujours entrer en remplacement (sauf si c'est un libéro qui sort)
+              const canSubstitute = isSubstitutionActive && (
+                (player.isLibero && isBackRowSubstitution) || // Libéro peut entrer pour joueur arrière
+                (!player.isLibero && !isLiberoGoingOut)        // Joueur normal peut entrer (sauf pour libéro)
+              );
+
+              const tooltipText = player.isLibero
+                ? isSubstitutionActive
+                  ? isBackRowSubstitution
+                    ? `Échanger libéro avec joueur arrière #${substitutionMode?.playerOut}`
+                    : 'Le libéro ne peut échanger qu\'avec un joueur arrière (P1, P5, P6)'
+                  : 'Libéro'
+                : isSubstitutionActive
+                  ? isLiberoGoingOut
+                    ? 'Seul un libéro peut remplacer un libéro'
+                    : `Faire entrer ${player.role} #${player.number}`
+                  : `${player.role}`;
 
               return (
                 <div
                   key={player.number}
                   className="flex flex-col items-center"
-                  title={
-                    player.isLibero
-                      ? 'Le libéro ne peut pas entrer en remplacement'
-                      : isSubstitutionActive
-                        ? `Faire entrer ${player.role} #${player.number}`
-                        : `${player.role}`
-                  }
+                  title={tooltipText}
                 >
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center shadow transition-all ${
                       canSubstitute
-                        ? 'cursor-pointer hover:scale-125 hover:ring-2 hover:ring-green-500'
-                        : player.isLibero
-                          ? 'opacity-50 cursor-not-allowed'
-                          : ''
+                        ? player.isLibero
+                          ? 'cursor-pointer hover:scale-125 hover:ring-2 hover:ring-blue-500'
+                          : 'cursor-pointer hover:scale-125 hover:ring-2 hover:ring-green-500'
+                        : 'opacity-50 cursor-not-allowed'
                     }`}
                     style={{ backgroundColor: bgColor }}
                     onClick={() => {
