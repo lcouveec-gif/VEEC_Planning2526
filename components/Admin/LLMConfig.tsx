@@ -65,19 +65,54 @@ const LLMConfig: React.FC = () => {
     setTestStatus({ success: false, message: 'Test en cours...' });
 
     try {
-      const response = await fetch(settings.endpoint, {
-        method: 'POST',
-        headers: {
+      let url = settings.endpoint;
+      let headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      let body: any = {};
+
+      // Configuration spécifique selon le provider
+      if (settings.provider === 'google') {
+        // Google Gemini API
+        url = `https://generativelanguage.googleapis.com/v1beta/models/${settings.model}:generateContent?key=${settings.apiKey}`;
+        body = {
+          contents: [{
+            parts: [{ text: 'Test' }]
+          }]
+        };
+      } else if (settings.provider === 'anthropic') {
+        // Anthropic Claude API
+        headers = {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${settings.apiKey}`,
-        },
-        body: JSON.stringify({
+          'x-api-key': settings.apiKey,
+          'anthropic-version': '2023-06-01',
+        };
+        body = {
           model: settings.model,
           messages: [
-            { role: 'user', content: 'Test de connexion' }
+            { role: 'user', content: 'Test' }
           ],
           max_tokens: 10,
-        }),
+        };
+      } else {
+        // OpenAI et custom
+        headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${settings.apiKey}`,
+        };
+        body = {
+          model: settings.model,
+          messages: [
+            { role: 'user', content: 'Test' }
+          ],
+          max_tokens: 10,
+        };
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
       });
 
       if (response.ok) {
@@ -89,7 +124,7 @@ const LLMConfig: React.FC = () => {
         const error = await response.json();
         setTestStatus({
           success: false,
-          message: `Erreur ${response.status}: ${error.error?.message || response.statusText}`,
+          message: `Erreur ${response.status}: ${error.error?.message || error.message || response.statusText}`,
         });
       }
     } catch (error) {
@@ -130,11 +165,11 @@ const LLMConfig: React.FC = () => {
     {
       value: 'google',
       label: 'Google (Gemini)',
-      defaultEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
+      defaultEndpoint: 'https://generativelanguage.googleapis.com/v1beta',
       models: [
         { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash (recommandé)' },
         { value: 'gemini-exp-1206', label: 'Gemini Exp 1206' },
-        { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+        { value: 'gemini-1.5-pro-latest', label: 'Gemini 1.5 Pro' },
         { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
         { value: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash 8B' },
       ],
