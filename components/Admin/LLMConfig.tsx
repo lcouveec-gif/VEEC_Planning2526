@@ -32,11 +32,29 @@ const LLMConfig: React.FC = () => {
   const [testStatus, setTestStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [customModel, setCustomModel] = useState('');
 
-  // Charger les paramètres depuis le localStorage
+  // Charger les paramètres depuis le localStorage avec validation et migration
   useEffect(() => {
     const stored = localStorage.getItem('llmSettings');
     if (stored) {
-      setSettings(JSON.parse(stored));
+      const loadedSettings = JSON.parse(stored);
+
+      // Valider que le modèle existe pour le provider
+      const provider = providers.find(p => p.value === loadedSettings.provider);
+      const validModel = provider?.models.find(m => m.value === loadedSettings.model);
+
+      if (!validModel && provider && provider.models.length > 0) {
+        // Modèle invalide - utiliser le modèle par défaut du provider
+        const fixedSettings = {
+          ...loadedSettings,
+          model: provider.models[0].value,
+          endpoint: provider.defaultEndpoint,
+        };
+        setSettings(fixedSettings);
+        localStorage.setItem('llmSettings', JSON.stringify(fixedSettings));
+        console.log(`Configuration migrée: modèle invalide "${loadedSettings.model}" remplacé par "${fixedSettings.model}"`);
+      } else {
+        setSettings(loadedSettings);
+      }
     }
   }, []);
 
@@ -74,7 +92,7 @@ const LLMConfig: React.FC = () => {
       // Configuration spécifique selon le provider
       if (settings.provider === 'google') {
         // Google Gemini API
-        url = `https://generativelanguage.googleapis.com/v1/models/${settings.model}:generateContent?key=${settings.apiKey}`;
+        url = `https://generativelanguage.googleapis.com/v1beta/models/${settings.model}:generateContent?key=${settings.apiKey}`;
         body = {
           contents: [{
             parts: [{ text: 'Test' }]
@@ -167,10 +185,17 @@ const LLMConfig: React.FC = () => {
     {
       value: 'google',
       label: 'Google (Gemini)',
-      defaultEndpoint: 'https://generativelanguage.googleapis.com/v1',
+      defaultEndpoint: 'https://generativelanguage.googleapis.com/v1beta',
       models: [
-        { value: 'gemini-pro', label: 'Gemini Pro (recommandé)' },
-        { value: 'gemini-pro-vision', label: 'Gemini Pro Vision' },
+        { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (recommandé)' },
+        { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+        { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+        { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Experimental' },
+        { value: 'gemini-flash-latest', label: 'Gemini Flash Latest' },
+        { value: 'gemini-pro-latest', label: 'Gemini Pro Latest' },
+        { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' },
+        { value: 'gemini-exp-1206', label: 'Gemini Experimental 1206' },
+        { value: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview' },
       ],
     },
     {
@@ -187,13 +212,15 @@ const LLMConfig: React.FC = () => {
 
   const handleProviderChange = (providerValue: string) => {
     const provider = providers.find(p => p.value === providerValue);
+    const defaultModel = provider?.models[0]?.value || 'gpt-4o';
     setSettings({
       ...settings,
       provider: providerValue,
       endpoint: provider?.defaultEndpoint || settings.endpoint,
-      model: provider?.models[0]?.value || settings.model,
+      model: defaultModel,
     });
     setCustomModel('');
+    console.log(`Provider changed to ${providerValue}, default model set to: ${defaultModel}`);
   };
 
   const handleModelChange = (modelValue: string) => {
