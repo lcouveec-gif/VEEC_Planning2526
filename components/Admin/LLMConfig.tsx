@@ -169,9 +169,7 @@ const LLMConfig: React.FC = () => {
       label: 'Google (Gemini)',
       defaultEndpoint: 'https://generativelanguage.googleapis.com/v1',
       models: [
-        { value: 'gemini-1.5-flash-latest', label: 'Gemini 1.5 Flash Latest (recommandé)' },
-        { value: 'gemini-1.5-pro-latest', label: 'Gemini 1.5 Pro Latest' },
-        { value: 'gemini-pro', label: 'Gemini Pro' },
+        { value: 'gemini-pro', label: 'Gemini Pro (recommandé)' },
         { value: 'gemini-pro-vision', label: 'Gemini Pro Vision' },
       ],
     },
