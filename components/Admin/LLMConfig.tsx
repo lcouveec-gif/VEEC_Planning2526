@@ -12,17 +12,25 @@ interface LLMSettings {
 const DEFAULT_SETTINGS: LLMSettings = {
   provider: 'openai',
   apiKey: '',
-  model: 'gpt-4',
+  model: 'gpt-4o',
   endpoint: 'https://api.openai.com/v1/chat/completions',
   temperature: 0.7,
   maxTokens: 2000,
 };
+
+interface Provider {
+  value: string;
+  label: string;
+  defaultEndpoint: string;
+  models: { value: string; label: string }[];
+}
 
 const LLMConfig: React.FC = () => {
   const [settings, setSettings] = useState<LLMSettings>(DEFAULT_SETTINGS);
   const [isEditing, setIsEditing] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [testStatus, setTestStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const [customModel, setCustomModel] = useState('');
 
   // Charger les paramètres depuis le localStorage
   useEffect(() => {
@@ -92,11 +100,76 @@ const LLMConfig: React.FC = () => {
     }
   };
 
-  const providers = [
-    { value: 'openai', label: 'OpenAI', defaultEndpoint: 'https://api.openai.com/v1/chat/completions' },
-    { value: 'anthropic', label: 'Anthropic (Claude)', defaultEndpoint: 'https://api.anthropic.com/v1/messages' },
-    { value: 'custom', label: 'Personnalisé', defaultEndpoint: '' },
+  const providers: Provider[] = [
+    {
+      value: 'openai',
+      label: 'OpenAI',
+      defaultEndpoint: 'https://api.openai.com/v1/chat/completions',
+      models: [
+        { value: 'gpt-4o', label: 'GPT-4o (recommandé)' },
+        { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+        { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+        { value: 'gpt-4', label: 'GPT-4' },
+        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+        { value: 'o1-preview', label: 'O1 Preview' },
+        { value: 'o1-mini', label: 'O1 Mini' },
+      ],
+    },
+    {
+      value: 'anthropic',
+      label: 'Anthropic (Claude)',
+      defaultEndpoint: 'https://api.anthropic.com/v1/messages',
+      models: [
+        { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (recommandé)' },
+        { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
+        { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus' },
+        { value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet' },
+        { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku' },
+      ],
+    },
+    {
+      value: 'google',
+      label: 'Google (Gemini)',
+      defaultEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
+      models: [
+        { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash (recommandé)' },
+        { value: 'gemini-exp-1206', label: 'Gemini Exp 1206' },
+        { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+        { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+        { value: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash 8B' },
+      ],
+    },
+    {
+      value: 'custom',
+      label: 'Personnalisé',
+      defaultEndpoint: '',
+      models: [],
+    },
   ];
+
+  const currentProvider = providers.find(p => p.value === settings.provider);
+  const availableModels = currentProvider?.models || [];
+  const isCustomModel = customModel === 'custom';
+
+  const handleProviderChange = (providerValue: string) => {
+    const provider = providers.find(p => p.value === providerValue);
+    setSettings({
+      ...settings,
+      provider: providerValue,
+      endpoint: provider?.defaultEndpoint || settings.endpoint,
+      model: provider?.models[0]?.value || settings.model,
+    });
+    setCustomModel('');
+  };
+
+  const handleModelChange = (modelValue: string) => {
+    if (modelValue === 'custom') {
+      setCustomModel('custom');
+    } else {
+      setSettings({ ...settings, model: modelValue });
+      setCustomModel('');
+    }
+  };
 
   return (
     <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-lg p-6">
@@ -119,6 +192,7 @@ const LLMConfig: React.FC = () => {
                   const stored = localStorage.getItem('llmSettings');
                   if (stored) setSettings(JSON.parse(stored));
                   else setSettings(DEFAULT_SETTINGS);
+                  setCustomModel('');
                 }}
                 className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors"
               >
@@ -141,14 +215,7 @@ const LLMConfig: React.FC = () => {
           <label className="block text-sm font-medium mb-2">Fournisseur LLM</label>
           <select
             value={settings.provider}
-            onChange={(e) => {
-              const provider = providers.find(p => p.value === e.target.value);
-              setSettings({
-                ...settings,
-                provider: e.target.value,
-                endpoint: provider?.defaultEndpoint || settings.endpoint,
-              });
-            }}
+            onChange={(e) => handleProviderChange(e.target.value)}
             disabled={!isEditing}
             className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -156,6 +223,45 @@ const LLMConfig: React.FC = () => {
               <option key={p.value} value={p.value}>{p.label}</option>
             ))}
           </select>
+        </div>
+
+        {/* Model */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Modèle</label>
+          {availableModels.length > 0 ? (
+            <>
+              <select
+                value={isCustomModel ? 'custom' : settings.model}
+                onChange={(e) => handleModelChange(e.target.value)}
+                disabled={!isEditing}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {availableModels.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+                <option value="custom">Autre modèle (personnalisé)...</option>
+              </select>
+              {isCustomModel && (
+                <input
+                  type="text"
+                  value={settings.model}
+                  onChange={(e) => setSettings({ ...settings, model: e.target.value })}
+                  disabled={!isEditing}
+                  placeholder="Entrez le nom du modèle..."
+                  className="w-full px-3 py-2 mt-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              )}
+            </>
+          ) : (
+            <input
+              type="text"
+              value={settings.model}
+              onChange={(e) => setSettings({ ...settings, model: e.target.value })}
+              disabled={!isEditing}
+              placeholder="Nom du modèle..."
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          )}
         </div>
 
         {/* API Key */}
@@ -167,7 +273,7 @@ const LLMConfig: React.FC = () => {
               value={settings.apiKey}
               onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
               disabled={!isEditing}
-              placeholder="sk-..."
+              placeholder="sk-... ou AIza..."
               className="w-full px-3 py-2 pr-24 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <button
@@ -177,19 +283,6 @@ const LLMConfig: React.FC = () => {
               {showApiKey ? 'Masquer' : 'Afficher'}
             </button>
           </div>
-        </div>
-
-        {/* Model */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Modèle</label>
-          <input
-            type="text"
-            value={settings.model}
-            onChange={(e) => setSettings({ ...settings, model: e.target.value })}
-            disabled={!isEditing}
-            placeholder="gpt-4, claude-3-opus-20240229, ..."
-            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-          />
         </div>
 
         {/* Endpoint */}
