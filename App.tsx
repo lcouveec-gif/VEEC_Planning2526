@@ -6,12 +6,13 @@ import MatchSchedule from './components/MatchSchedule';
 import PositionTracker from './components/PositionTracker';
 import TeamView from './components/TeamView';
 import Admin from './components/Admin';
+import Referee from './components/Referee';
 // import AuthModal from './components/Auth/AuthModal';
 import { useTrainingSessions } from './hooks/useTrainingSessions';
 import type { TrainingSession } from './types';
 import { GYMS, DAYS } from './constants';
 
-type PageType = 'training' | 'matches' | 'position' | 'team' | 'admin';
+type PageType = 'training' | 'matches' | 'position' | 'team' | 'admin' | 'referee';
 
 // For PDF export libraries from CDN
 declare const html2canvas: any;
@@ -264,6 +265,8 @@ const App: React.FC = () => {
         <PositionTracker selectedTeamId={selectedTeamId} />
       ) : currentPage === 'team' ? (
         <TeamView onNavigate={handleTeamNavigation} />
+      ) : currentPage === 'referee' ? (
+        <Referee />
       ) : (
         <Admin initialSection={adminSection} selectedTeamId={selectedTeamId} />
       )}

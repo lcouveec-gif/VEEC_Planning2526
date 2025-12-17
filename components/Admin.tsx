@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import CollectifsManager from './CollectifsManager';
 import TeamsManager from './TeamsManager';
+import WebhookManager from './Admin/WebhookManager';
+import LLMConfig from './Admin/LLMConfig';
 
-type AdminSection = 'menu' | 'teams' | 'collectifs' | 'planning';
+type AdminSection = 'menu' | 'teams' | 'collectifs' | 'planning' | 'automation';
 
 interface AdminProps {
   initialSection?: string;
@@ -27,7 +29,7 @@ const Admin: React.FC<AdminProps> = ({ initialSection, selectedTeamId }) => {
         Administration
       </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Carte Gestion des équipes */}
         <button
           onClick={() => setCurrentSection('teams')}
@@ -111,6 +113,34 @@ const Admin: React.FC<AdminProps> = ({ initialSection, selectedTeamId }) => {
             Configurer les plannings d'entraînement
           </p>
         </button>
+
+        {/* Carte IA / Automatisation */}
+        <button
+          onClick={() => setCurrentSection('automation')}
+          className="bg-light-surface dark:bg-dark-surface rounded-lg p-6 shadow-md hover:shadow-lg transition-all border-2 border-transparent hover:border-light-primary dark:hover:border-dark-primary text-left group"
+        >
+          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 mb-4 group-hover:scale-110 transition-transform">
+            <svg
+              className="w-8 h-8 text-blue-600 dark:text-blue-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+              />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-light-onSurface dark:text-dark-onSurface mb-2">
+            IA / Automatisation
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Webhooks et configuration LLM
+          </p>
+        </button>
       </div>
     </div>
   );
@@ -171,6 +201,27 @@ const Admin: React.FC<AdminProps> = ({ initialSection, selectedTeamId }) => {
               <p className="text-gray-600 dark:text-gray-400">
                 Fonctionnalité en cours de développement...
               </p>
+            </div>
+          </div>
+        );
+
+      case 'automation':
+        return (
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-6 flex items-center gap-4">
+              <button
+                onClick={() => setCurrentSection('menu')}
+                className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+              >
+                ← Retour
+              </button>
+              <h2 className="text-2xl font-bold text-light-onSurface dark:text-dark-onSurface">
+                IA / Automatisation
+              </h2>
+            </div>
+            <div className="space-y-6">
+              <WebhookManager />
+              <LLMConfig />
             </div>
           </div>
         );
