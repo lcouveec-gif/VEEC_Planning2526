@@ -74,12 +74,14 @@ const LLMConfig: React.FC = () => {
       // Configuration spécifique selon le provider
       if (settings.provider === 'google') {
         // Google Gemini API
-        url = `https://generativelanguage.googleapis.com/v1beta/models/${settings.model}:generateContent?key=${settings.apiKey}`;
+        url = `https://generativelanguage.googleapis.com/v1/models/${settings.model}:generateContent?key=${settings.apiKey}`;
         body = {
           contents: [{
             parts: [{ text: 'Test' }]
           }]
         };
+        // Log pour debug
+        console.log('Testing Google Gemini API:', url);
       } else if (settings.provider === 'anthropic') {
         // Anthropic Claude API
         headers = {
@@ -165,13 +167,12 @@ const LLMConfig: React.FC = () => {
     {
       value: 'google',
       label: 'Google (Gemini)',
-      defaultEndpoint: 'https://generativelanguage.googleapis.com/v1beta',
+      defaultEndpoint: 'https://generativelanguage.googleapis.com/v1',
       models: [
-        { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash (recommandé)' },
-        { value: 'gemini-exp-1206', label: 'Gemini Exp 1206' },
-        { value: 'gemini-1.5-pro-latest', label: 'Gemini 1.5 Pro' },
-        { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
-        { value: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash 8B' },
+        { value: 'gemini-1.5-flash-latest', label: 'Gemini 1.5 Flash Latest (recommandé)' },
+        { value: 'gemini-1.5-pro-latest', label: 'Gemini 1.5 Pro Latest' },
+        { value: 'gemini-pro', label: 'Gemini Pro' },
+        { value: 'gemini-pro-vision', label: 'Gemini Pro Vision' },
       ],
     },
     {
