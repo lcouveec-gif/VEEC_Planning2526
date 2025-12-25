@@ -130,29 +130,6 @@ jobs:
             fi
           "
 
-      - name: Save last deploy date
-        run: |
-          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
-          if [ "$BRANCH_NAME" = "main" ]; then
-            FILE="LAST_DEPLOY_MCP_PROD.md"
-            TITLE="Production"
-          else
-            FILE="LAST_DEPLOY_MCP_RECETTE.md"
-            TITLE="Recette"
-          fi
-
-          echo "## Dernier déploiement MCP Server ($TITLE)" > $FILE
-          echo "" >> $FILE
-          echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $FILE
-
-      - name: Commit last deploy date
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add LAST_DEPLOY_MCP_*.md
-          git commit -m "Update last deploy date (MCP Server) [skip ci]" || echo "No changes"
-          git push
-
       - name: Cleanup
         if: always()
         run: rm -f key.pem mcp-server-deploy.tar.gz
