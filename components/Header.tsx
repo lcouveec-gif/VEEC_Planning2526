@@ -6,7 +6,7 @@ import { PdfIcon, SpinnerIcon, BellIcon } from './icons/ThemeIcons';
 import Logo from './Logo';
 // import UserMenu from './UserMenu';
 
-type PageType = 'training' | 'matches' | 'position' | 'team' | 'admin' | 'referee';
+type PageType = 'training' | 'matches' | 'position' | 'team' | 'admin' | 'referee' | 'ai';
 
 interface HeaderProps {
   theme: 'dark' | 'light';
@@ -72,6 +72,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                    currentPage === 'position' ? 'Position' :
                    currentPage === 'team' ? 'Équipes' :
                    currentPage === 'referee' ? 'Arbitre' :
+                   currentPage === 'ai' ? 'IA' :
                    'Admin'}
                 </span>
                 <svg
@@ -136,6 +137,16 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                     }`}
                   >
                     Arbitre
+                  </button>
+                  <button
+                    onClick={() => handlePageChange('ai')}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                      currentPage === 'ai'
+                        ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    🤖 IA
                   </button>
                   <button
                     onClick={() => handlePageChange('admin')}
