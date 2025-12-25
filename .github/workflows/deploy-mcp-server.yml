@@ -57,9 +57,6 @@ jobs:
 
       - name: Prepare known_hosts
         run: |
-          echo "SSH_HOST: ${{ env.SSH_HOST }}"
-          echo "SSH_USER: ${{ env.SSH_USER }}"
-          echo "SSH_PORT: ${SSH_PORT:-22}"
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           ssh-keyscan -p ${SSH_PORT:-22} ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
@@ -134,7 +131,6 @@ jobs:
           "
 
       - name: Save last deploy date
-        working-directory: .github/workflows
         run: |
           BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           if [ "$BRANCH_NAME" = "main" ]; then
@@ -153,7 +149,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .github/workflows/LAST_DEPLOY_MCP_*.md
+          git add LAST_DEPLOY_MCP_*.md
           git commit -m "Update last deploy date (MCP Server) [skip ci]" || echo "No changes"
           git push
 
