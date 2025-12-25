@@ -1,74 +1,45 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
-import type { Match } from '../types';
+import { useQuery } from '@tanstack/react-query';
+import { matchesService, type MatchesFilters } from '../services/matchesService';
 
-interface UseMatchesResult {
-  matches: Match[];
-  loading: boolean;
-  error: string | null;
-  refetch: () => Promise<void>;
-}
+/**
+ * Query keys pour les matchs
+ */
+export const matchesKeys = {
+  all: ['matches'] as const,
+  lists: () => [...matchesKeys.all, 'list'] as const,
+  list: (filters: MatchesFilters) => [...matchesKeys.lists(), filters] as const,
+};
 
-export function useMatches(startDate?: string, endDate?: string, teamIds?: string[]): UseMatchesResult {
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchMatches = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Construction de la requête avec filtres
-      let query = supabase
-        .from('matches')
-        .select(`
-          *,
-          equipe:VEEC_Equipes_FFVB!matches_idequipe_fkey(*)
-        `)
-        .order('Date', { ascending: true })
-        .order('Heure', { ascending: true });
-
-      // Filtre par date de début
-      if (startDate) {
-        query = query.gte('Date', startDate);
-      }
-
-      // Filtre par date de fin
-      if (endDate) {
-        query = query.lte('Date', endDate);
-      }
-
-      // Filtre par équipes (multi-sélection)
-      if (teamIds && teamIds.length > 0) {
-        query = query.in('idequipe', teamIds);
-      }
-
-      const { data, error: supabaseError } = await query;
-
-      if (supabaseError) {
-        throw supabaseError;
-      }
-
-      setMatches(data || []);
-    } catch (err: any) {
-      console.error('Error fetching matches:', err);
-      setError(err.message || 'Une erreur est survenue lors du chargement des matchs.');
-      setMatches([]);
-    } finally {
-      setLoading(false);
-    }
+/**
+ * Hook pour récupérer les matchs avec filtres optionnels
+ *
+ * @param startDate - Date de début (format YYYY-MM-DD)
+ * @param endDate - Date de fin (format YYYY-MM-DD)
+ * @param teamIds - IDs des équipes à filtrer
+ *
+ * Avantages React Query:
+ * - Cache par combinaison de filtres
+ * - Refetch automatique si les filtres changent
+ * - Pas de refetch inutile si les filtres sont identiques
+ */
+export function useMatches(startDate?: string, endDate?: string, teamIds?: string[]) {
+  const filters: MatchesFilters = {
+    startDate,
+    endDate,
+    teamIds,
   };
 
-  useEffect(() => {
-    fetchMatches();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate, endDate, JSON.stringify(teamIds)]);
+  const query = useQuery({
+    queryKey: matchesKeys.list(filters),
+    queryFn: () => matchesService.fetchMatches(filters),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
   return {
-    matches,
-    loading,
-    error,
-    refetch: fetchMatches,
+    matches: query.data || [],
+    loading: query.isLoading,
+    isFetching: query.isFetching,
+    error: query.error?.message || null,
+    refetch: query.refetch,
   };
 }

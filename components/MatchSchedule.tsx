@@ -1,14 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import MatchFilters from './MatchFilters';
 import MatchList from './MatchList';
 import { useMatches } from '../hooks/useMatches';
 import { useTeams } from '../hooks/useTeams';
 
-interface MatchScheduleProps {
-  selectedTeamId?: string;
-}
-
-const MatchSchedule: React.FC<MatchScheduleProps> = ({ selectedTeamId }) => {
+const MatchSchedule: React.FC = () => {
+  const { teamId: selectedTeamId } = useParams<{ teamId?: string }>();
   // Dates par défaut : date du jour et pas de date de fin (tous les matchs à venir)
   const today = new Date();
   const defaultStartDate = today.toISOString().split('T')[0];

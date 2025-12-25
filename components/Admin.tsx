@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import CollectifsManager from './CollectifsManager';
 import TeamsManager from './TeamsManager';
 import WebhookManager from './Admin/WebhookManager';
@@ -6,12 +7,8 @@ import LLMConfig from './Admin/LLMConfig';
 
 type AdminSection = 'menu' | 'teams' | 'collectifs' | 'planning' | 'automation';
 
-interface AdminProps {
-  initialSection?: string;
-  selectedTeamId?: string;
-}
-
-const Admin: React.FC<AdminProps> = ({ initialSection, selectedTeamId }) => {
+const Admin: React.FC = () => {
+  const { section: initialSection, teamId: selectedTeamId } = useParams<{ section?: string; teamId?: string }>();
   const [currentSection, setCurrentSection] = useState<AdminSection>(
     (initialSection as AdminSection) || 'menu'
   );
@@ -21,7 +18,7 @@ const Admin: React.FC<AdminProps> = ({ initialSection, selectedTeamId }) => {
     if (initialSection && initialSection !== currentSection) {
       setCurrentSection(initialSection as AdminSection);
     }
-  }, [initialSection]);
+  }, [initialSection, currentSection]);
 
   const renderMenu = () => (
     <div className="max-w-4xl mx-auto">

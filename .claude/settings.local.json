@@ -16,7 +16,15 @@
       "Bash(node:*)",
       "Bash(ls:*)",
       "Bash(chmod:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git push:*)",
+      "Bash(gh run list:*)",
+      "Bash(ssh laurent@n8n.coutellec.fr:*)",
+      "Bash(ssh-keyscan:*)",
+      "Bash(~/.ssh/known_hosts)",
+      "Bash(ssh:*)",
+      "Bash(grep:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []
