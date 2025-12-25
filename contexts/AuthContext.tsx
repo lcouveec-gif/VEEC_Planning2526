@@ -1,19 +1,7 @@
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { useAuthStore, type UserRole, type VEECProfile } from '../stores/useAuthStore';
 import type { User, Session } from '@supabase/supabase-js';
-
-export type UserRole = 'admin' | 'board' | 'entraineur' | 'joueur' | 'public';
-
-export interface VEECProfile {
-  id: string;
-  user_id: string;
-  email: string;
-  role: UserRole;
-  nom?: string;
-  prenom?: string;
-  created_at: string;
-  updated_at: string;
-}
 
 interface AuthContextType {
   user: User | null;
@@ -29,10 +17,7 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<VEECProfile | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, profile, session, loading, setAuth, setLoading, clearAuth } = useAuthStore();
 
   // Charger le profil utilisateur depuis veec_profiles
   const loadProfile = async (userId: string) => {
@@ -58,35 +43,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Initialiser la session au chargement
   useEffect(() => {
     // Récupérer la session actuelle
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        loadProfile(session.user.id).then(setProfile);
+        const profileData = await loadProfile(session.user.id);
+        setAuth(session.user, profileData, session);
+      } else {
+        setLoading(false);
       }
-
-      setLoading(false);
     });
 
     // Écouter les changements d'authentification
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-
         if (session?.user) {
           const profileData = await loadProfile(session.user.id);
-          setProfile(profileData);
+          setAuth(session.user, profileData, session);
         } else {
-          setProfile(null);
+          clearAuth();
         }
-
-        setLoading(false);
       }
     );
 
     return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Connexion
@@ -99,9 +78,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (error) return { error };
 
-      if (data.user) {
+      if (data.user && data.session) {
         const profileData = await loadProfile(data.user.id);
-        setProfile(profileData);
+        setAuth(data.user, profileData, data.session);
       }
 
       return { error: null };
@@ -126,13 +105,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       // 2. Créer le profil dans veec_profiles
-      // Note: Par défaut, les nouveaux utilisateurs ont le rôle 'public'
+      // Note: Par défaut, les nouveaux utilisateurs ont le rôle 'user'
       const { error: profileError } = await supabase
         .from('veec_profiles')
         .insert({
           user_id: authData.user.id,
           email: email,
-          role: 'public',
+          role: 'user', // Rôle par défaut
           nom: nom,
           prenom: prenom,
         });
@@ -151,9 +130,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Déconnexion
   const signOut = async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setSession(null);
+    clearAuth();
   };
 
   // Vérifier si l'utilisateur a un rôle spécifique
