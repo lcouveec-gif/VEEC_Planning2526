@@ -43,6 +43,14 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       # --- SSH key for rsync/ssh ---
+      - name: Validate secrets
+        run: |
+          echo "Checking required secrets..."
+          if [ -z "${{ secrets.SSH_KEY }}" ]; then echo "ERROR: SSH_KEY is not set"; exit 1; fi
+          if [ -z "${{ secrets.SSH_HOST }}" ]; then echo "ERROR: SSH_HOST is not set"; exit 1; fi
+          if [ -z "${{ secrets.SSH_USER }}" ]; then echo "ERROR: SSH_USER is not set"; exit 1; fi
+          echo "All required secrets are configured ✓"
+
       - name: Write SSH key
         run: |
           echo "${{ secrets.SSH_KEY }}" > key.pem
@@ -50,9 +58,11 @@ jobs:
 
       - name: Prepare known_hosts
         run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          ssh-keyscan -p ${SSH_PORT:-22} ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+          mkdir -p ~/.ssh || true
+          chmod 700 ~/.ssh || true
+          touch ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          ssh-keyscan -p ${SSH_PORT:-22} ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts 2>&1 || echo "Warning: ssh-keyscan failed"
 
       # --- Deploy FRONTEND ---
       - name: Rsync dist/ to VPS (Frontend Recette)
