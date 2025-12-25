@@ -24,7 +24,9 @@
       "Bash(~/.ssh/known_hosts)",
       "Bash(ssh:*)",
       "Bash(grep:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []
