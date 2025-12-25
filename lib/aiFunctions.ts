@@ -128,11 +128,11 @@ async function getMatches(args: {
     // Si on cherche par équipe, d'abord trouver l'ID de l'équipe VEEC
     let teamIds: string[] = [];
     if (args.team) {
-      // Essayer d'abord par NUM_EQUIPE
+      // Essayer d'abord par IDEQUIPE
       let { data: teams, error: teamError } = await supabase
         .from('VEEC_Equipes_FFVB')
         .select('IDEQUIPE, NOM_FFVB')
-        .ilike('NUM_EQUIPE', `%${args.team}%`);
+        .ilike('IDEQUIPE', `%${args.team}%`);
 
       // Si aucune équipe trouvée, essayer par NOM_FFVB
       if (!teams || teams.length === 0) {
@@ -153,7 +153,7 @@ async function getMatches(args: {
       .from('matches')
       .select(`
         *,
-        equipe:VEEC_Equipes_FFVB!matches_idequipe_fkey(*)
+        equipe:VEEC_Equipes_FFVB!fk_matches_equipe(IDEQUIPE, NOM_FFVB)
       `)
       .order('Date', { ascending: true })
       .order('Heure', { ascending: true });
@@ -178,23 +178,28 @@ async function getMatches(args: {
     return {
       success: true,
       data: (data || []).map((match: any) => {
-        // Déterminer l'adversaire en fonction de Domicile_Exterieur
-        // Si Domicile = l'équipe VEEC est Equipe_1, l'adversaire est Equipe_2
-        // Si Exterieur = l'équipe VEEC est Equipe_2, l'adversaire est Equipe_1
-        const isHome = match.Domicile_Exterieur?.toLowerCase() === 'domicile';
-        const adversaire = isHome ? match.Equipe_2 : match.Equipe_1;
+        // ✨ Utilisation de EQA_nom et EQB_nom pour déterminer domicile/extérieur
+        // Si EQA_nom correspond à notre équipe → on joue à DOMICILE, adversaire = EQB_nom
+        // Si EQB_nom correspond à notre équipe → on joue à EXTERIEUR, adversaire = EQA_nom
+        const nomEquipeVEEC = match.equipe?.NOM_FFVB || '';
+        const isHome = match.EQA_nom?.includes(nomEquipeVEEC) ||
+                       match.EQA_nom === nomEquipeVEEC;
+        const adversaire = isHome ? match.EQB_nom : match.EQA_nom;
 
         return {
           id: match.idmatch,
           date: match.Date,
           heure: match.Heure,
           competition: match.Competition,
-          equipeVEEC: match.equipe?.NOM_FFVB || 'Équipe inconnue',
-          numeroEquipe: match.equipe?.NUM_EQUIPE,
+          equipeVEEC: nomEquipeVEEC || 'Équipe inconnue',
+          numeroEquipe: match.equipe?.IDEQUIPE,
           adversaire: adversaire || 'Adversaire inconnu',
-          domicileExterieur: match.Domicile_Exterieur,
+          domicileExterieur: isHome ? 'Domicile' : 'Exterieur',
           lieu: isHome ? 'à domicile' : 'à l\'extérieur',
           salle: match.Salle,
+          score: match.Score || null,
+          sets: match.Set || null,
+          total: match.Total || null,
         };
       }),
       count: data?.length || 0,
@@ -241,7 +246,7 @@ async function getTeams(args: { search?: string }) {
           id: team.IDEQUIPE,
           nom: team.NOM_FFVB,
           division: team.DIVISION,
-          numero: team.NUM_EQUIPE,
+          code: team.IDEQUIPE,
           couleurPrincipale: team.COULEUR_PRINCIPALE,
           couleurSecondaire: team.COULEUR_SECONDAIRE,
         })),
@@ -265,7 +270,7 @@ async function getTeams(args: { search?: string }) {
         id: team.IDEQUIPE,
         nom: team.NOM_FFVB,
         division: team.DIVISION,
-        numero: team.NUM_EQUIPE,
+        code: team.IDEQUIPE,
         couleurPrincipale: team.COULEUR_PRINCIPALE,
         couleurSecondaire: team.COULEUR_SECONDAIRE,
       })),
@@ -285,17 +290,17 @@ async function getPlayers(args: { search?: string; team?: string }) {
     // Si on cherche par équipe, utiliser la table VEEC_Collectifs
     if (args.team) {
       // D'abord trouver l'ID de l'équipe VEEC
-      // Essayer d'abord par NUM_EQUIPE
+      // Essayer d'abord par IDEQUIPE
       let { data: teams, error: teamError } = await supabase
         .from('VEEC_Equipes_FFVB')
-        .select('IDEQUIPE, NOM_FFVB, NUM_EQUIPE')
-        .ilike('NUM_EQUIPE', `%${args.team}%`);
+        .select('IDEQUIPE, NOM_FFVB')
+        .ilike('IDEQUIPE', `%${args.team}%`);
 
       // Si aucune équipe trouvée, essayer par NOM_FFVB
       if (!teams || teams.length === 0) {
         const result = await supabase
           .from('VEEC_Equipes_FFVB')
-          .select('IDEQUIPE, NOM_FFVB, NUM_EQUIPE')
+          .select('IDEQUIPE, NOM_FFVB')
           .ilike('NOM_FFVB', `%${args.team}%`);
         teams = result.data;
         teamError = result.error;
@@ -322,21 +327,20 @@ async function getPlayers(args: { search?: string; team?: string }) {
       const teamIds = teams.map((t: any) => t.IDEQUIPE);
       console.log('[getPlayers] IDs équipes:', teamIds);
 
-      // Récupérer les joueurs via la table VEEC_Collectifs
+      // Récupérer les joueurs via la table VEEC_Collectifs avec JOIN automatique
       let collectifsQuery = supabase
         .from('VEEC_Collectifs')
         .select(`
-          IDLicencie,
-          VEEC_Licencie (
-            IDLicencie,
+          numero_maillot,
+          poste,
+          licencie:VEEC_Licencie!fk_collectifs_licencie(
+            id,
             Nom_Licencie,
             Prenom_Licencie,
-            Numero_Maillot,
-            Poste_Habituel,
-            Date_Naissance
+            Date_Naissance_licencie
           )
         `)
-        .in('IDEQUIPE', teamIds);
+        .in('equipe_id', teamIds);
 
       const { data: collectifs, error: collectifsError } = await collectifsQuery;
 
@@ -348,34 +352,32 @@ async function getPlayers(args: { search?: string; team?: string }) {
         throw collectifsError;
       }
 
-      // Filtrer et formater les données
-      let players = (collectifs || [])
-        .map((c: any) => c.VEEC_Licencie)
-        .filter((p: any) => p !== null);
+      // Transformer les données (déjà jointées grâce à la FK!)
+      let results = (collectifs || []).map((c: any) => ({
+        id: c.licencie?.id,
+        nom: c.licencie?.Nom_Licencie,
+        prenom: c.licencie?.Prenom_Licencie,
+        numero: c.numero_maillot,
+        poste: c.poste,
+        dateNaissance: c.licencie?.Date_Naissance_licencie,
+      }));
 
-      console.log('[getPlayers] Joueurs après mapping:', players);
-      console.log('[getPlayers] Nombre de joueurs:', players.length);
+      console.log('[getPlayers] Joueurs après mapping:', results);
+      console.log('[getPlayers] Nombre de joueurs:', results.length);
 
       // Appliquer le filtre de recherche si fourni
       if (args.search) {
         const searchLower = args.search.toLowerCase();
-        players = players.filter((p: any) =>
-          p.Nom_Licencie?.toLowerCase().includes(searchLower) ||
-          p.Prenom_Licencie?.toLowerCase().includes(searchLower)
+        results = results.filter((p: any) =>
+          p.nom?.toLowerCase().includes(searchLower) ||
+          p.prenom?.toLowerCase().includes(searchLower)
         );
       }
 
       return {
         success: true,
-        data: players.map((player: any) => ({
-          id: player.IDLicencie,
-          nom: player.Nom_Licencie,
-          prenom: player.Prenom_Licencie,
-          numero: player.Numero_Maillot,
-          poste: player.Poste_Habituel,
-          dateNaissance: player.Date_Naissance,
-        })),
-        count: players.length,
+        data: results,
+        count: results.length,
       };
     }
 
@@ -404,18 +406,16 @@ async function getPlayers(args: { search?: string; team?: string }) {
       // Combiner et dédupliquer
       const allResults = [...(nomResults || []), ...(prenomResults || [])];
       const uniquePlayers = Array.from(
-        new Map(allResults.map(p => [p.IDLicencie, p])).values()
+        new Map(allResults.map(p => [p.id, p])).values()
       );
 
       return {
         success: true,
         data: uniquePlayers.map((player: any) => ({
-          id: player.IDLicencie,
+          id: player.id,
           nom: player.Nom_Licencie,
           prenom: player.Prenom_Licencie,
-          numero: player.Numero_Maillot,
-          poste: player.Poste_Habituel,
-          dateNaissance: player.Date_Naissance,
+          dateNaissance: player.Date_Naissance_licencie,
         })),
         count: uniquePlayers.length,
       };
@@ -435,12 +435,10 @@ async function getPlayers(args: { search?: string; team?: string }) {
     return {
       success: true,
       data: (data || []).map((player: any) => ({
-        id: player.IDLicencie,
+        id: player.id,
         nom: player.Nom_Licencie,
         prenom: player.Prenom_Licencie,
-        numero: player.Numero_Maillot,
-        poste: player.Poste_Habituel,
-        dateNaissance: player.Date_Naissance,
+        dateNaissance: player.Date_Naissance_licencie,
       })),
       count: data?.length || 0,
     };
@@ -459,7 +457,7 @@ async function getStatistics() {
       supabase.from('training_sessions').select('id', { count: 'exact', head: true }),
       supabase.from('matches').select('idmatch', { count: 'exact', head: true }),
       supabase.from('VEEC_Equipes_FFVB').select('IDEQUIPE', { count: 'exact', head: true }),
-      supabase.from('VEEC_Licencie').select('IDLicencie', { count: 'exact', head: true }),
+      supabase.from('VEEC_Licencie').select('id', { count: 'exact', head: true }),
     ]);
 
     return {

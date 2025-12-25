@@ -1,0 +1,135 @@
+name: Deploy MCP Server to VPS
+
+on:
+  push:
+    branches: [ "main", "recette" ]
+    paths:
+      - 'mcp-server-veec/**'
+      - '.github/workflows/deploy-mcp-server.yml'
+
+jobs:
+  deploy-mcp-server:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    env:
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      MCP_SERVER_DIR: /home/${{ secrets.SSH_USER }}/mcp-server-veec
+      MCP_PM2_NAME: mcp-server
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: mcp-server-veec/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mcp-server-veec
+        run: npm ci
+
+      - name: Build MCP Server
+        working-directory: mcp-server-veec
+        run: npm run build
+
+      - name: Create deployment archive
+        working-directory: mcp-server-veec
+        run: |
+          tar -czf ../mcp-server-deploy.tar.gz \
+            dist/ \
+            package.json \
+            package-lock.json \
+            .env.example
+
+      - name: Write SSH key
+        run: |
+          echo "${{ secrets.SSH_KEY }}" > key.pem
+          chmod 600 key.pem
+
+      - name: Show key fingerprint
+        run: ssh-keygen -lf key.pem
+
+      - name: Prepare known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -p ${SSH_PORT:-22} ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Upload archive to VPS
+        run: |
+          scp -i key.pem -P ${SSH_PORT:-22} \
+            mcp-server-deploy.tar.gz \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:~/
+
+      - name: Deploy and restart MCP Server
+        run: |
+          ssh -i key.pem -p ${SSH_PORT:-22} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+            set -e
+
+            # Créer le répertoire s'il n'existe pas
+            mkdir -p ${{ env.MCP_SERVER_DIR }}
+            cd ${{ env.MCP_SERVER_DIR }}
+
+            # Extraire l'archive
+            tar -xzf ~/mcp-server-deploy.tar.gz
+
+            # Créer .env s'il n'existe pas (première installation)
+            if [ ! -f .env ]; then
+              echo '⚠️  Création du fichier .env depuis .env.example'
+              cp .env.example .env
+              echo 'SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}' >> .env
+              echo 'SUPABASE_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}' >> .env
+            fi
+
+            # Installer les dépendances en production
+            npm install --production --silent
+
+            # Vérifier si PM2 est installé
+            if ! command -v pm2 &> /dev/null; then
+              echo '⚠️  PM2 non installé, installation en cours...'
+              npm install -g pm2
+            fi
+
+            # Redémarrer le serveur MCP avec PM2
+            pm2 delete ${{ env.MCP_PM2_NAME }} 2>/dev/null || true
+            pm2 start dist/index.js --name ${{ env.MCP_PM2_NAME }}
+            pm2 save
+
+            # Configurer PM2 pour démarrer au boot (si pas déjà fait)
+            pm2 startup systemd -u ${{ env.SSH_USER }} --hp /home/${{ env.SSH_USER }} || true
+
+            # Nettoyage
+            rm ~/mcp-server-deploy.tar.gz
+
+            echo '✅ MCP Server déployé et redémarré avec succès'
+
+            # Afficher le statut
+            pm2 status ${{ env.MCP_PM2_NAME }}
+          "
+
+      - name: Verify MCP Server is running
+        run: |
+          ssh -i key.pem -p ${SSH_PORT:-22} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+            # Attendre 2 secondes que le serveur démarre
+            sleep 2
+
+            # Vérifier que le processus tourne
+            if pm2 list | grep -q '${{ env.MCP_PM2_NAME }}.*online'; then
+              echo '✅ MCP Server is running'
+              pm2 logs ${{ env.MCP_PM2_NAME }} --lines 10 --nostream
+            else
+              echo '❌ MCP Server failed to start'
+              pm2 logs ${{ env.MCP_PM2_NAME }} --lines 50 --nostream
+              exit 1
+            fi
+          "
+
+      - name: Cleanup
+        if: always()
+        run: rm -f key.pem mcp-server-deploy.tar.gz

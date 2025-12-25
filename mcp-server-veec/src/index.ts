@@ -198,7 +198,7 @@ async function getMatches(args: {
       let { data: teams } = await supabase
         .from("VEEC_Equipes_FFVB")
         .select("IDEQUIPE, NOM_FFVB")
-        .ilike("NUM_EQUIPE", `%${args.team}%`);
+        .ilike("IDEQUIPE", `%${args.team}%`);
 
       if (!teams || teams.length === 0) {
         const result = await supabase
@@ -213,11 +213,12 @@ async function getMatches(args: {
       }
     }
 
+    // ✨ Utilisation du JOIN automatique avec la foreign key
     let query = supabase
       .from("matches")
       .select(`
         *,
-        equipe:VEEC_Equipes_FFVB!matches_idequipe_fkey(*)
+        equipe:VEEC_Equipes_FFVB!fk_matches_equipe(IDEQUIPE, NOM_FFVB)
       `)
       .order("Date", { ascending: true })
       .order("Heure", { ascending: true });
@@ -242,20 +243,28 @@ async function getMatches(args: {
     return {
       success: true,
       data: (data || []).map((match: any) => {
-        const isHome = match.Domicile_Exterieur?.toLowerCase() === "domicile";
-        const adversaire = isHome ? match.Equipe_2 : match.Equipe_1;
+        // ✨ Utilisation de EQA_nom et EQB_nom pour déterminer domicile/extérieur
+        // Si EQA_nom correspond à notre équipe → on joue à DOMICILE, adversaire = EQB_nom
+        // Si EQB_nom correspond à notre équipe → on joue à EXTERIEUR, adversaire = EQA_nom
+        const nomEquipeVEEC = match.equipe?.NOM_FFVB || "";
+        const isHome = match.EQA_nom?.includes(nomEquipeVEEC) ||
+                       match.EQA_nom === nomEquipeVEEC;
+        const adversaire = isHome ? match.EQB_nom : match.EQA_nom;
 
         return {
           id: match.idmatch,
           date: match.Date,
           heure: match.Heure,
           competition: match.Competition,
-          equipeVEEC: match.equipe?.NOM_FFVB || "Équipe inconnue",
-          numeroEquipe: match.equipe?.NUM_EQUIPE,
+          equipeVEEC: nomEquipeVEEC || "Équipe inconnue",
+          numeroEquipe: match.equipe?.IDEQUIPE,
           adversaire: adversaire || "Adversaire inconnu",
-          domicileExterieur: match.Domicile_Exterieur,
+          domicileExterieur: isHome ? "Domicile" : "Exterieur",
           lieu: isHome ? "à domicile" : "à l'extérieur",
           salle: match.Salle,
+          score: match.Score || null,
+          sets: match.Set || null,
+          total: match.Total || null,
         };
       }),
       count: data?.length || 0,
@@ -274,13 +283,13 @@ async function getPlayers(args: { search?: string; team?: string }) {
       // Recherche par équipe via VEEC_Collectifs
       let { data: teams } = await supabase
         .from("VEEC_Equipes_FFVB")
-        .select("IDEQUIPE, NOM_FFVB, NUM_EQUIPE")
-        .ilike("NUM_EQUIPE", `%${args.team}%`);
+        .select("IDEQUIPE, NOM_FFVB")
+        .ilike("IDEQUIPE", `%${args.team}%`);
 
       if (!teams || teams.length === 0) {
         const result = await supabase
           .from("VEEC_Equipes_FFVB")
-          .select("IDEQUIPE, NOM_FFVB, NUM_EQUIPE")
+          .select("IDEQUIPE, NOM_FFVB")
           .ilike("NOM_FFVB", `%${args.team}%`);
         teams = result.data;
       }
@@ -296,47 +305,56 @@ async function getPlayers(args: { search?: string; team?: string }) {
 
       const teamIds = teams.map((t: any) => t.IDEQUIPE);
 
+      // ✨ Utilisation du JOIN automatique avec la foreign key
       const { data: collectifs, error } = await supabase
         .from("VEEC_Collectifs")
         .select(`
-          IDLicencie,
-          VEEC_Licencie (
-            IDLicencie,
+          numero_maillot,
+          poste,
+          licencie:VEEC_Licencie!fk_collectifs_licencie(
+            id,
             Nom_Licencie,
             Prenom_Licencie,
-            Numero_Maillot,
-            Poste_Habituel,
-            Date_Naissance
+            Date_Naissance_licencie
           )
         `)
-        .in("IDEQUIPE", teamIds);
+        .in("equipe_id", teamIds);
 
       if (error) throw error;
 
-      let players = (collectifs || [])
-        .map((c: any) => c.VEEC_Licencie)
-        .filter((p: any) => p !== null);
+      if (!collectifs || collectifs.length === 0) {
+        return {
+          success: true,
+          data: [],
+          count: 0,
+          message: "Aucun joueur trouvé dans le collectif de cette équipe",
+        };
+      }
 
+      // Transformation des résultats (déjà jointés!)
+      let results = collectifs.map((c: any) => ({
+        id: c.licencie?.id,
+        nom: c.licencie?.Nom_Licencie,
+        prenom: c.licencie?.Prenom_Licencie,
+        numero: c.numero_maillot,
+        poste: c.poste,
+        dateNaissance: c.licencie?.Date_Naissance_licencie,
+      }));
+
+      // Filtrage par recherche si nécessaire
       if (args.search) {
         const searchLower = args.search.toLowerCase();
-        players = players.filter(
-          (p: any) =>
-            p.Nom_Licencie?.toLowerCase().includes(searchLower) ||
-            p.Prenom_Licencie?.toLowerCase().includes(searchLower)
+        results = results.filter(
+          (r: any) =>
+            r.nom?.toLowerCase().includes(searchLower) ||
+            r.prenom?.toLowerCase().includes(searchLower)
         );
       }
 
       return {
         success: true,
-        data: players.map((player: any) => ({
-          id: player.IDLicencie,
-          nom: player.Nom_Licencie,
-          prenom: player.Prenom_Licencie,
-          numero: player.Numero_Maillot,
-          poste: player.Poste_Habituel,
-          dateNaissance: player.Date_Naissance,
-        })),
-        count: players.length,
+        data: results,
+        count: results.length,
       };
     }
 
@@ -356,18 +374,16 @@ async function getPlayers(args: { search?: string; team?: string }) {
 
       const allResults = [...(nomResults || []), ...(prenomResults || [])];
       const uniquePlayers = Array.from(
-        new Map(allResults.map((p) => [p.IDLicencie, p])).values()
+        new Map(allResults.map((p) => [p.id, p])).values()
       );
 
       return {
         success: true,
         data: uniquePlayers.map((player: any) => ({
-          id: player.IDLicencie,
+          id: player.id,
           nom: player.Nom_Licencie,
           prenom: player.Prenom_Licencie,
-          numero: player.Numero_Maillot,
-          poste: player.Poste_Habituel,
-          dateNaissance: player.Date_Naissance,
+          dateNaissance: player.Date_Naissance_licencie,
         })),
         count: uniquePlayers.length,
       };
@@ -384,12 +400,10 @@ async function getPlayers(args: { search?: string; team?: string }) {
     return {
       success: true,
       data: (data || []).map((player: any) => ({
-        id: player.IDLicencie,
+        id: player.id,
         nom: player.Nom_Licencie,
         prenom: player.Prenom_Licencie,
-        numero: player.Numero_Maillot,
-        poste: player.Poste_Habituel,
-        dateNaissance: player.Date_Naissance,
+        dateNaissance: player.Date_Naissance_licencie,
       })),
       count: data?.length || 0,
     };
@@ -427,7 +441,7 @@ async function getTeams(args: { search?: string }) {
           id: team.IDEQUIPE,
           nom: team.NOM_FFVB,
           division: team.DIVISION,
-          numero: team.NUM_EQUIPE,
+          code: team.IDEQUIPE,
           couleurPrincipale: team.COULEUR_PRINCIPALE,
           couleurSecondaire: team.COULEUR_SECONDAIRE,
         })),
@@ -448,7 +462,7 @@ async function getTeams(args: { search?: string }) {
         id: team.IDEQUIPE,
         nom: team.NOM_FFVB,
         division: team.DIVISION,
-        numero: team.NUM_EQUIPE,
+        code: team.IDEQUIPE,
         couleurPrincipale: team.COULEUR_PRINCIPALE,
         couleurSecondaire: team.COULEUR_SECONDAIRE,
       })),
