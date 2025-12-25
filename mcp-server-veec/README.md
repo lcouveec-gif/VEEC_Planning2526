@@ -29,6 +29,17 @@ cd mcp-server-veec
 npm install
 ```
 
+### ⚡ Optimisation avec Foreign Keys (optionnel mais recommandé)
+
+Pour améliorer les **performances de 50%** et garantir l'intégrité des données :
+
+👉 **[START_HERE.md](START_HERE.md)** - Guide d'installation des foreign keys (5 min)
+
+Avantages :
+- 🚀 Requêtes **2x plus rapides**
+- 🛡️ Intégrité référentielle garantie
+- 🔧 Code simplifié (optionnel)
+
 ### 2. Configuration
 
 Créez un fichier `.env` à partir de `.env.example` :
@@ -50,9 +61,11 @@ SUPABASE_ANON_KEY=your_anon_key_here
 npm run build
 ```
 
-## 🚀 Utilisation avec Claude Desktop
+## 🚀 Utilisation
 
-### Configuration Claude Desktop
+### Option 1: Serveur Local (Développement)
+
+Configuration Claude Desktop pour utilisation **locale**:
 
 1. Ouvrez le fichier de configuration de Claude Desktop :
    - **macOS** : `~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -63,7 +76,7 @@ npm run build
 ```json
 {
   "mcpServers": {
-    "veec": {
+    "veec-local": {
       "command": "node",
       "args": [
         "/Users/Laurent/Documents/GitHub/VEEC_Planning2526/mcp-server-veec/dist/index.js"
@@ -80,6 +93,65 @@ npm run build
 3. **Redémarrez Claude Desktop**
 
 4. Vous verrez maintenant une icône 🔨 indiquant que les outils VEEC sont disponibles
+
+### Option 2: Serveur Distant (Production) 🌐
+
+Pour déployer le serveur MCP sur un VPS et y accéder via internet.
+
+**Avantages du déploiement VPS:**
+- ✅ Disponible 24/7 (même quand votre Mac est éteint)
+- ✅ Accessible depuis n'importe où
+- ✅ Performances stables
+- ✅ Sécurité renforcée (clés sur le serveur)
+
+#### Option 2A: Déploiement automatique via GitHub Actions (Recommandé) ⚡
+
+**Déploiement transparent**: Chaque push sur `main` déploie automatiquement le MCP Server!
+
+👉 **[QUICK_START_GITHUB_ACTIONS.md](QUICK_START_GITHUB_ACTIONS.md)** - Configuration en 5 minutes
+
+**Workflow:**
+```bash
+git push origin main  # 🚀 Déploiement automatique!
+```
+
+**Ce qui se passe automatiquement:**
+1. ✅ Build du projet
+2. ✅ Tests de validation
+3. ✅ Création de l'archive
+4. ✅ Upload vers le VPS
+5. ✅ Installation et redémarrage
+6. ✅ Vérification du déploiement
+
+👉 **[GITHUB_ACTIONS_SETUP.md](GITHUB_ACTIONS_SETUP.md)** - Documentation complète
+
+#### Option 2B: Déploiement manuel via script
+
+Si vous préférez déployer manuellement:
+
+👉 **[QUICK_START_VPS.md](QUICK_START_VPS.md)** - Guide rapide (10 min)
+
+👉 **[DEPLOYMENT_VPS.md](DEPLOYMENT_VPS.md)** - Documentation complète
+
+**Déploiement manuel:**
+```bash
+./deploy.sh  # Script de déploiement automatique
+```
+
+**Configuration Claude Desktop pour le VPS:**
+```json
+{
+  "mcpServers": {
+    "veec-remote": {
+      "command": "ssh",
+      "args": [
+        "user@votre-vps.com",
+        "cd ~/mcp-server-veec && node dist/index.js"
+      ]
+    }
+  }
+}
+```
 
 ### Exemples d'utilisation dans Claude Desktop
 
