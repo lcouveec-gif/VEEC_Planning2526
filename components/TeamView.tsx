@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTeams } from '../hooks/useTeams';
 import { useCollectifPlayers } from '../hooks/useCollectifPlayers';
 
-interface TeamViewProps {
-  onNavigate?: (page: 'matches' | 'position' | 'admin' | 'training', teamId?: string, adminSection?: string) => void;
-}
-
-const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position' | 'admin' | 'training', teamId?: string, adminSection?: string) => void }> = ({ team, onNavigate }) => {
+const TeamCard: React.FC<{ team: any }> = ({ team }) => {
+  const navigate = useNavigate();
   const [showImageModal, setShowImageModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -155,7 +153,7 @@ const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position'
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onNavigate?.('training', team.IDEQUIPE);
+              navigate(`/training?team=${team.IDEQUIPE}`);
             }}
             className="flex flex-col items-center gap-1 px-2 py-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
             title="Voir les entraînements"
@@ -168,7 +166,7 @@ const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position'
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onNavigate?.('matches', team.IDEQUIPE);
+              navigate(`/matches/${team.IDEQUIPE}`);
             }}
             className="flex flex-col items-center gap-1 px-2 py-2 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
             title="Voir les matchs"
@@ -181,7 +179,7 @@ const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position'
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onNavigate?.('position', team.IDEQUIPE);
+              navigate(`/position/${team.IDEQUIPE}`);
             }}
             className="flex flex-col items-center gap-1 px-2 py-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors"
             title="Gérer les positions"
@@ -194,7 +192,7 @@ const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position'
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onNavigate?.('admin', team.IDEQUIPE, 'collectifs');
+              navigate(`/admin/collectifs/${team.IDEQUIPE}`);
             }}
             className="flex flex-col items-center gap-1 px-2 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             title="Gérer le collectif"
@@ -275,7 +273,7 @@ const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position'
   );
 };
 
-const TeamView: React.FC<TeamViewProps> = ({ onNavigate }) => {
+const TeamView: React.FC = () => {
   const { teams, loading, error } = useTeams();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -343,7 +341,7 @@ const TeamView: React.FC<TeamViewProps> = ({ onNavigate }) => {
             {/* Grille d'équipes - Desktop et Mobile */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredTeams.map((team) => (
-                <TeamCard key={team.IDEQUIPE} team={team} onNavigate={onNavigate} />
+                <TeamCard key={team.IDEQUIPE} team={team} />
               ))}
             </div>
 

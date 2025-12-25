@@ -1,121 +1,101 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { teamsService } from '../services/teamsService';
 import type { Team } from '../types';
 
-interface UseTeamsResult {
-  teams: Team[];
-  loading: boolean;
-  error: string | null;
-  refetch: () => Promise<void>;
-  createTeam: (team: Team) => Promise<Team | null>;
-  updateTeam: (idequipe: string, updates: Partial<Team>) => Promise<boolean>;
-  deleteTeam: (idequipe: string) => Promise<boolean>;
-}
+/**
+ * Query keys pour React Query
+ */
+export const teamsKeys = {
+  all: ['teams'] as const,
+  lists: () => [...teamsKeys.all, 'list'] as const,
+  list: (filters?: any) => [...teamsKeys.lists(), { filters }] as const,
+  details: () => [...teamsKeys.all, 'detail'] as const,
+  detail: (id: string) => [...teamsKeys.details(), id] as const,
+};
 
-export function useTeams(): UseTeamsResult {
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+/**
+ * Hook pour récupérer toutes les équipes avec React Query
+ *
+ * Avantages par rapport à l'ancien hook:
+ * - Cache automatique (5 min)
+ * - Refetch intelligent en arrière-plan
+ * - Retry automatique en cas d'erreur
+ * - Déduplication des requêtes
+ * - isLoading vs isFetching (distinction entre première charge et refetch)
+ */
+export function useTeams() {
+  const queryClient = useQueryClient();
 
-  const fetchTeams = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  // Query pour récupérer les équipes
+  const query = useQuery({
+    queryKey: teamsKeys.lists(),
+    queryFn: teamsService.fetchTeams,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-      const { data, error: supabaseError } = await supabase
-        .from('VEEC_Equipes_FFVB')
-        .select('*')
-        .order('NOM_FFVB', { ascending: true });
+  // Mutation pour créer une équipe
+  const createTeamMutation = useMutation({
+    mutationFn: teamsService.createTeam,
+    onSuccess: () => {
+      // Invalider le cache pour refetch automatiquement
+      queryClient.invalidateQueries({ queryKey: teamsKeys.lists() });
+    },
+  });
 
-      if (supabaseError) {
-        throw supabaseError;
-      }
+  // Mutation pour mettre à jour une équipe
+  const updateTeamMutation = useMutation({
+    mutationFn: ({ idequipe, updates }: { idequipe: string; updates: Partial<Team> }) =>
+      teamsService.updateTeam(idequipe, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: teamsKeys.lists() });
+    },
+  });
 
-      setTeams(data || []);
-    } catch (err: any) {
-      console.error('Error fetching teams:', err);
-      setError(err.message || 'Une erreur est survenue lors du chargement des équipes.');
-      setTeams([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createTeam = async (team: Team): Promise<Team | null> => {
-    try {
-      setError(null);
-      const { data, error: supabaseError } = await supabase
-        .from('VEEC_Equipes_FFVB')
-        .insert([team])
-        .select()
-        .single();
-
-      if (supabaseError) throw supabaseError;
-
-      await fetchTeams();
-      return data;
-    } catch (err: any) {
-      console.error('Error creating team:', err);
-      setError(err.message || 'Erreur lors de la création de l\'équipe.');
-      return null;
-    }
-  };
-
-  const updateTeam = async (idequipe: string, updates: Partial<Team>): Promise<boolean> => {
-    try {
-      setError(null);
-
-      const { data, error: supabaseError } = await supabase
-        .from('VEEC_Equipes_FFVB')
-        .update(updates)
-        .eq('IDEQUIPE', idequipe)
-        .select();
-
-      if (supabaseError) throw supabaseError;
-
-      if (!data || data.length === 0) {
-        throw new Error(`Aucune équipe trouvée avec l'IDEQUIPE: "${idequipe}"`);
-      }
-
-      await fetchTeams();
-      return true;
-    } catch (err: any) {
-      console.error('Error updating team:', err);
-      setError(err.message || 'Erreur lors de la mise à jour de l\'équipe.');
-      return false;
-    }
-  };
-
-  const deleteTeam = async (idequipe: string): Promise<boolean> => {
-    try {
-      setError(null);
-      const { error: supabaseError } = await supabase
-        .from('VEEC_Equipes_FFVB')
-        .delete()
-        .eq('IDEQUIPE', idequipe);
-
-      if (supabaseError) throw supabaseError;
-
-      await fetchTeams();
-      return true;
-    } catch (err: any) {
-      console.error('Error deleting team:', err);
-      setError(err.message || 'Erreur lors de la suppression de l\'équipe.');
-      return false;
-    }
-  };
-
-  useEffect(() => {
-    fetchTeams();
-  }, []);
+  // Mutation pour supprimer une équipe
+  const deleteTeamMutation = useMutation({
+    mutationFn: teamsService.deleteTeam,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: teamsKeys.lists() });
+    },
+  });
 
   return {
-    teams,
-    loading,
-    error,
-    refetch: fetchTeams,
-    createTeam,
-    updateTeam,
-    deleteTeam,
+    // Données et état de la query
+    teams: query.data || [],
+    loading: query.isLoading, // Première charge uniquement
+    isFetching: query.isFetching, // Inclut refetch en arrière-plan
+    error: query.error?.message || null,
+    refetch: query.refetch,
+
+    // Mutations
+    createTeam: async (team: Team) => {
+      try {
+        const result = await createTeamMutation.mutateAsync(team);
+        return result;
+      } catch (error) {
+        return null;
+      }
+    },
+    updateTeam: async (idequipe: string, updates: Partial<Team>) => {
+      try {
+        await updateTeamMutation.mutateAsync({ idequipe, updates });
+        return true;
+      } catch (error) {
+        return false;
+      }
+    },
+    deleteTeam: async (idequipe: string) => {
+      try {
+        await deleteTeamMutation.mutateAsync(idequipe);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    },
+
+    // États des mutations
+    isCreating: createTeamMutation.isPending,
+    isUpdating: updateTeamMutation.isPending,
+    isDeleting: deleteTeamMutation.isPending,
   };
 }
