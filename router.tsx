@@ -13,6 +13,7 @@ import Referee from './components/Referee';
 import AIChat from './components/AIChat';
 import TrainingPage from './pages/TrainingPage';
 import LoginPage from './pages/LoginPage';
+import LinksPage from './pages/LinksPage';
 
 export const router = createBrowserRouter([
   {
@@ -72,6 +73,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['admin', 'entraineur', 'user']}>
             <TeamView />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'links',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'entraineur', 'user']}>
+            <LinksPage />
           </ProtectedRoute>
         )
       },

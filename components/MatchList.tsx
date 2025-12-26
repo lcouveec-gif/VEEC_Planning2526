@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Match } from '../types';
+import ClubLogo from './ClubLogo';
 
 interface MatchListProps {
   matches: Match[];
@@ -192,14 +193,18 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className={`flex items-center gap-1.5 text-sm sm:text-base truncate ${isTeamA ? 'font-bold' : 'font-semibold'}`}>
-                        {isTeamA && (
-                          <img src="/logo.png" alt="VEEC" className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                        {isTeamA ? (
+                          <ClubLogo codeClub="0775819" clubName="VEEC" size="sm" className="flex-shrink-0" showFallback={false} />
+                        ) : (
+                          <ClubLogo codeClub={match.EQA_no} clubName={match.EQA_nom} size="sm" className="flex-shrink-0" showFallback={false} />
                         )}
                         <span className="truncate">{match.EQA_nom}</span>
                       </div>
                       <div className={`flex items-center gap-1.5 text-sm sm:text-base truncate mt-0.5 ${isTeamB ? 'font-bold' : 'font-semibold'}`}>
-                        {isTeamB && (
-                          <img src="/logo.png" alt="VEEC" className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                        {isTeamB ? (
+                          <ClubLogo codeClub="0775819" clubName="VEEC" size="sm" className="flex-shrink-0" showFallback={false} />
+                        ) : (
+                          <ClubLogo codeClub={match.EQB_no} clubName={match.EQB_nom} size="sm" className="flex-shrink-0" showFallback={false} />
                         )}
                         <span className="truncate">{match.EQB_nom}</span>
                       </div>
