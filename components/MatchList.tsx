@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Match } from '../types';
 import ClubLogo from './ClubLogo';
+import MatchDetailModal from './MatchDetailModal';
 
 interface MatchListProps {
   matches: Match[];
 }
 
 const MatchList: React.FC<MatchListProps> = ({ matches }) => {
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('fr-FR', {
@@ -120,8 +123,15 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {sortedDates.map((date) => (
+    <>
+      {selectedMatch && (
+        <MatchDetailModal
+          match={selectedMatch}
+          onClose={() => setSelectedMatch(null)}
+        />
+      )}
+      <div className="space-y-4 sm:space-y-6">
+        {sortedDates.map((date) => (
         <div key={date} className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-md overflow-hidden">
           <div className="bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary px-3 sm:px-4 py-2">
             <h2 className="text-sm sm:text-base font-bold capitalize">{formatDate(date)}</h2>
@@ -155,7 +165,8 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
               return (
               <div
                 key={match.id}
-                className="p-3 sm:p-4 hover:bg-light-background dark:hover:bg-dark-background transition-colors"
+                className="p-3 sm:p-4 hover:bg-light-background dark:hover:bg-dark-background transition-colors cursor-pointer"
+                onClick={() => setSelectedMatch(match)}
               >
                 <div className="flex flex-col gap-2">
                   {/* Ligne 1: Heure et badges */}
@@ -302,7 +313,8 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
           </div>
         </div>
       ))}
-    </div>
+      </div>
+    </>
   );
 };
 
