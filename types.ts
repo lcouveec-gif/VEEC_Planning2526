@@ -104,3 +104,19 @@ export interface Club {
   created_at?: string;
   updated_at?: string;
 }
+
+// Types pour la gestion des gymnases
+export interface Gymnase {
+  id: string; // UUID
+  nom: string; // Nom du gymnase
+  code_club?: string; // Code du club propriétaire (7 positions, ex: 0775819) - optionnel
+  adresse?: string; // Adresse complète
+  ville?: string; // Ville
+  code_postal?: string; // Code postal
+  latitude?: number; // Latitude GPS
+  longitude?: number; // Longitude GPS
+  notes?: string; // Notes supplémentaires
+  created_at?: string;
+  updated_at?: string;
+  club?: Club; // Relation avec le club (via JOIN)
+}

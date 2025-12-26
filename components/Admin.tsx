@@ -8,8 +8,9 @@ import LLMConfig from './Admin/LLMConfig';
 import PermissionsManager from './Admin/PermissionsManager';
 import LinksManager from './Admin/LinksManager';
 import ClubsManager from './Admin/ClubsManager';
+import GymnasesManager from './Admin/GymnasesManager';
 
-type AdminSection = 'menu' | 'teams' | 'collectifs' | 'planning' | 'automation' | 'permissions' | 'links' | 'clubs';
+type AdminSection = 'menu' | 'teams' | 'collectifs' | 'planning' | 'automation' | 'permissions' | 'links' | 'clubs' | 'gymnases';
 
 const Admin: React.FC = () => {
   const { section: initialSection, teamId: selectedTeamId } = useParams<{ section?: string; teamId?: string }>();
@@ -114,6 +115,40 @@ const Admin: React.FC = () => {
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Gérer les clubs adverses et leurs logos
+          </p>
+        </button>
+
+        {/* Carte Gestion des gymnases */}
+        <button
+          onClick={() => setCurrentSection('gymnases')}
+          className="bg-light-surface dark:bg-dark-surface rounded-lg p-6 shadow-md hover:shadow-lg transition-all border-2 border-transparent hover:border-light-primary dark:hover:border-dark-primary text-left group"
+        >
+          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-900/30 mb-4 group-hover:scale-110 transition-transform">
+            <svg
+              className="w-8 h-8 text-purple-600 dark:text-purple-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-light-onSurface dark:text-dark-onSurface mb-2">
+            Gymnases
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Gérer les gymnases et leurs adresses
           </p>
         </button>
 
@@ -366,6 +401,24 @@ const Admin: React.FC = () => {
               </h2>
             </div>
             <ClubsManager />
+          </div>
+        );
+
+      case 'gymnases':
+        return (
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-6 flex items-center gap-4">
+              <button
+                onClick={() => setCurrentSection('menu')}
+                className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+              >
+                ← Retour
+              </button>
+              <h2 className="text-2xl font-bold text-light-onSurface dark:text-dark-onSurface">
+                Gestion des gymnases
+              </h2>
+            </div>
+            <GymnasesManager />
           </div>
         );
 
