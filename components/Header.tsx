@@ -5,7 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import ThemeSwitcher from './ThemeSwitcher';
 import { PdfIcon, SpinnerIcon, BellIcon } from './icons/ThemeIcons';
 import Logo from './Logo';
-// import UserMenu from './UserMenu';
+import UserMenu from './UserMenu';
 
 interface HeaderProps {
   theme: 'dark' | 'light';
@@ -184,7 +184,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
               {isExporting ? <SpinnerIcon className="w-6 h-6" /> : <PdfIcon className="w-6 h-6" />}
             </button>
             <ThemeSwitcher theme={theme} toggleTheme={toggleTheme} />
-            {/* <UserMenu onOpenAuth={onOpenAuth} /> */}
+            <UserMenu />
           </div>
         </div>
       </div>
