@@ -56,30 +56,45 @@ jobs:
           echo "${{ secrets.SSH_KEY }}" > key.pem
           chmod 600 key.pem
 
+      - name: Debug SSH configuration
+        run: |
+          echo "SSH_HOST: ${{ env.SSH_HOST }}"
+          echo "SSH_USER: ${{ env.SSH_USER }}"
+          echo "SSH_PORT: ${SSH_PORT:-22}"
+          echo "Testing SSH connectivity..."
+
       - name: Prepare known_hosts
         run: |
           mkdir -p ~/.ssh || true
           chmod 700 ~/.ssh || true
           touch ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
+          echo "Running ssh-keyscan on port ${SSH_PORT:-22}..."
           ssh-keyscan -p ${SSH_PORT:-22} ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts 2>&1 || echo "Warning: ssh-keyscan failed"
+          cat ~/.ssh/known_hosts
+
+      - name: Test SSH connection
+        run: |
+          echo "Testing SSH connection..."
+          ssh -v -i key.pem -p ${SSH_PORT:-22} -o ConnectTimeout=10 -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "echo 'SSH connection successful'" || echo "SSH test failed"
 
       # --- Deploy FRONTEND ---
       - name: Rsync dist/ to VPS (Frontend Recette)
         run: |
-          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" dist/ \
+          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22} -o ConnectTimeout=30 -o StrictHostKeyChecking=no" dist/ \
             ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.FRONTEND_DIR }}/
 
       # --- Deploy BACKEND (dossier `server/`) ---
       - name: Rsync server/ to VPS (Backend Recette)
         run: |
-          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" server/ \
+          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22} -o ConnectTimeout=30 -o StrictHostKeyChecking=no" server/ \
             ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.BACKEND_DIR }}/
 
       # --- Install deps backend & restart PM2 (force clean) ---
       - name: Install & restart backend with PM2
         run: |
-          ssh -i key.pem -p ${SSH_PORT:-22} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+          ssh -i key.pem -p ${SSH_PORT:-22} -o ConnectTimeout=30 -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
             set -e
             cd ${BACKEND_DIR}
             npm install --production
