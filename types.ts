@@ -20,6 +20,7 @@ export interface Team {
   CURL_TEAM?: string;
   CALDAV_URL?: string;
   QRCODE_URL?: string;
+  scorenco_url?: string; // URL Score'n'co de l'équipe
   image_url?: string; // URL de l'image stockée dans Supabase Storage
 }
 
@@ -91,4 +92,15 @@ export interface MatchPositionData {
   startDate: string;
   players: Player[]; // 12 joueurs
   setLineups: SetLineup[]; // De 3 à 5 sets
+}
+
+// Types pour la gestion des clubs adverses
+export interface Club {
+  code_club: string; // Code à 7 positions (ex: 0775819)
+  nom: string; // Nom complet du club (sans numéro d'équipe)
+  nom_court?: string; // Nom court/abréviation
+  ville?: string;
+  logo_url?: string; // URL du logo dans Supabase Storage (fichier: code_club.png)
+  created_at?: string;
+  updated_at?: string;
 }

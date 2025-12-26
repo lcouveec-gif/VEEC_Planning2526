@@ -118,35 +118,56 @@ const TeamCard: React.FC<{ team: any }> = ({ team }) => {
           </span>
         </div>
 
-        {/* Actions rapides - Calendrier et QR Code */}
-        {team.NOM_CAL && team.QRCODE_URL && (
+        {/* Actions rapides - Calendrier, Score'n'co et QR Code */}
+        {(team.NOM_CAL && team.QRCODE_URL) || team.scorenco_url ? (
           <div className="flex gap-2 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCalendarClick(team.QRCODE_URL);
-              }}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary hover:opacity-90 transition-opacity text-sm font-medium"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span>Calendrier</span>
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowQRModal(true);
-              }}
-              className="px-3 py-2 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
-              title="Afficher QR Code"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-              </svg>
-            </button>
+            {team.NOM_CAL && team.QRCODE_URL && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCalendarClick(team.QRCODE_URL);
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary hover:opacity-90 transition-opacity text-sm font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>Calendrier</span>
+              </button>
+            )}
+
+            {team.scorenco_url && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(team.scorenco_url, '_blank');
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors text-sm font-medium"
+                title="Voir sur Score'n'co"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                <span>Score'n'co</span>
+              </button>
+            )}
+
+            {team.QRCODE_URL && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowQRModal(true);
+                }}
+                className="px-3 py-2 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                title="Afficher QR Code"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                </svg>
+              </button>
+            )}
           </div>
-        )}
+        ) : null}
 
         {/* Navigation vers autres sections */}
         <div className="grid grid-cols-4 gap-2">

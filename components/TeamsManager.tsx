@@ -27,6 +27,7 @@ const TeamsManager: React.FC = () => {
     CURL_TEAM: '',
     CALDAV_URL: '',
     QRCODE_URL: '',
+    scorenco_url: '',
     image_url: '',
   });
   const [showQRCode, setShowQRCode] = useState<string | null>(null);
@@ -51,6 +52,7 @@ const TeamsManager: React.FC = () => {
       CURL_TEAM: team.CURL_TEAM || '',
       CALDAV_URL: team.CALDAV_URL || '',
       QRCODE_URL: team.QRCODE_URL || '',
+      scorenco_url: team.scorenco_url || '',
       image_url: team.image_url || '',
     });
     setSelectedImage(null);
@@ -70,6 +72,7 @@ const TeamsManager: React.FC = () => {
       CURL_TEAM: '',
       CALDAV_URL: '',
       QRCODE_URL: '',
+      scorenco_url: '',
       image_url: '',
     });
     setSelectedImage(null);
@@ -667,6 +670,33 @@ const TeamsManager: React.FC = () => {
                 <p className="text-xs text-gray-500 mt-2 text-center">Aperçu du QR Code</p>
               </div>
             )}
+          </div>
+
+          {/* Score'n'co URL */}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              URL Score'n'co
+              <span className="text-xs text-gray-500 ml-2">(ex: https://app.scorenco.com/teams/126306)</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={formData.scorenco_url || ''}
+                onChange={(e) => setFormData({ ...formData, scorenco_url: e.target.value })}
+                className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary focus:border-transparent"
+                placeholder="https://app.scorenco.com/teams/..."
+              />
+              {formData.scorenco_url && (
+                <button
+                  type="button"
+                  onClick={() => window.open(formData.scorenco_url, '_blank')}
+                  className="px-4 py-2 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors font-medium"
+                  title="Ouvrir Score'n'co"
+                >
+                  Ouvrir
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Image d'équipe */}

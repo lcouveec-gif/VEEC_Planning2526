@@ -78,6 +78,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                    currentPage === 'matches' ? 'Matchs' :
                    currentPage === 'position' ? 'Position' :
                    currentPage === 'team' ? 'Équipes' :
+                   currentPage === 'links' ? 'Liens' :
                    currentPage === 'referee' ? 'Arbitre' :
                    currentPage === 'ai' ? 'IA' :
                    'Admin'}
@@ -134,6 +135,16 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                     }`}
                   >
                     Équipes
+                  </button>
+                  <button
+                    onClick={() => handlePageChange('/links')}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                      currentPage === 'links'
+                        ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Liens
                   </button>
                   <button
                     onClick={() => handlePageChange('/referee')}

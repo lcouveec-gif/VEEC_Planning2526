@@ -6,8 +6,10 @@ import TeamsManager from './TeamsManager';
 import WebhookManager from './Admin/WebhookManager';
 import LLMConfig from './Admin/LLMConfig';
 import PermissionsManager from './Admin/PermissionsManager';
+import LinksManager from './Admin/LinksManager';
+import ClubsManager from './Admin/ClubsManager';
 
-type AdminSection = 'menu' | 'teams' | 'collectifs' | 'planning' | 'automation' | 'permissions';
+type AdminSection = 'menu' | 'teams' | 'collectifs' | 'planning' | 'automation' | 'permissions' | 'links' | 'clubs';
 
 const Admin: React.FC = () => {
   const { section: initialSection, teamId: selectedTeamId } = useParams<{ section?: string; teamId?: string }>();
@@ -56,6 +58,62 @@ const Admin: React.FC = () => {
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Gérer les équipes du club et leurs informations
+          </p>
+        </button>
+
+        {/* Carte Gestion des liens */}
+        <button
+          onClick={() => setCurrentSection('links')}
+          className="bg-light-surface dark:bg-dark-surface rounded-lg p-6 shadow-md hover:shadow-lg transition-all border-2 border-transparent hover:border-light-primary dark:hover:border-dark-primary text-left group"
+        >
+          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-orange-100 dark:bg-orange-900/30 mb-4 group-hover:scale-110 transition-transform">
+            <svg
+              className="w-8 h-8 text-orange-600 dark:text-orange-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+              />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-light-onSurface dark:text-dark-onSurface mb-2">
+            Gestion des liens
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Gérer les liens du club et réseaux sociaux
+          </p>
+        </button>
+
+        {/* Carte Gestion des clubs adverses */}
+        <button
+          onClick={() => setCurrentSection('clubs')}
+          className="bg-light-surface dark:bg-dark-surface rounded-lg p-6 shadow-md hover:shadow-lg transition-all border-2 border-transparent hover:border-light-primary dark:hover:border-dark-primary text-left group"
+        >
+          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 mb-4 group-hover:scale-110 transition-transform">
+            <svg
+              className="w-8 h-8 text-red-600 dark:text-red-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+              />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-light-onSurface dark:text-dark-onSurface mb-2">
+            Clubs adverses
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Gérer les clubs adverses et leurs logos
           </p>
         </button>
 
@@ -272,6 +330,42 @@ const Admin: React.FC = () => {
               </h2>
             </div>
             <PermissionsManager />
+          </div>
+        );
+
+      case 'links':
+        return (
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-6 flex items-center gap-4">
+              <button
+                onClick={() => setCurrentSection('menu')}
+                className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+              >
+                ← Retour
+              </button>
+              <h2 className="text-2xl font-bold text-light-onSurface dark:text-dark-onSurface">
+                Gestion des liens
+              </h2>
+            </div>
+            <LinksManager />
+          </div>
+        );
+
+      case 'clubs':
+        return (
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-6 flex items-center gap-4">
+              <button
+                onClick={() => setCurrentSection('menu')}
+                className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+              >
+                ← Retour
+              </button>
+              <h2 className="text-2xl font-bold text-light-onSurface dark:text-dark-onSurface">
+                Gestion des clubs adverses
+              </h2>
+            </div>
+            <ClubsManager />
           </div>
         );
 
