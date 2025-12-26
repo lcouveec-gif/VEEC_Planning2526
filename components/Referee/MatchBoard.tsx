@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import CourtDisplay from './CourtDisplay';
+import ClubLogo from '../ClubLogo';
+import { useClubs } from '../../hooks/useClubs';
 import type { MatchData, SetLineup, SetData } from '../../types/referee';
 
 interface MatchBoardProps {
@@ -10,9 +12,20 @@ interface MatchBoardProps {
 }
 
 const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack, onNeedCoinTossForSet5 }) => {
+  const { clubs } = useClubs();
   const [showLineupSetup, setShowLineupSetup] = useState(true);
   const [substitutionMode, setSubstitutionMode] = useState<{ team: 'A' | 'B'; playerOut: string } | null>(null);
+  const [swappedSides, setSwappedSides] = useState(false); // État pour inverser les camps
   const currentSetData = matchData.sets[matchData.currentSet - 1];
+
+  // Récupérer les clubs
+  const clubA = matchData.teamA.clubCode ? clubs.find(c => c.code_club === matchData.teamA.clubCode) : null;
+  const clubB = matchData.teamB.clubCode ? clubs.find(c => c.code_club === matchData.teamB.clubCode) : null;
+
+  // Fonction pour inverser les camps
+  const handleSwapSides = () => {
+    setSwappedSides(!swappedSides);
+  };
 
   // Rotation des joueurs (sens horaire vue de dessus)
   const rotateTeamClockwise = (lineup: SetLineup): SetLineup => {
@@ -136,19 +149,45 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
     // Ne pas descendre en dessous de 0
     if (currentScore === 0) return;
 
+    // Calculer le nouveau score
+    const newScore = {
+      ...currentSet.score,
+      [`team${team}`]: currentScore - 1,
+    };
+
+    // Vérifier si le set était terminé et doit redevenir en cours
+    const isSet5 = matchData.currentSet === 5;
+    const winningScore = isSet5 ? 15 : 25;
+
+    // Le set est fini si une équipe a au moins le score gagnant avec 2 points d'écart
+    const wasFinished = currentSet.finished;
+    const isNowFinished =
+      (newScore.teamA >= winningScore && newScore.teamA - newScore.teamB >= 2) ||
+      (newScore.teamB >= winningScore && newScore.teamB - newScore.teamA >= 2);
+
     // Retirer un point sans impact sur la rotation
     const updatedSets = [...matchData.sets];
     updatedSets[matchData.currentSet - 1] = {
       ...currentSet,
-      score: {
-        ...currentSet.score,
-        [`team${team}`]: currentScore - 1,
-      },
+      score: newScore,
+      finished: isNowFinished,
     };
+
+    // Si le set était terminé et ne l'est plus, ajuster les sets gagnés
+    let newSetsWon = { ...matchData.setsWon };
+    if (wasFinished && !isNowFinished) {
+      // Déterminer quelle équipe avait gagné ce set
+      if (currentSet.score.teamA > currentSet.score.teamB) {
+        newSetsWon.A = Math.max(0, newSetsWon.A - 1);
+      } else {
+        newSetsWon.B = Math.max(0, newSetsWon.B - 1);
+      }
+    }
 
     setMatchData({
       ...matchData,
       sets: updatedSets,
+      setsWon: newSetsWon,
     });
   };
 
@@ -226,7 +265,6 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
 
     // Si le set est terminé, calculer qui a gagné
     let newSetsWon = { ...matchData.setsWon };
-    let newCurrentSet = matchData.currentSet;
 
     if (setFinished) {
       if (newScore.teamA > newScore.teamB) {
@@ -234,51 +272,57 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
       } else {
         newSetsWon.B++;
       }
-
-      // Vérifier si le match est terminé (3 sets gagnés)
-      const matchFinished = newSetsWon.A === 3 || newSetsWon.B === 3;
-
-      if (!matchFinished && matchData.sets.length < 5) {
-        // Créer le prochain set
-        newCurrentSet++;
-
-        // Si c'est le 5ème set et qu'on a un callback pour le tirage au sort
-        if (newCurrentSet === 5 && onNeedCoinTossForSet5) {
-          // Sauvegarder l'état actuel et demander un nouveau tirage au sort
-          setMatchData({
-            ...matchData,
-            sets: updatedSets,
-            setsWon: newSetsWon,
-            currentSet: newCurrentSet,
-          });
-          onNeedCoinTossForSet5();
-          return;
-        }
-
-        // Déterminer l'équipe au service pour le nouveau set
-        // Pour les sets 2, 3, 4: l'équipe qui n'avait pas le service au début du set précédent
-        const previousSet = updatedSets[updatedSets.length - 1];
-        const newServingTeam = previousSet.servingTeam === 'A' ? 'B' : 'A';
-
-        updatedSets.push({
-          number: newCurrentSet,
-          lineupA: { P1: '', P2: '', P3: '', P4: '', P5: '', P6: '' },
-          lineupB: { P1: '', P2: '', P3: '', P4: '', P5: '', P6: '' },
-          score: { teamA: 0, teamB: 0 },
-          servingTeam: newServingTeam,
-          started: false,
-          finished: false,
-        });
-        setShowLineupSetup(true);
-      }
+      // Ne pas passer automatiquement au set suivant
+      // L'utilisateur devra cliquer sur "Passer au set suivant"
     }
 
     setMatchData({
       ...matchData,
       sets: updatedSets,
       setsWon: newSetsWon,
+    });
+  };
+
+  const handleNextSet = () => {
+    const matchFinished = matchData.setsWon.A === 3 || matchData.setsWon.B === 3;
+
+    if (matchFinished || matchData.sets.length >= 5) return;
+
+    const newCurrentSet = matchData.currentSet + 1;
+
+    // Si c'est le 5ème set et qu'on a un callback pour le tirage au sort
+    if (newCurrentSet === 5 && onNeedCoinTossForSet5) {
+      setMatchData({
+        ...matchData,
+        currentSet: newCurrentSet,
+      });
+      onNeedCoinTossForSet5();
+      return;
+    }
+
+    // Déterminer l'équipe au service pour le nouveau set
+    // Pour les sets 2, 3, 4: l'équipe qui n'avait pas le service au début du set précédent
+    const previousSet = matchData.sets[matchData.sets.length - 1];
+    const newServingTeam = previousSet.servingTeam === 'A' ? 'B' : 'A';
+
+    // Initialiser avec les joueurs du set précédent
+    const updatedSets = [...matchData.sets];
+    updatedSets.push({
+      number: newCurrentSet,
+      lineupA: { ...previousSet.lineupA }, // Copie du lineup précédent
+      lineupB: { ...previousSet.lineupB }, // Copie du lineup précédent
+      score: { teamA: 0, teamB: 0 },
+      servingTeam: newServingTeam,
+      started: false,
+      finished: false,
+    });
+
+    setMatchData({
+      ...matchData,
+      sets: updatedSets,
       currentSet: newCurrentSet,
     });
+    setShowLineupSetup(true);
   };
 
   const handleLineupChange = (team: 'A' | 'B', position: keyof SetLineup, playerNumber: string) => {
@@ -289,6 +333,24 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
       currentSet.lineupA[position] = playerNumber;
     } else {
       currentSet.lineupB[position] = playerNumber;
+    }
+
+    setMatchData({ ...matchData, sets: updatedSets });
+  };
+
+  // Rotation pendant la configuration
+  const handleConfigRotation = (team: 'A' | 'B', direction: 'clockwise' | 'counter') => {
+    const updatedSets = [...matchData.sets];
+    const currentSet = updatedSets[matchData.currentSet - 1];
+
+    if (team === 'A') {
+      currentSet.lineupA = direction === 'clockwise'
+        ? rotateTeamClockwise(currentSet.lineupA)
+        : rotateTeamCounterClockwise(currentSet.lineupA);
+    } else {
+      currentSet.lineupB = direction === 'clockwise'
+        ? rotateTeamClockwise(currentSet.lineupB)
+        : rotateTeamCounterClockwise(currentSet.lineupB);
     }
 
     setMatchData({ ...matchData, sets: updatedSets });
@@ -330,13 +392,39 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Équipe A */}
           <div className="border-2 border-gray-300 dark:border-gray-600 rounded-lg p-4">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <div
-                className="w-6 h-6 rounded-full"
-                style={{ backgroundColor: matchData.teamA.colorPrimary }}
-              ></div>
-              {matchData.teamA.name}
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                {clubA ? (
+                  <ClubLogo
+                    codeClub={clubA.code_club}
+                    clubName={clubA.nom}
+                    size="sm"
+                  />
+                ) : (
+                  <div
+                    className="w-6 h-6 rounded-full"
+                    style={{ backgroundColor: matchData.teamA.colorPrimary }}
+                  ></div>
+                )}
+                {matchData.teamA.name}
+              </h3>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => handleConfigRotation('A', 'counter')}
+                  className="px-2 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors text-sm font-bold"
+                  title="Rotation anti-horaire"
+                >
+                  ↺
+                </button>
+                <button
+                  onClick={() => handleConfigRotation('A', 'clockwise')}
+                  className="px-2 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors text-sm font-bold"
+                  title="Rotation horaire"
+                >
+                  ↻
+                </button>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {/* Colonne Arrière (gauche) */}
               <div className="space-y-2">
@@ -360,7 +448,7 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
                         <option value="">-</option>
                         {availablePlayers.map(p => (
                           <option key={p.number} value={p.number}>
-                            #{p.number} - {p.role} {p.isLibero ? '(L)' : ''} {p.isCaptain ? '(C)' : ''}
+                            #{p.number} {p.isLibero ? '(Libéro)' : ''} {p.isCaptain ? '(Capitaine)' : ''}
                           </option>
                         ))}
                       </select>
@@ -391,7 +479,7 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
                         <option value="">-</option>
                         {availablePlayers.map(p => (
                           <option key={p.number} value={p.number}>
-                            #{p.number} - {p.role} {p.isLibero ? '(L)' : ''} {p.isCaptain ? '(C)' : ''}
+                            #{p.number} {p.isLibero ? '(Libéro)' : ''} {p.isCaptain ? '(Capitaine)' : ''}
                           </option>
                         ))}
                       </select>
@@ -404,13 +492,39 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
 
           {/* Équipe B */}
           <div className="border-2 border-gray-300 dark:border-gray-600 rounded-lg p-4">
-            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <div
-                className="w-6 h-6 rounded-full border-2 border-gray-400"
-                style={{ backgroundColor: matchData.teamB.colorPrimary }}
-              ></div>
-              {matchData.teamB.name}
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                {clubB ? (
+                  <ClubLogo
+                    codeClub={clubB.code_club}
+                    clubName={clubB.nom}
+                    size="sm"
+                  />
+                ) : (
+                  <div
+                    className="w-6 h-6 rounded-full"
+                    style={{ backgroundColor: matchData.teamB.colorPrimary }}
+                  ></div>
+                )}
+                {matchData.teamB.name}
+              </h3>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => handleConfigRotation('B', 'counter')}
+                  className="px-2 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors text-sm font-bold"
+                  title="Rotation anti-horaire"
+                >
+                  ↺
+                </button>
+                <button
+                  onClick={() => handleConfigRotation('B', 'clockwise')}
+                  className="px-2 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors text-sm font-bold"
+                  title="Rotation horaire"
+                >
+                  ↻
+                </button>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {/* Colonne Avant (gauche, près du filet) */}
               <div className="space-y-2">
@@ -434,7 +548,7 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
                         <option value="">-</option>
                         {availablePlayers.map(p => (
                           <option key={p.number} value={p.number}>
-                            #{p.number} - {p.role} {p.isLibero ? '(L)' : ''} {p.isCaptain ? '(C)' : ''}
+                            #{p.number} {p.isLibero ? '(Libéro)' : ''} {p.isCaptain ? '(Capitaine)' : ''}
                           </option>
                         ))}
                       </select>
@@ -465,7 +579,7 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
                         <option value="">-</option>
                         {availablePlayers.map(p => (
                           <option key={p.number} value={p.number}>
-                            #{p.number} - {p.role} {p.isLibero ? '(L)' : ''} {p.isCaptain ? '(C)' : ''}
+                            #{p.number} {p.isLibero ? '(Libéro)' : ''} {p.isCaptain ? '(Capitaine)' : ''}
                           </option>
                         ))}
                       </select>
@@ -492,42 +606,63 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
   // Affichage du terrain et du match en cours
   const matchFinished = matchData.setsWon.A === 3 || matchData.setsWon.B === 3;
 
+  // Déterminer les équipes pour l'affichage (gauche/droite) en fonction de swappedSides
+  const displayTeamLeft = swappedSides ? matchData.teamB : matchData.teamA;
+  const displayTeamRight = swappedSides ? matchData.teamA : matchData.teamB;
+  const displayClubLeft = swappedSides ? clubB : clubA;
+  const displayClubRight = swappedSides ? clubA : clubB;
+  const displayScoreLeft = swappedSides ? currentSetData.score.teamB : currentSetData.score.teamA;
+  const displayScoreRight = swappedSides ? currentSetData.score.teamA : currentSetData.score.teamB;
+  const displaySetsLeft = swappedSides ? matchData.setsWon.B : matchData.setsWon.A;
+  const displaySetsRight = swappedSides ? matchData.setsWon.A : matchData.setsWon.B;
+  const teamLeftId: 'A' | 'B' = swappedSides ? 'B' : 'A';
+  const teamRightId: 'A' | 'B' = swappedSides ? 'A' : 'B';
+
   return (
     <div className="space-y-3 sm:space-y-4">
       {/* Tableau d'affichage avec boutons de points intégrés */}
       <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-lg p-3 sm:p-6">
         <div className="grid grid-cols-3 gap-2 sm:gap-4 items-stretch mb-3 sm:mb-4">
-          {/* Équipe A avec boutons point */}
+          {/* Équipe gauche avec boutons point */}
           <div className="text-center flex flex-col">
             <div className="flex items-center justify-center gap-1 sm:gap-2 mb-2">
-              <div
-                className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 shadow"
-                style={{ backgroundColor: matchData.teamA.colorPrimary }}
-              ></div>
-              <h3 className="text-sm sm:text-lg font-bold truncate">{matchData.teamA.name}</h3>
+              {displayClubLeft ? (
+                <ClubLogo
+                  codeClub={displayClubLeft.code_club}
+                  clubName={displayClubLeft.nom}
+                  size="sm"
+                  className="flex-shrink-0"
+                />
+              ) : (
+                <div
+                  className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 shadow"
+                  style={{ backgroundColor: displayTeamLeft.colorPrimary }}
+                ></div>
+              )}
+              <h3 className="text-sm sm:text-lg font-bold truncate">{displayTeamLeft.name}</h3>
             </div>
-            <div className="text-4xl sm:text-6xl font-bold mb-2">{currentSetData.score.teamA}</div>
-            <div className="text-xs sm:text-sm font-semibold mb-3" style={{ color: matchData.teamA.colorPrimary }}>
-              {matchData.setsWon.A} {matchData.setsWon.A > 1 ? 'Sets' : 'Set'}
+            <div className="text-4xl sm:text-6xl font-bold mb-2">{displayScoreLeft}</div>
+            <div className="text-xs sm:text-sm font-semibold mb-3" style={{ color: displayTeamLeft.colorPrimary }}>
+              {displaySetsLeft} {displaySetsLeft > 1 ? 'Sets' : 'Set'}
             </div>
             <div className="flex gap-2 mt-auto">
               <button
-                onClick={() => handleRemovePoint('A')}
-                disabled={currentSetData.score.teamA === 0}
+                onClick={() => handleRemovePoint(teamLeftId)}
+                disabled={displayScoreLeft === 0}
                 className="flex-1 px-2 sm:px-3 py-2 text-sm sm:text-base font-bold rounded-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: matchData.teamA.colorPrimary,
-                  color: matchData.teamA.colorSecondary,
+                  backgroundColor: displayTeamLeft.colorPrimary,
+                  color: displayTeamLeft.colorSecondary,
                 }}
               >
                 −
               </button>
               <button
-                onClick={() => handleScorePoint('A')}
+                onClick={() => handleScorePoint(teamLeftId)}
                 className="flex-[2] px-3 sm:px-4 py-2 text-sm sm:text-base font-bold rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md"
                 style={{
-                  backgroundColor: matchData.teamA.colorPrimary,
-                  color: matchData.teamA.colorSecondary,
+                  backgroundColor: displayTeamLeft.colorPrimary,
+                  color: displayTeamLeft.colorSecondary,
                 }}
               >
                 + Point
@@ -541,7 +676,7 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
               SET {matchData.currentSet}
             </div>
             <div className="text-2xl sm:text-4xl font-bold mb-2 text-gray-700 dark:text-gray-300">
-              {matchData.setsWon.A} - {matchData.setsWon.B}
+              {swappedSides ? `${matchData.setsWon.B} - ${matchData.setsWon.A}` : `${matchData.setsWon.A} - ${matchData.setsWon.B}`}
             </div>
             {currentSetData.servingTeam && (
               <div className="text-xs sm:text-sm mt-2 bg-yellow-100 dark:bg-yellow-900 text-yellow-900 dark:text-yellow-100 py-1 px-2 rounded-full inline-block mx-auto">
@@ -550,37 +685,46 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
             )}
           </div>
 
-          {/* Équipe B avec boutons point */}
+          {/* Équipe droite avec boutons point */}
           <div className="text-center flex flex-col">
             <div className="flex items-center justify-center gap-1 sm:gap-2 mb-2">
-              <div
-                className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 shadow"
-                style={{ backgroundColor: matchData.teamB.colorPrimary }}
-              ></div>
-              <h3 className="text-sm sm:text-lg font-bold truncate">{matchData.teamB.name}</h3>
+              {displayClubRight ? (
+                <ClubLogo
+                  codeClub={displayClubRight.code_club}
+                  clubName={displayClubRight.nom}
+                  size="sm"
+                  className="flex-shrink-0"
+                />
+              ) : (
+                <div
+                  className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 shadow"
+                  style={{ backgroundColor: displayTeamRight.colorPrimary }}
+                ></div>
+              )}
+              <h3 className="text-sm sm:text-lg font-bold truncate">{displayTeamRight.name}</h3>
             </div>
-            <div className="text-4xl sm:text-6xl font-bold mb-2">{currentSetData.score.teamB}</div>
-            <div className="text-xs sm:text-sm font-semibold mb-3" style={{ color: matchData.teamB.colorPrimary }}>
-              {matchData.setsWon.B} {matchData.setsWon.B > 1 ? 'Sets' : 'Set'}
+            <div className="text-4xl sm:text-6xl font-bold mb-2">{displayScoreRight}</div>
+            <div className="text-xs sm:text-sm font-semibold mb-3" style={{ color: displayTeamRight.colorPrimary }}>
+              {displaySetsRight} {displaySetsRight > 1 ? 'Sets' : 'Set'}
             </div>
             <div className="flex gap-2 mt-auto">
               <button
-                onClick={() => handleRemovePoint('B')}
-                disabled={currentSetData.score.teamB === 0}
+                onClick={() => handleRemovePoint(teamRightId)}
+                disabled={displayScoreRight === 0}
                 className="flex-1 px-2 sm:px-3 py-2 text-sm sm:text-base font-bold rounded-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: matchData.teamB.colorPrimary,
-                  color: matchData.teamB.colorSecondary,
+                  backgroundColor: displayTeamRight.colorPrimary,
+                  color: displayTeamRight.colorSecondary,
                 }}
               >
                 −
               </button>
               <button
-                onClick={() => handleScorePoint('B')}
+                onClick={() => handleScorePoint(teamRightId)}
                 className="flex-[2] px-3 sm:px-4 py-2 text-sm sm:text-base font-bold rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md"
                 style={{
-                  backgroundColor: matchData.teamB.colorPrimary,
-                  color: matchData.teamB.colorSecondary,
+                  backgroundColor: displayTeamRight.colorPrimary,
+                  color: displayTeamRight.colorSecondary,
                 }}
               >
                 + Point
@@ -600,7 +744,7 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
                   : 'bg-gray-200 dark:bg-gray-700'
               }`}
             >
-              S{set.number}: {set.score.teamA}-{set.score.teamB}
+              S{set.number}: {swappedSides ? `${set.score.teamB}-${set.score.teamA}` : `${set.score.teamA}-${set.score.teamB}`}
             </div>
           ))}
         </div>
@@ -609,21 +753,39 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
       {/* Terrain de volley */}
       {!matchFinished && (
         <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-lg p-3 sm:p-6">
+          {/* Bouton pour inverser les camps */}
+          <div className="flex justify-center mb-4">
+            <button
+              onClick={handleSwapSides}
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors font-medium text-sm flex items-center gap-2"
+              title="Inverser les camps pour correspondre à la position réelle sur le terrain"
+            >
+              <span className="text-lg">⇄</span>
+              <span>Inverser les camps</span>
+            </button>
+          </div>
+
           <CourtDisplay
-            teamA={matchData.teamA}
-            teamB={matchData.teamB}
-            lineupA={currentSetData.lineupA}
-            lineupB={currentSetData.lineupB}
+            teamA={swappedSides ? matchData.teamB : matchData.teamA}
+            teamB={swappedSides ? matchData.teamA : matchData.teamB}
+            lineupA={swappedSides ? currentSetData.lineupB : currentSetData.lineupA}
+            lineupB={swappedSides ? currentSetData.lineupA : currentSetData.lineupB}
             servingTeam={currentSetData.servingTeam}
-            onRotateA={handleManualRotation.bind(null, 'A')}
-            onRotateB={handleManualRotation.bind(null, 'B')}
-            getPlayerInfo={getPlayerInfo}
-            onSubstitute={handleSubstitution}
-            substitutionMode={substitutionMode}
-            onStartSubstitution={(team, playerOut) => setSubstitutionMode({ team, playerOut })}
+            onRotateA={handleManualRotation.bind(null, swappedSides ? 'B' : 'A')}
+            onRotateB={handleManualRotation.bind(null, swappedSides ? 'A' : 'B')}
+            getPlayerInfo={(team, playerNumber) => getPlayerInfo(swappedSides ? (team === 'A' ? 'B' : 'A') : team, playerNumber)}
+            onSubstitute={(team, playerOut, playerIn) => handleSubstitution(swappedSides ? (team === 'A' ? 'B' : 'A') : team, playerOut, playerIn)}
+            substitutionMode={substitutionMode ? {
+              team: swappedSides ? (substitutionMode.team === 'A' ? 'B' : 'A') as 'A' | 'B' : substitutionMode.team,
+              playerOut: substitutionMode.playerOut
+            } : null}
+            onStartSubstitution={(team, playerOut) => setSubstitutionMode({
+              team: swappedSides ? (team === 'A' ? 'B' : 'A') as 'A' | 'B' : team,
+              playerOut
+            })}
             onCancelSubstitution={() => setSubstitutionMode(null)}
-            liberoExchangeA={currentSetData.liberoExchangeA}
-            liberoExchangeB={currentSetData.liberoExchangeB}
+            liberoExchangeA={swappedSides ? currentSetData.liberoExchangeB : currentSetData.liberoExchangeA}
+            liberoExchangeB={swappedSides ? currentSetData.liberoExchangeA : currentSetData.liberoExchangeB}
           />
         </div>
       )}
@@ -638,10 +800,10 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
             Score: {currentSetData.score.teamA} - {currentSetData.score.teamB}
           </p>
           <button
-            onClick={() => setShowLineupSetup(true)}
+            onClick={handleNextSet}
             className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors shadow-md"
           >
-            Configurer le set suivant
+            Passer au set suivant
           </button>
         </div>
       )}

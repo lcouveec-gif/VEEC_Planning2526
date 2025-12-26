@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import type { TeamInfo, CoinTossResult, CoinTossChoice } from '../../types/referee';
+import ClubLogo from '../ClubLogo';
+import { useClubs } from '../../hooks/useClubs';
 
 interface CoinTossProps {
   teamA: TeamInfo;
@@ -9,10 +11,15 @@ interface CoinTossProps {
 }
 
 const CoinToss: React.FC<CoinTossProps> = ({ teamA, teamB, onComplete, onBack }) => {
+  const { clubs } = useClubs();
   const [isFlipping, setIsFlipping] = useState(false);
   const [winner, setWinner] = useState<'A' | 'B' | null>(null);
   const [choice, setChoice] = useState<CoinTossChoice | null>(null);
   const [manualMode, setManualMode] = useState(false);
+
+  // Récupérer les clubs
+  const clubA = teamA.clubCode ? clubs.find(c => c.code_club === teamA.clubCode) : null;
+  const clubB = teamB.clubCode ? clubs.find(c => c.code_club === teamB.clubCode) : null;
 
   const flipCoin = () => {
     setIsFlipping(true);
@@ -51,18 +58,38 @@ const CoinToss: React.FC<CoinTossProps> = ({ teamA, teamB, onComplete, onBack })
       <div className="mb-8">
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="text-center p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
-            <div
-              className="w-16 h-16 rounded-full mx-auto mb-2"
-              style={{ backgroundColor: teamA.colorPrimary }}
-            ></div>
+            <div className="flex justify-center mb-3">
+              {clubA ? (
+                <ClubLogo
+                  codeClub={clubA.code_club}
+                  clubName={clubA.nom}
+                  size="lg"
+                />
+              ) : (
+                <div
+                  className="w-16 h-16 rounded-full"
+                  style={{ backgroundColor: teamA.colorPrimary }}
+                ></div>
+              )}
+            </div>
             <h3 className="font-bold text-lg">{teamA.name}</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">Équipe A</p>
           </div>
           <div className="text-center p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
-            <div
-              className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-gray-400"
-              style={{ backgroundColor: teamB.colorPrimary }}
-            ></div>
+            <div className="flex justify-center mb-3">
+              {clubB ? (
+                <ClubLogo
+                  codeClub={clubB.code_club}
+                  clubName={clubB.nom}
+                  size="lg"
+                />
+              ) : (
+                <div
+                  className="w-16 h-16 rounded-full"
+                  style={{ backgroundColor: teamB.colorPrimary }}
+                ></div>
+              )}
+            </div>
             <h3 className="font-bold text-lg">{teamB.name}</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">Équipe B</p>
           </div>

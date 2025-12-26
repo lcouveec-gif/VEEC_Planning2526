@@ -13,12 +13,17 @@ import Referee from './components/Referee';
 import AIChat from './components/AIChat';
 import TrainingPage from './pages/TrainingPage';
 import LoginPage from './pages/LoginPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import LinksPage from './pages/LinksPage';
 
 export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />
+  },
+  {
+    path: '/reset-password',
+    element: <ResetPasswordPage />
   },
   {
     path: '/',

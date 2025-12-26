@@ -136,6 +136,19 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ match, onClose }) =
     }
   };
 
+  const openWazeDirections = () => {
+    if (gymnase?.latitude && gymnase?.longitude) {
+      // Waze utilisera automatiquement la position actuelle comme point de départ
+      const url = `https://waze.com/ul?ll=${gymnase.latitude},${gymnase.longitude}&navigate=yes&zoom=17`;
+      window.open(url, '_blank');
+    } else if (gymnase?.adresse) {
+      const address = [gymnase.adresse, gymnase.code_postal, gymnase.ville].filter(Boolean).join(', ');
+      // Waze utilisera automatiquement la position actuelle comme point de départ
+      const url = `https://waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`;
+      window.open(url, '_blank');
+    }
+  };
+
   const openGoogleMapsLocation = () => {
     if (gymnase?.latitude && gymnase?.longitude) {
       const url = `https://www.google.com/maps/search/?api=1&query=${gymnase.latitude},${gymnase.longitude}`;
@@ -398,7 +411,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ match, onClose }) =
                     {(gymnase.adresse || gymnase.ville) && (
                       <div className="flex items-start gap-4">
                         <div className="w-10 h-10 flex items-center justify-center bg-veec-green/10 rounded-lg flex-shrink-0">
-                          <span className="text-xl">🏢</span>
+                          <span className="text-xl">🏟️</span>
                         </div>
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-1">Adresse</p>
@@ -429,23 +442,43 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ match, onClose }) =
 
                     {/* Boutons d'action */}
                     {((gymnase.latitude && gymnase.longitude) || gymnase.adresse) && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <button
-                          onClick={openGoogleMapsDirections}
-                          className="group relative px-6 py-4 bg-veec-green hover:bg-veec-green/90 text-white rounded-xl font-semibold transition-all hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
-                        >
-                          <span className="text-2xl">🚗</span>
-                          <span>Y aller</span>
-                          <div className="absolute inset-0 bg-white/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        </button>
+                      <div className="space-y-3">
+                        <p className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                          Itinéraire vers le gymnase
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <button
+                            onClick={openGoogleMapsDirections}
+                            className="group relative px-5 py-3 bg-white dark:bg-gray-800 border-2 border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl font-semibold transition-all hover:scale-105 hover:shadow-lg flex items-center justify-center gap-3"
+                          >
+                            <img
+                              src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/googlemaps.svg"
+                              alt="Google Maps"
+                              className="w-6 h-6"
+                              style={{ filter: 'invert(27%) sepia(98%) saturate(2476%) hue-rotate(200deg) brightness(99%) contrast(101%)' }}
+                            />
+                            <span className="text-blue-600 dark:text-blue-400">Google Maps</span>
+                          </button>
+                          <button
+                            onClick={openWazeDirections}
+                            className="group relative px-5 py-3 bg-white dark:bg-gray-800 border-2 border-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 rounded-xl font-semibold transition-all hover:scale-105 hover:shadow-lg flex items-center justify-center gap-3"
+                          >
+                            <img
+                              src="https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/waze.svg"
+                              alt="Waze"
+                              className="w-6 h-6"
+                              style={{ filter: 'invert(57%) sepia(86%) saturate(1757%) hue-rotate(160deg) brightness(92%) contrast(101%)' }}
+                            />
+                            <span className="text-cyan-600 dark:text-cyan-400">Waze</span>
+                          </button>
+                        </div>
                         {gymnase.latitude && gymnase.longitude && (
                           <button
                             onClick={openGoogleMapsLocation}
-                            className="group relative px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-all hover:scale-105 hover:shadow-xl flex items-center justify-center gap-3"
+                            className="w-full group relative px-5 py-3 bg-veec-green hover:bg-veec-green/90 text-white rounded-xl font-semibold transition-all hover:scale-105 hover:shadow-xl flex items-center justify-center gap-2"
                           >
-                            <span className="text-2xl">🗺️</span>
-                            <span>Voir la carte</span>
-                            <div className="absolute inset-0 bg-white/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <span className="text-xl">📍</span>
+                            <span>Voir la localisation</span>
                           </button>
                         )}
                       </div>

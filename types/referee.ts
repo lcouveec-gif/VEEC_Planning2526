@@ -1,18 +1,16 @@
 // Types pour le module Arbitre
 
 export type PlayerPosition = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6';
-export type PlayerRole = 'Passeur' | 'Pointu' | 'R4' | 'Central' | 'Libéro';
 
 export interface RefereePlayer {
   number: string; // 01 à 99
-  position: PlayerPosition;
-  role: PlayerRole;
   isLibero: boolean;
   isCaptain: boolean;
 }
 
 export interface TeamInfo {
   name: string;
+  clubCode?: string; // Code du club (optionnel)
   colorPrimary: string;
   colorSecondary: string;
   players: RefereePlayer[];
