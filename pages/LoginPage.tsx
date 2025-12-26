@@ -10,6 +10,7 @@ const LoginPage: React.FC = () => {
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [nom, setNom] = useState('');
@@ -170,39 +171,83 @@ const LoginPage: React.FC = () => {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    if (!email) {
+      setError('Veuillez entrer votre adresse email');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        console.error('Erreur réinitialisation:', error);
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      setSuccess('Un email de réinitialisation a été envoyé à votre adresse. Vérifiez votre boîte de réception.');
+      setEmail('');
+      setLoading(false);
+
+      // Retour à la page de connexion après 3 secondes
+      setTimeout(() => {
+        setIsForgotPassword(false);
+        setSuccess(null);
+      }, 3000);
+    } catch (err: any) {
+      console.error('❌ Erreur inattendue:', err);
+      setError(`Erreur: ${err.message || 'Une erreur est survenue'}`);
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-veec-blue to-blue-700 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-black px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8">
+        <div className="bg-light-surface dark:bg-dark-surface rounded-2xl shadow-2xl p-8">
           {/* Logo/Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            <h1 className="text-3xl font-bold text-light-onSurface dark:text-dark-onSurface mb-2">
               VEEC Planning
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              {isSignUp ? 'Créer un compte' : 'Connectez-vous à votre compte'}
+            <p className="text-light-onSurface/70 dark:text-dark-onSurface/70">
+              {isForgotPassword
+                ? 'Réinitialiser votre mot de passe'
+                : isSignUp
+                ? 'Créer un compte'
+                : 'Connectez-vous à votre compte'}
             </p>
           </div>
 
           {/* Messages d'erreur/succès */}
           {error && (
-            <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            <div className="mb-6 p-4 bg-veec-red/10 border border-veec-red/30 text-veec-red rounded-lg">
               <p className="text-sm">{error}</p>
             </div>
           )}
 
           {success && (
-            <div className="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
+            <div className="mb-6 p-4 bg-veec-green/10 border border-veec-green/30 text-veec-green rounded-lg">
               <p className="text-sm">{success}</p>
             </div>
           )}
 
           {/* Formulaire */}
-          <form onSubmit={isSignUp ? handleSignUp : handleSignIn}>
-            {isSignUp && (
+          <form onSubmit={isForgotPassword ? handleForgotPassword : (isSignUp ? handleSignUp : handleSignIn)}>
+            {!isForgotPassword && isSignUp && (
               <>
                 <div className="mb-4">
-                  <label htmlFor="nom" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="nom" className="block text-sm font-medium text-light-onSurface dark:text-dark-onSurface mb-2">
                     Nom
                   </label>
                   <input
@@ -210,14 +255,14 @@ const LoginPage: React.FC = () => {
                     id="nom"
                     value={nom}
                     onChange={(e) => setNom(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-veec-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-light-border dark:border-dark-border rounded-lg focus:ring-2 focus:ring-veec-green focus:border-transparent bg-light-background dark:bg-dark-background text-light-onBackground dark:text-dark-onBackground"
                     required={isSignUp}
                     disabled={loading}
                   />
                 </div>
 
                 <div className="mb-4">
-                  <label htmlFor="prenom" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="prenom" className="block text-sm font-medium text-light-onSurface dark:text-dark-onSurface mb-2">
                     Prénom
                   </label>
                   <input
@@ -225,7 +270,7 @@ const LoginPage: React.FC = () => {
                     id="prenom"
                     value={prenom}
                     onChange={(e) => setPrenom(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-veec-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    className="w-full px-4 py-2 border border-light-border dark:border-dark-border rounded-lg focus:ring-2 focus:ring-veec-green focus:border-transparent bg-light-background dark:bg-dark-background text-light-onBackground dark:text-dark-onBackground"
                     required={isSignUp}
                     disabled={loading}
                   />
@@ -234,7 +279,7 @@ const LoginPage: React.FC = () => {
             )}
 
             <div className="mb-4">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-light-onSurface dark:text-dark-onSurface mb-2">
                 Email
               </label>
               <input
@@ -242,32 +287,34 @@ const LoginPage: React.FC = () => {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-veec-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
+                className="w-full px-4 py-2 border border-light-border dark:border-dark-border rounded-lg focus:ring-2 focus:ring-veec-green focus:border-transparent bg-light-background dark:bg-dark-background text-light-onBackground dark:text-dark-onBackground"
                 required
                 disabled={loading}
               />
             </div>
 
-            <div className="mb-6">
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Mot de passe
-              </label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-veec-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
-                required
-                disabled={loading}
-                minLength={6}
-              />
-            </div>
+            {!isForgotPassword && (
+              <div className="mb-6">
+                <label htmlFor="password" className="block text-sm font-medium text-light-onSurface dark:text-dark-onSurface mb-2">
+                  Mot de passe
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-light-border dark:border-dark-border rounded-lg focus:ring-2 focus:ring-veec-green focus:border-transparent bg-light-background dark:bg-dark-background text-light-onBackground dark:text-dark-onBackground"
+                  required
+                  disabled={loading}
+                  minLength={6}
+                />
+              </div>
+            )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-veec-blue hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-light-primary dark:bg-dark-primary hover:opacity-90 text-light-onPrimary dark:text-dark-onPrimary font-semibold py-3 px-4 rounded-lg transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <span className="flex items-center justify-center">
@@ -277,32 +324,67 @@ const LoginPage: React.FC = () => {
                   </svg>
                   Chargement...
                 </span>
+              ) : isForgotPassword ? (
+                'Envoyer le lien de réinitialisation'
+              ) : isSignUp ? (
+                'Créer un compte'
               ) : (
-                isSignUp ? 'Créer un compte' : 'Se connecter'
+                'Se connecter'
               )}
             </button>
           </form>
 
-          {/* Toggle Sign In / Sign Up */}
+          {/* Lien mot de passe oublié */}
+          {!isSignUp && !isForgotPassword && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => {
+                  setIsForgotPassword(true);
+                  setError(null);
+                  setSuccess(null);
+                }}
+                className="text-light-primary dark:text-dark-primary hover:opacity-80 font-medium text-sm transition-opacity"
+                disabled={loading}
+              >
+                Mot de passe oublié ?
+              </button>
+            </div>
+          )}
+
+          {/* Toggle Sign In / Sign Up / Forgot Password */}
           <div className="mt-6 text-center">
-            <button
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setError(null);
-                setSuccess(null);
-              }}
-              className="text-veec-blue hover:text-blue-600 font-medium text-sm"
-              disabled={loading}
-            >
-              {isSignUp
-                ? 'Vous avez déjà un compte ? Connectez-vous'
-                : "Pas encore de compte ? Inscrivez-vous"}
-            </button>
+            {isForgotPassword ? (
+              <button
+                onClick={() => {
+                  setIsForgotPassword(false);
+                  setError(null);
+                  setSuccess(null);
+                }}
+                className="text-light-primary dark:text-dark-primary hover:opacity-80 font-medium text-sm transition-opacity"
+                disabled={loading}
+              >
+                ← Retour à la connexion
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setError(null);
+                  setSuccess(null);
+                }}
+                className="text-light-primary dark:text-dark-primary hover:opacity-80 font-medium text-sm transition-opacity"
+                disabled={loading}
+              >
+                {isSignUp
+                  ? 'Vous avez déjà un compte ? Connectez-vous'
+                  : "Pas encore de compte ? Inscrivez-vous"}
+              </button>
+            )}
           </div>
         </div>
 
         {/* Info rôles */}
-        <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-4 text-white text-sm">
+        <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-4 text-white text-sm border border-white/20">
           <p className="font-semibold mb-2">Rôles disponibles :</p>
           <ul className="space-y-1 text-xs">
             <li>• <strong>User</strong> : Accès lecture seule aux Entraînements, Matchs, Équipes</li>

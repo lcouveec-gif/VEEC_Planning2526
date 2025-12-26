@@ -92,17 +92,17 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
           </div>
         </div>
 
-        {/* Rôle (plus visible) */}
-        {player?.role && (
-          <div className="text-center text-xs sm:text-sm font-bold mb-0.5" style={{ color: teamData.colorPrimary }}>
-            {player.role}
-          </div>
-        )}
-
         {/* Position */}
         <div className="text-center text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 font-medium">
           {position}
         </div>
+
+        {/* Badge Libéro */}
+        {player?.isLibero && (
+          <div className="text-center text-[8px] sm:text-[9px] font-bold text-blue-600 dark:text-blue-400 mt-0.5">
+            LIBÉRO
+          </div>
+        )}
 
         {/* Capitaine */}
         {player?.isCaptain && (
@@ -190,8 +190,8 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
                   : isSubstitutionActive
                     ? isLiberoGoingOut
                       ? 'Seul le joueur échangé peut remplacer le libéro'
-                      : `Faire entrer ${player.role} #${player.number}`
-                    : `${player.role}`;
+                      : `Faire entrer #${player.number}`
+                    : `#${player.number}`;
 
               return (
                 <div
@@ -220,9 +220,16 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
                       {player.number}
                     </span>
                   </div>
-                  <div className="text-[8px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">
-                    {player.role}
-                  </div>
+                  {player.isLibero && (
+                    <div className="text-[8px] text-blue-600 dark:text-blue-400 mt-0.5 text-center font-bold">
+                      LIB
+                    </div>
+                  )}
+                  {player.isCaptain && (
+                    <div className="text-[8px] text-yellow-600 dark:text-yellow-400 mt-0.5 text-center font-bold">
+                      CAP
+                    </div>
+                  )}
                 </div>
               );
             })
