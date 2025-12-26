@@ -7,11 +7,10 @@ import type { MatchData, SetLineup, SetData } from '../../types/referee';
 interface MatchBoardProps {
   matchData: MatchData;
   setMatchData: React.Dispatch<React.SetStateAction<MatchData>>;
-  onBack: () => void;
   onNeedCoinTossForSet5?: () => void;
 }
 
-const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack, onNeedCoinTossForSet5 }) => {
+const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onNeedCoinTossForSet5 }) => {
   const { clubs } = useClubs();
   const [showLineupSetup, setShowLineupSetup] = useState(true);
   const [substitutionMode, setSubstitutionMode] = useState<{ team: 'A' | 'B'; playerOut: string } | null>(null);
@@ -832,24 +831,9 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onBack
           <p className="text-lg text-gray-600 dark:text-gray-400">
             Score final : {matchData.setsWon.A} - {matchData.setsWon.B}
           </p>
-          <button
-            onClick={onBack}
-            className="mt-6 px-6 py-3 bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary rounded-lg font-semibold hover:opacity-90 transition-opacity"
-          >
-            Nouveau match
-          </button>
-        </div>
-      )}
-
-      {/* Bouton retour */}
-      {!matchFinished && (
-        <div className="text-center">
-          <button
-            onClick={onBack}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-          >
-            Abandonner le match
-          </button>
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+            Utilisez le bouton "Réinitialiser le match" en haut de la page pour commencer un nouveau match
+          </p>
         </div>
       )}
     </div>
