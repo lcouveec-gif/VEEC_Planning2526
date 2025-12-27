@@ -618,13 +618,19 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onNeed
   const teamRightId: 'A' | 'B' = swappedSides ? 'A' : 'B';
 
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-2 sm:space-y-3">
       {/* Tableau d'affichage avec boutons de points intégrés */}
-      <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-lg p-3 sm:p-6">
-        <div className="grid grid-cols-3 gap-2 sm:gap-4 items-stretch mb-3 sm:mb-4">
+      <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-lg p-2 sm:p-4">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 items-stretch mb-2 sm:mb-3">
           {/* Équipe gauche avec boutons point */}
-          <div className="text-center flex flex-col">
-            <div className="flex items-center justify-center gap-1 sm:gap-2 mb-2">
+          <div
+            className={`text-center flex flex-col rounded-lg p-2 transition-all ${
+              currentSetData.servingTeam === teamLeftId
+                ? 'ring-4 ring-yellow-400 dark:ring-yellow-500 shadow-lg'
+                : ''
+            }`}
+          >
+            <div className="flex items-center justify-center gap-1 sm:gap-2 mb-1">
               {displayClubLeft ? (
                 <ClubLogo
                   codeClub={displayClubLeft.code_club}
@@ -634,14 +640,14 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onNeed
                 />
               ) : (
                 <div
-                  className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 shadow"
+                  className="w-4 h-4 sm:w-5 sm:h-5 rounded-full flex-shrink-0 shadow"
                   style={{ backgroundColor: displayTeamLeft.colorPrimary }}
                 ></div>
               )}
-              <h3 className="text-sm sm:text-lg font-bold truncate">{displayTeamLeft.name}</h3>
+              <h3 className="text-xs sm:text-base font-bold truncate">{displayTeamLeft.name}</h3>
             </div>
-            <div className="text-4xl sm:text-6xl font-bold mb-2">{displayScoreLeft}</div>
-            <div className="text-xs sm:text-sm font-semibold mb-3" style={{ color: displayTeamLeft.colorPrimary }}>
+            <div className="text-3xl sm:text-5xl font-bold mb-1">{displayScoreLeft}</div>
+            <div className="text-xs font-semibold mb-2" style={{ color: displayTeamLeft.colorPrimary }}>
               {displaySetsLeft} {displaySetsLeft > 1 ? 'Sets' : 'Set'}
             </div>
             <div className="flex gap-2 mt-auto">
@@ -671,22 +677,23 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onNeed
 
           {/* Set actuel et score global */}
           <div className="text-center flex flex-col justify-center">
-            <div className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
               SET {matchData.currentSet}
             </div>
-            <div className="text-2xl sm:text-4xl font-bold mb-2 text-gray-700 dark:text-gray-300">
+            <div className="text-xl sm:text-3xl font-bold text-gray-700 dark:text-gray-300">
               {swappedSides ? `${matchData.setsWon.B} - ${matchData.setsWon.A}` : `${matchData.setsWon.A} - ${matchData.setsWon.B}`}
             </div>
-            {currentSetData.servingTeam && (
-              <div className="text-xs sm:text-sm mt-2 bg-yellow-100 dark:bg-yellow-900 text-yellow-900 dark:text-yellow-100 py-1 px-2 rounded-full inline-block mx-auto">
-                <span className="font-semibold">Au service:</span> {currentSetData.servingTeam === 'A' ? matchData.teamA.name : matchData.teamB.name}
-              </div>
-            )}
           </div>
 
           {/* Équipe droite avec boutons point */}
-          <div className="text-center flex flex-col">
-            <div className="flex items-center justify-center gap-1 sm:gap-2 mb-2">
+          <div
+            className={`text-center flex flex-col rounded-lg p-2 transition-all ${
+              currentSetData.servingTeam === teamRightId
+                ? 'ring-4 ring-yellow-400 dark:ring-yellow-500 shadow-lg'
+                : ''
+            }`}
+          >
+            <div className="flex items-center justify-center gap-1 sm:gap-2 mb-1">
               {displayClubRight ? (
                 <ClubLogo
                   codeClub={displayClubRight.code_club}
@@ -696,14 +703,14 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onNeed
                 />
               ) : (
                 <div
-                  className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex-shrink-0 shadow"
+                  className="w-4 h-4 sm:w-5 sm:h-5 rounded-full flex-shrink-0 shadow"
                   style={{ backgroundColor: displayTeamRight.colorPrimary }}
                 ></div>
               )}
-              <h3 className="text-sm sm:text-lg font-bold truncate">{displayTeamRight.name}</h3>
+              <h3 className="text-xs sm:text-base font-bold truncate">{displayTeamRight.name}</h3>
             </div>
-            <div className="text-4xl sm:text-6xl font-bold mb-2">{displayScoreRight}</div>
-            <div className="text-xs sm:text-sm font-semibold mb-3" style={{ color: displayTeamRight.colorPrimary }}>
+            <div className="text-3xl sm:text-5xl font-bold mb-1">{displayScoreRight}</div>
+            <div className="text-xs font-semibold mb-2" style={{ color: displayTeamRight.colorPrimary }}>
               {displaySetsRight} {displaySetsRight > 1 ? 'Sets' : 'Set'}
             </div>
             <div className="flex gap-2 mt-auto">
@@ -751,9 +758,9 @@ const MatchBoard: React.FC<MatchBoardProps> = ({ matchData, setMatchData, onNeed
 
       {/* Terrain de volley */}
       {!matchFinished && (
-        <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-lg p-3 sm:p-6">
+        <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-lg p-2 sm:p-3">
           {/* Bouton pour inverser les camps */}
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center mb-2">
             <button
               onClick={handleSwapSides}
               className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors font-medium text-sm flex items-center gap-2"

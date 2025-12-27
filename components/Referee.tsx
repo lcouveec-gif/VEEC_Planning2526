@@ -132,23 +132,12 @@ const Referee: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-light-background dark:bg-dark-background p-4 sm:p-6">
+    <div className="min-h-screen bg-light-background dark:bg-dark-background p-2 sm:p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Bouton Réinitialiser */}
-        <div className="flex justify-end mb-4">
-          <button
-            onClick={handleResetMatch}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-sm sm:text-base"
-          >
-            <span className="text-lg">🔄</span>
-            <span className="hidden sm:inline">Réinitialiser le match</span>
-            <span className="sm:hidden">Réinitialiser</span>
-          </button>
-        </div>
-
-        {/* Workflow Steps */}
-        <div className="mb-6">
-          <div className="flex items-center justify-center space-x-2 sm:space-x-4 mb-4">
+        {/* En-tête compact avec étapes et bouton réinitialiser */}
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          {/* Workflow Steps */}
+          <div className="flex items-center space-x-2 sm:space-x-4">
             {/* Étape 1 */}
             <div className="flex items-center">
               <div
@@ -204,9 +193,14 @@ const Referee: React.FC = () => {
             </div>
           </div>
 
-          <h2 className="text-xl sm:text-2xl font-bold text-center text-light-onSurface dark:text-dark-onSurface">
-            {getStepTitle()}
-          </h2>
+          {/* Bouton Réinitialiser */}
+          <button
+            onClick={handleResetMatch}
+            className="px-3 py-2 sm:px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-xs sm:text-sm"
+          >
+            <span className="text-base sm:text-lg">🔄</span>
+            <span className="hidden sm:inline">Réinitialiser</span>
+          </button>
         </div>
 
         {step === 'setup' && (
