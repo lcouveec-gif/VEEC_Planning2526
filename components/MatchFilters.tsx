@@ -32,9 +32,18 @@ const MatchFilters: React.FC<MatchFiltersProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
-  // Dates temporaires pour la saisie manuelle
+  // Dates temporaires pour la saisie manuelle - synchronisées avec les props
   const [tempStartDate, setTempStartDate] = useState(startDate);
   const [tempEndDate, setTempEndDate] = useState(endDate);
+
+  // Synchroniser tempStartDate et tempEndDate avec les props quand elles changent
+  React.useEffect(() => {
+    setTempStartDate(startDate);
+  }, [startDate]);
+
+  React.useEffect(() => {
+    setTempEndDate(endDate);
+  }, [endDate]);
 
   // Trier les équipes par ordre alphabétique
   const sortedTeams = useMemo(() => {

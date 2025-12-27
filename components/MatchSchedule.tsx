@@ -5,6 +5,8 @@ import MatchList from './MatchList';
 import { useMatches } from '../hooks/useMatches';
 import { useTeams } from '../hooks/useTeams';
 
+const STORAGE_KEY_FILTERS = 'veec_match_filters';
+
 const MatchSchedule: React.FC = () => {
   const { teamId: selectedTeamId } = useParams<{ teamId?: string }>();
   // Dates par défaut : date du jour et pas de date de fin (tous les matchs à venir)
@@ -12,15 +14,57 @@ const MatchSchedule: React.FC = () => {
   const defaultStartDate = today.toISOString().split('T')[0];
   const defaultEndDate = ''; // Pas de date de fin par défaut
 
-  const [startDate, setStartDate] = useState<string>(defaultStartDate);
-  const [endDate, setEndDate] = useState<string>(defaultEndDate);
-  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([]);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [locationFilter, setLocationFilter] = useState<'all' | 'home' | 'away'>('all');
+  // Charger les filtres depuis localStorage
+  const loadFiltersFromStorage = () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_FILTERS);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Erreur chargement filtres:', e);
+    }
+    return null;
+  };
 
-  // Dates utilisées pour la requête (avec debounce)
-  const [debouncedStartDate, setDebouncedStartDate] = useState<string>(defaultStartDate);
-  const [debouncedEndDate, setDebouncedEndDate] = useState<string>(defaultEndDate);
+  const savedFilters = loadFiltersFromStorage();
+
+  // Utiliser les valeurs sauvegardées si elles existent (même si vides), sinon les valeurs par défaut
+  const [startDate, setStartDate] = useState<string>(
+    savedFilters && 'startDate' in savedFilters ? savedFilters.startDate : defaultStartDate
+  );
+  const [endDate, setEndDate] = useState<string>(
+    savedFilters && 'endDate' in savedFilters ? savedFilters.endDate : defaultEndDate
+  );
+  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>(
+    savedFilters?.selectedTeamIds || []
+  );
+  const [searchTerm, setSearchTerm] = useState<string>(
+    savedFilters?.searchTerm || ''
+  );
+  const [locationFilter, setLocationFilter] = useState<'all' | 'home' | 'away'>(
+    savedFilters?.locationFilter || 'all'
+  );
+
+  // Dates utilisées pour la requête (avec debounce) - initialisées avec les mêmes valeurs
+  const [debouncedStartDate, setDebouncedStartDate] = useState<string>(
+    savedFilters && 'startDate' in savedFilters ? savedFilters.startDate : defaultStartDate
+  );
+  const [debouncedEndDate, setDebouncedEndDate] = useState<string>(
+    savedFilters && 'endDate' in savedFilters ? savedFilters.endDate : defaultEndDate
+  );
+
+  // Sauvegarder les filtres dans localStorage à chaque changement
+  useEffect(() => {
+    const filters = {
+      startDate,
+      endDate,
+      selectedTeamIds,
+      searchTerm,
+      locationFilter,
+    };
+    localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(filters));
+  }, [startDate, endDate, selectedTeamIds, searchTerm, locationFilter]);
 
   // Debounce des dates pour éviter trop de requêtes
   useEffect(() => {
@@ -56,6 +100,7 @@ const MatchSchedule: React.FC = () => {
     setSelectedTeamIds([]);
     setSearchTerm('');
     setLocationFilter('all');
+    localStorage.removeItem(STORAGE_KEY_FILTERS);
   };
 
   // Fonction de normalisation des chaînes (utilisée pour la comparaison)

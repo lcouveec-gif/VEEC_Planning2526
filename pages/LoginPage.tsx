@@ -255,7 +255,7 @@ const LoginPage: React.FC = () => {
                     id="nom"
                     value={nom}
                     onChange={(e) => setNom(e.target.value)}
-                    className="w-full px-4 py-2 border border-light-border dark:border-dark-border rounded-lg focus:ring-2 focus:ring-veec-green focus:border-transparent bg-light-background dark:bg-dark-background text-light-onBackground dark:text-dark-onBackground"
+                    className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-veec-green focus:border-transparent bg-gray-800 text-white placeholder-gray-400"
                     required={isSignUp}
                     disabled={loading}
                   />
@@ -270,7 +270,7 @@ const LoginPage: React.FC = () => {
                     id="prenom"
                     value={prenom}
                     onChange={(e) => setPrenom(e.target.value)}
-                    className="w-full px-4 py-2 border border-light-border dark:border-dark-border rounded-lg focus:ring-2 focus:ring-veec-green focus:border-transparent bg-light-background dark:bg-dark-background text-light-onBackground dark:text-dark-onBackground"
+                    className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-veec-green focus:border-transparent bg-gray-800 text-white placeholder-gray-400"
                     required={isSignUp}
                     disabled={loading}
                   />
@@ -287,7 +287,7 @@ const LoginPage: React.FC = () => {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-light-border dark:border-dark-border rounded-lg focus:ring-2 focus:ring-veec-green focus:border-transparent bg-light-background dark:bg-dark-background text-light-onBackground dark:text-dark-onBackground"
+                className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-veec-green focus:border-transparent bg-gray-800 text-white placeholder-gray-400"
                 required
                 disabled={loading}
               />
@@ -303,7 +303,7 @@ const LoginPage: React.FC = () => {
                   id="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2 border border-light-border dark:border-dark-border rounded-lg focus:ring-2 focus:ring-veec-green focus:border-transparent bg-light-background dark:bg-dark-background text-light-onBackground dark:text-dark-onBackground"
+                  className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-veec-green focus:border-transparent bg-gray-800 text-white placeholder-gray-400"
                   required
                   disabled={loading}
                   minLength={6}

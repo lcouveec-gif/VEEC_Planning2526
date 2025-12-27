@@ -125,9 +125,6 @@ const Layout: React.FC = () => {
       <Header
         theme={theme}
         toggleTheme={toggleTheme}
-        onExportPdf={handleExportPdf}
-        isExporting={isExporting}
-        onSubscribeToNotifications={handleSubscribe}
       />
       <Outlet />
     </div>

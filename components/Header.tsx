@@ -3,20 +3,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ThemeSwitcher from './ThemeSwitcher';
-import { PdfIcon, SpinnerIcon, BellIcon } from './icons/ThemeIcons';
 import Logo from './Logo';
 import UserMenu from './UserMenu';
 
 interface HeaderProps {
   theme: 'dark' | 'light';
   toggleTheme: () => void;
-  onExportPdf: () => void;
-  isExporting: boolean;
-  onSubscribeToNotifications: () => void;
-  // onOpenAuth: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExporting, onSubscribeToNotifications }) => {
+const Header: React.FC<HeaderProps> = ({ theme, toggleTheme }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -179,21 +174,6 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                 </div>
               )}
             </div>
-            <button
-              onClick={onSubscribeToNotifications}
-              className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-light-surface dark:focus:ring-offset-dark-surface focus:ring-light-primary dark:focus:ring-dark-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Subscribe to notifications"
-            >
-              <BellIcon className="w-6 h-6" />
-            </button>
-            <button
-              onClick={onExportPdf}
-              disabled={isExporting}
-              className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-light-surface dark:focus:ring-offset-dark-surface focus:ring-light-primary dark:focus:ring-dark-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Export to PDF"
-            >
-              {isExporting ? <SpinnerIcon className="w-6 h-6" /> : <PdfIcon className="w-6 h-6" />}
-            </button>
             <ThemeSwitcher theme={theme} toggleTheme={toggleTheme} />
             <UserMenu />
           </div>
