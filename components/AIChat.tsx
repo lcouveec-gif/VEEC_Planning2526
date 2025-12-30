@@ -6,6 +6,7 @@ import {
   getFunctionDefinitionsForAnthropic,
   getFunctionDefinitionsForGemini,
 } from '../lib/aiFunctions';
+import { supabase } from '../lib/supabaseClient';
 
 interface Message {
   id: string;
@@ -124,26 +125,75 @@ const AIChat: React.FC = () => {
     };
   }, []);
 
-  // Charger la configuration LLM au montage
+  // Charger la configuration LLM depuis Supabase au montage
   useEffect(() => {
-    const stored = localStorage.getItem('llmSettings');
-    if (stored) {
-      const settings = JSON.parse(stored);
-      setLlmSettings(settings);
+    const loadLLMSettings = async () => {
+      try {
+        // Récupérer la session actuelle
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
 
-      // Message de bienvenue avec date actuelle
-      const now = new Date();
-      const dateFr = now.toLocaleDateString('fr-FR', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
+        if (!currentSession) {
+          console.log('No session, LLM settings not loaded');
+          return;
+        }
 
-      setMessages([{
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: `Bonjour ! Je suis votre assistant IA pour la gestion du planning VEEC.
+        // Appel à l'Edge Function pour récupérer les paramètres
+        const response = await fetch(
+          'https://odfijihyepuxjzeueiri.supabase.co/functions/v1/get-llm-settings',
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${currentSession.access_token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (response.ok && data.settings) {
+          // Récupérer la clé API déchiffrée pour cette session
+          const apiKeyResponse = await fetch(
+            'https://odfijihyepuxjzeueiri.supabase.co/functions/v1/get-llm-api-key',
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${currentSession.access_token}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+
+          const apiKeyData = await apiKeyResponse.json();
+
+          if (!apiKeyResponse.ok || !apiKeyData.apiKey) {
+            console.error('Failed to load API key:', apiKeyData);
+            return;
+          }
+
+          // Stocker les paramètres avec la clé API en mémoire (pas dans localStorage)
+          setLlmSettings({
+            provider: data.settings.provider,
+            apiKey: apiKeyData.apiKey, // Clé API récupérée de manière sécurisée
+            model: data.settings.model,
+            endpoint: data.settings.endpoint,
+            temperature: data.settings.temperature,
+            maxTokens: data.settings.maxTokens,
+          });
+
+          // Message de bienvenue avec date actuelle
+          const now = new Date();
+          const dateFr = now.toLocaleDateString('fr-FR', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+
+          setMessages([{
+            id: Date.now().toString(),
+            role: 'assistant',
+            content: `Bonjour ! Je suis votre assistant IA pour la gestion du planning VEEC.
 
 📆 Nous sommes le ${dateFr}
 
@@ -155,9 +205,17 @@ Je peux vous aider à :
 🎤 Vous pouvez aussi me parler avec le microphone !
 
 Que souhaitez-vous savoir ?`,
-        timestamp: new Date(),
-      }]);
-    }
+            timestamp: new Date(),
+          }]);
+        } else {
+          console.log('No LLM settings found in Supabase');
+        }
+      } catch (error) {
+        console.error('Error loading LLM settings:', error);
+      }
+    };
+
+    loadLLMSettings();
   }, []);
 
   // Auto-scroll vers le bas quand de nouveaux messages arrivent
@@ -178,6 +236,13 @@ Que souhaitez-vous savoir ?`,
       throw new Error('Configuration LLM non trouvée');
     }
 
+    // Récupérer la session actuelle
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+    if (!currentSession) {
+      throw new Error('Session expirée, veuillez vous reconnecter');
+    }
+
     let iterations = 0;
     const maxIterations = 5; // Limite pour éviter les boucles infinies
 
@@ -185,10 +250,7 @@ Que souhaitez-vous savoir ?`,
       iterations++;
 
       try {
-        let url = llmSettings.endpoint;
-        let headers: HeadersInit = {
-          'Content-Type': 'application/json',
-        };
+        // Préparer le body selon le provider pour l'Edge Function
         let body: any = {};
 
         // Configuration spécifique selon le provider
@@ -408,7 +470,7 @@ Que souhaitez-vous savoir ?`,
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
 
-    if (!llmSettings || !llmSettings.apiKey) {
+    if (!llmSettings) {
       alert('Veuillez configurer le LLM dans Admin > IA/Automatisation');
       return;
     }
@@ -516,14 +578,14 @@ Comment puis-je vous aider ?`,
     return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   };
 
-  if (!llmSettings || !llmSettings.apiKey) {
+  if (!llmSettings) {
     return (
       <div className="min-h-screen p-8 flex items-center justify-center">
         <div className="max-w-2xl w-full bg-light-surface dark:bg-dark-surface rounded-lg shadow-lg p-8 text-center">
           <div className="text-6xl mb-4">🤖</div>
           <h2 className="text-2xl font-bold mb-4">Configuration requise</h2>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Pour utiliser l'assistant IA, vous devez d'abord configurer l'accès au LLM.
+            Pour utiliser l'assistant IA, vous devez d'abord configurer l'accès au LLM dans votre profil utilisateur.
           </p>
           <a
             href="#admin"
