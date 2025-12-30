@@ -3,7 +3,7 @@ import FilterControls from '../components/FilterControls';
 import ScheduleGrid from '../components/ScheduleGrid';
 import { useTrainingSessions } from '../hooks/useTrainingSessions';
 import type { TrainingSession } from '../types';
-import { GYMS, DAYS } from '../constants';
+import { GYMS, DAYS, GYM_ADDRESSES } from '../constants';
 
 const TrainingPage: React.FC = () => {
   const [dayFilter, setDayFilter] = useState<string[]>([]);
@@ -70,6 +70,50 @@ const TrainingPage: React.FC = () => {
             days={DAYS}
             resetFilters={resetFilters}
           />
+
+          {/* Afficher les liens de navigation si un seul gymnase est sélectionné */}
+          {gymFilter.length === 1 && (
+            (() => {
+              const gymKey = gymFilter[0].toLowerCase();
+              const gymInfo = GYM_ADDRESSES[gymKey];
+
+              return gymInfo ? (
+                <div className="mt-6 mb-8 p-6 bg-light-surface dark:bg-dark-surface rounded-lg shadow-md border border-light-border dark:border-dark-border">
+                  <h3 className="text-xl font-bold mb-3 text-light-onSurface dark:text-dark-onSurface">
+                    📍 {gymInfo.name}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    {gymInfo.address}
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <a
+                      href={gymInfo.wazeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-[#33CCFF] hover:bg-[#00B8FF] text-white rounded-lg font-semibold transition-colors shadow-sm"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                      </svg>
+                      Ouvrir dans Waze
+                    </a>
+                    <a
+                      href={gymInfo.googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-[#4285F4] hover:bg-[#357ABD] text-white rounded-lg font-semibold transition-colors shadow-sm"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                      </svg>
+                      Ouvrir dans Google Maps
+                    </a>
+                  </div>
+                </div>
+              ) : null;
+            })()
+          )}
+
           <div id="schedule-to-export" className="mt-8">
             {daysWithEvents.length > 0 ? (
               daysWithEvents.map(day => (
