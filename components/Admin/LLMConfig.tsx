@@ -50,9 +50,19 @@ const LLMConfig: React.FC = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
+
+      // Récupérer la session actuelle depuis Supabase
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+      if (!currentSession) {
+        setHasExistingSettings(false);
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('get-llm-settings', {
         headers: {
-          Authorization: `Bearer ${session?.access_token}`,
+          Authorization: `Bearer ${currentSession.access_token}`,
         },
       });
 
@@ -84,7 +94,7 @@ const LLMConfig: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!session) {
+    if (!user) {
       alert('Vous devez être connecté pour sauvegarder vos paramètres');
       return;
     }
@@ -101,6 +111,14 @@ const LLMConfig: React.FC = () => {
     }
 
     try {
+      // Récupérer la session actuelle depuis Supabase
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+      if (!currentSession) {
+        alert('Session expirée, veuillez vous reconnecter');
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('save-llm-settings', {
         body: {
           provider: settings.provider,
@@ -111,7 +129,7 @@ const LLMConfig: React.FC = () => {
           maxTokens: settings.maxTokens,
         },
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${currentSession.access_token}`,
         },
       });
 
@@ -147,7 +165,7 @@ const LLMConfig: React.FC = () => {
   };
 
   const handleTestConnection = async () => {
-    if (!session) {
+    if (!user) {
       setTestStatus({ success: false, message: 'Vous devez être connecté' });
       return;
     }
@@ -155,13 +173,21 @@ const LLMConfig: React.FC = () => {
     setTestStatus({ success: false, message: 'Test en cours...' });
 
     try {
+      // Récupérer la session actuelle depuis Supabase
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+      if (!currentSession) {
+        setTestStatus({ success: false, message: 'Session expirée, veuillez vous reconnecter' });
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('call-llm', {
         body: {
           messages: [{ role: 'user', content: 'Test' }],
           maxTokens: 10,
         },
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${currentSession.access_token}`,
         },
       });
 
