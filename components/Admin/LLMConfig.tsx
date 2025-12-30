@@ -60,14 +60,22 @@ const LLMConfig: React.FC = () => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('get-llm-settings', {
-        headers: {
-          Authorization: `Bearer ${currentSession.access_token}`,
-        },
-      });
+      // Appel direct avec fetch
+      const response = await fetch(
+        'https://odfijihyepuxjzeueiri.supabase.co/functions/v1/get-llm-settings',
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${currentSession.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      if (error) {
-        console.error('Error loading settings:', error);
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Error loading settings:', data);
         setHasExistingSettings(false);
         return;
       }
@@ -189,20 +197,28 @@ const LLMConfig: React.FC = () => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('call-llm', {
-        body: {
-          messages: [{ role: 'user', content: 'Test' }],
-          maxTokens: 10,
-        },
-        headers: {
-          Authorization: `Bearer ${currentSession.access_token}`,
-        },
-      });
+      // Appel direct avec fetch au lieu de supabase.functions.invoke
+      const response = await fetch(
+        'https://odfijihyepuxjzeueiri.supabase.co/functions/v1/call-llm',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentSession.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: 'Test' }],
+            maxTokens: 10,
+          }),
+        }
+      );
 
-      if (error) {
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
         setTestStatus({
           success: false,
-          message: `Erreur: ${error.message}`,
+          message: `Erreur: ${data.error || response.statusText}`,
         });
         return;
       }
