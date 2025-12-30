@@ -19,32 +19,63 @@ serve(async (req) => {
   }
 
   try {
-    // Créer un client Supabase avec le token de l'utilisateur
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    );
-
-    // Vérifier l'authentification
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseClient.auth.getUser();
-
-    if (authError || !user) {
+    // Récupérer le token d'autorisation
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: 'Non authentifié' }),
+        JSON.stringify({ error: 'Missing authorization header' }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
         }
       );
     }
+
+    // Créer un client Supabase avec le token de l'utilisateur
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY');
+      return new Response(
+        JSON.stringify({ error: 'Configuration serveur incorrecte' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
+    // Vérifier l'authentification en décodant le JWT
+    const jwt = authHeader.replace('Bearer ', '');
+    const payload = JSON.parse(atob(jwt.split('.')[1]));
+    const userId = payload.sub;
+
+    if (!userId) {
+      console.error('No user ID in JWT');
+      return new Response(
+        JSON.stringify({ error: 'Non authentifié - invalid token' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      );
+    }
+
+    console.log('User authenticated:', userId);
+
+    // Créer un objet user minimal
+    const user = { id: userId };
 
     // Parser le body
     const requestData: CallLLMRequest = await req.json();
