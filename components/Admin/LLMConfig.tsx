@@ -119,23 +119,31 @@ const LLMConfig: React.FC = () => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('save-llm-settings', {
-        body: {
-          provider: settings.provider,
-          apiKey: settings.apiKey,
-          model: settings.model,
-          endpoint: settings.endpoint,
-          temperature: settings.temperature,
-          maxTokens: settings.maxTokens,
-        },
-        headers: {
-          Authorization: `Bearer ${currentSession.access_token}`,
-        },
-      });
+      // Appel direct avec fetch au lieu de supabase.functions.invoke
+      const response = await fetch(
+        'https://odfijihyepuxjzeueiri.supabase.co/functions/v1/save-llm-settings',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentSession.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            provider: settings.provider,
+            apiKey: settings.apiKey,
+            model: settings.model,
+            endpoint: settings.endpoint,
+            temperature: settings.temperature,
+            maxTokens: settings.maxTokens,
+          }),
+        }
+      );
 
-      if (error) {
-        console.error('Error saving settings:', error);
-        alert(`Erreur lors de la sauvegarde: ${error.message}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Error saving settings:', data);
+        alert(`Erreur lors de la sauvegarde: ${data.error || response.statusText}`);
         return;
       }
 
