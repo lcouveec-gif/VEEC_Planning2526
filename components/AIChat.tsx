@@ -250,7 +250,11 @@ Que souhaitez-vous savoir ?`,
       iterations++;
 
       try {
-        // Préparer le body selon le provider pour l'Edge Function
+        // Déclarer les variables pour l'appel LLM
+        let url = llmSettings.endpoint;
+        let headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        };
         let body: any = {};
 
         // Configuration spécifique selon le provider
