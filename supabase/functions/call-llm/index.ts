@@ -112,7 +112,7 @@ serve(async (req) => {
       }
     );
 
-    if (decryptError || !decryptedSettings) {
+    if (decryptError || !decryptedSettings || decryptedSettings.length === 0) {
       console.error('Error fetching decrypted settings:', decryptError);
       return new Response(
         JSON.stringify({
@@ -126,6 +126,9 @@ serve(async (req) => {
       );
     }
 
+    // La RPC retourne un tableau, on prend le premier élément
+    const settingsRow = decryptedSettings[0];
+
     // Extraire les paramètres
     const {
       provider,
@@ -134,7 +137,7 @@ serve(async (req) => {
       endpoint,
       temperature: defaultTemperature,
       max_tokens: defaultMaxTokens,
-    } = decryptedSettings;
+    } = settingsRow;
 
     // Utiliser les paramètres de la requête ou ceux par défaut
     const temperature = requestData.temperature ?? defaultTemperature;
