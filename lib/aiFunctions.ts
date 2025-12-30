@@ -123,6 +123,7 @@ async function getMatches(args: {
   startDate?: string;
   endDate?: string;
   competition?: string;
+  location?: 'domicile' | 'exterieur';
 }) {
   try {
     // Si on cherche par équipe, d'abord trouver l'ID de l'équipe VEEC
@@ -175,34 +176,63 @@ async function getMatches(args: {
 
     if (error) throw error;
 
+    // Transformer les données et calculer domicile/extérieur
+    let matches = (data || []).map((match: any) => {
+      // ✨ Utilisation de EQA_nom et EQB_nom pour déterminer domicile/extérieur
+      // Si EQA_nom correspond à notre équipe → on joue à DOMICILE, adversaire = EQB_nom
+      // Si EQB_nom correspond à notre équipe → on joue à EXTERIEUR, adversaire = EQA_nom
+      const nomEquipeVEEC = match.equipe?.NOM_FFVB || '';
+
+      // Comparaison stricte: chercher une correspondance exacte du nom d'équipe
+      // Normaliser les espaces et la casse pour la comparaison
+      const normalizeTeamName = (name: string) => name?.trim().toLowerCase() || '';
+      const nomVEECNormalized = normalizeTeamName(nomEquipeVEEC);
+      const eqaNormalized = normalizeTeamName(match.EQA_nom);
+      const eqbNormalized = normalizeTeamName(match.EQB_nom);
+
+      // Vérifier si notre équipe participe vraiment à ce match
+      // (correction pour les matchs mal référencés dans la BDD)
+      const teamParticipates = eqaNormalized === nomVEECNormalized || eqbNormalized === nomVEECNormalized;
+
+      // On est à domicile si notre nom d'équipe correspond EXACTEMENT à EQA_nom
+      const isHome = eqaNormalized === nomVEECNormalized;
+      const adversaire = isHome ? match.EQB_nom : match.EQA_nom;
+
+      return {
+        id: match.idmatch,
+        date: match.Date,
+        heure: match.Heure,
+        competition: match.Competition,
+        equipeVEEC: nomEquipeVEEC || 'Équipe inconnue',
+        numeroEquipe: match.equipe?.IDEQUIPE,
+        adversaire: adversaire || 'Adversaire inconnu',
+        domicileExterieur: isHome ? 'Domicile' : 'Exterieur',
+        lieu: isHome ? 'à domicile' : 'à l\'extérieur',
+        gymnase: match.Salle,  // Nom du gymnase/salle où se joue le match
+        salle: match.Salle,    // Conservé pour compatibilité
+        score: match.Score || null,
+        sets: match.Set || null,
+        total: match.Total || null,
+        _teamParticipates: teamParticipates,  // Flag interne pour filtrage
+      };
+    });
+
+    // IMPORTANT: Filtrer les matchs où l'équipe ne participe pas vraiment
+    // (correction pour données mal référencées dans la BDD)
+    matches = matches.filter((match: any) => match._teamParticipates);
+
+    // Filtrer par location si spécifié
+    if (args.location) {
+      const locationFilter = args.location.toLowerCase();
+      matches = matches.filter((match: any) =>
+        match.domicileExterieur.toLowerCase() === locationFilter
+      );
+    }
+
     return {
       success: true,
-      data: (data || []).map((match: any) => {
-        // ✨ Utilisation de EQA_nom et EQB_nom pour déterminer domicile/extérieur
-        // Si EQA_nom correspond à notre équipe → on joue à DOMICILE, adversaire = EQB_nom
-        // Si EQB_nom correspond à notre équipe → on joue à EXTERIEUR, adversaire = EQA_nom
-        const nomEquipeVEEC = match.equipe?.NOM_FFVB || '';
-        const isHome = match.EQA_nom?.includes(nomEquipeVEEC) ||
-                       match.EQA_nom === nomEquipeVEEC;
-        const adversaire = isHome ? match.EQB_nom : match.EQA_nom;
-
-        return {
-          id: match.idmatch,
-          date: match.Date,
-          heure: match.Heure,
-          competition: match.Competition,
-          equipeVEEC: nomEquipeVEEC || 'Équipe inconnue',
-          numeroEquipe: match.equipe?.IDEQUIPE,
-          adversaire: adversaire || 'Adversaire inconnu',
-          domicileExterieur: isHome ? 'Domicile' : 'Exterieur',
-          lieu: isHome ? 'à domicile' : 'à l\'extérieur',
-          salle: match.Salle,
-          score: match.Score || null,
-          sets: match.Set || null,
-          total: match.Total || null,
-        };
-      }),
-      count: data?.length || 0,
+      data: matches,
+      count: matches.length,
     };
   } catch (error: any) {
     return {
@@ -335,9 +365,11 @@ async function getPlayers(args: { search?: string; team?: string }) {
           poste,
           licencie:VEEC_Licencie!fk_collectifs_licencie(
             id,
+            Num_Licencie,
             Nom_Licencie,
             Prenom_Licencie,
-            Date_Naissance_licencie
+            Date_Naissance_licencie,
+            Categorie_licencie
           )
         `)
         .in('equipe_id', teamIds);
@@ -355,9 +387,11 @@ async function getPlayers(args: { search?: string; team?: string }) {
       // Transformer les données (déjà jointées grâce à la FK!)
       let results = (collectifs || []).map((c: any) => ({
         id: c.licencie?.id,
+        numeroLicence: c.licencie?.Num_Licencie,
         nom: c.licencie?.Nom_Licencie,
         prenom: c.licencie?.Prenom_Licencie,
-        numero: c.numero_maillot,
+        categorie: c.licencie?.Categorie_licencie,
+        numeroMaillot: c.numero_maillot,
         poste: c.poste,
         dateNaissance: c.licencie?.Date_Naissance_licencie,
       }));
@@ -413,8 +447,10 @@ async function getPlayers(args: { search?: string; team?: string }) {
         success: true,
         data: uniquePlayers.map((player: any) => ({
           id: player.id,
+          numeroLicence: player.Num_Licencie,
           nom: player.Nom_Licencie,
           prenom: player.Prenom_Licencie,
+          categorie: player.Categorie_licencie,
           dateNaissance: player.Date_Naissance_licencie,
         })),
         count: uniquePlayers.length,
@@ -436,8 +472,10 @@ async function getPlayers(args: { search?: string; team?: string }) {
       success: true,
       data: (data || []).map((player: any) => ({
         id: player.id,
+        numeroLicence: player.Num_Licencie,
         nom: player.Nom_Licencie,
         prenom: player.Prenom_Licencie,
+        categorie: player.Categorie_licencie,
         dateNaissance: player.Date_Naissance_licencie,
       })),
       count: data?.length || 0,
@@ -532,7 +570,7 @@ export const AI_FUNCTIONS: AIFunction[] = [
   },
   {
     name: 'getMatches',
-    description: 'Récupère la liste des matchs des équipes VEEC. Permet de filtrer par équipe (SM1, SM2, SF1, U18M, etc.), dates et compétition. IMPORTANT: utilise le nom ou numéro d\'équipe VEEC (ex: "SM1", "U18M", "SF1").',
+    description: 'Récupère la liste des matchs des équipes VEEC avec toutes les informations: date, heure, adversaire, gymnase/salle, domicile ou extérieur, compétition. Permet de filtrer par équipe (SM1, SM2, SF1, U18M, etc.), dates, compétition et localisation (domicile/extérieur). IMPORTANT: utilise le nom ou numéro d\'équipe VEEC (ex: "SM1", "U18M", "SF1"). Le champ "gymnase" contient le nom du lieu où se joue le match.',
     parameters: {
       type: 'object',
       properties: {
@@ -551,6 +589,11 @@ export const AI_FUNCTIONS: AIFunction[] = [
         competition: {
           type: 'string',
           description: 'Nom de la compétition (ex: "Régionale", "Nationale", "Départementale")',
+        },
+        location: {
+          type: 'string',
+          enum: ['domicile', 'exterieur'],
+          description: 'Filtrer par localisation: "domicile" pour les matchs à domicile, "exterieur" pour les matchs à l\'extérieur',
         },
       },
     },
@@ -572,7 +615,7 @@ export const AI_FUNCTIONS: AIFunction[] = [
   },
   {
     name: 'getPlayers',
-    description: 'Récupère la liste des joueurs licenciés. Permet de filtrer par nom/prénom ou par équipe (ex: "SM1", "U18M").',
+    description: 'Récupère les informations complètes des joueurs licenciés FFVB: numéro de licence, nom, prénom, date de naissance, catégorie (SEN, U18, etc.), équipe, numéro de maillot et poste. Permet de filtrer par nom/prénom ou par équipe (ex: "SM1", "U18M").',
     parameters: {
       type: 'object',
       properties: {

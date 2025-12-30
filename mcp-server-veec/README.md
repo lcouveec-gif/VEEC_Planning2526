@@ -14,8 +14,13 @@ Ce serveur MCP permet d'accéder aux données VEEC depuis :
 
 1. **get_current_datetime** - Obtient la date et l'heure actuelles
 2. **calculate_date** - Calcule des dates relatives (demain, hier, semaine prochaine, etc.)
-3. **get_matches** - Récupère les matchs avec filtres (équipe, dates, compétition)
-4. **get_players** - Liste les joueurs licenciés (par nom, prénom ou équipe)
+3. **get_matches** - Récupère les matchs avec filtres (équipe, dates, compétition) + infos gymnase et navigation
+4. **get_players** - Informations complètes des joueurs licenciés FFVB:
+   - 🎫 Numéro de licence
+   - 👤 Nom et prénom
+   - 📊 Catégorie (SEN, U18, etc.)
+   - 🎂 Date de naissance et âge
+   - 👕 Équipe(s), numéro de maillot et poste
 5. **get_teams** - Récupère les équipes du club
 6. **get_training_sessions** - Liste les créneaux d'entraînement
 7. **get_statistics** - Statistiques générales du club

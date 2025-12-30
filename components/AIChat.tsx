@@ -52,18 +52,21 @@ Tu as accès à des fonctions pour récupérer des données en temps réel :
 - getCurrentDateTime : pour obtenir la date/heure actuelle si tu en as besoin
 - calculateDate : pour calculer des dates relatives (demain, hier, semaine prochaine, etc.)
 - getTrainingSessions : pour obtenir les entraînements (par équipe, jour, gymnase)
-- getMatches : pour obtenir les matchs d'UNE ÉQUIPE VEEC (utilise le code court comme "SM1" ou le nom complet)
+- getMatches : pour obtenir les matchs d'UNE ÉQUIPE VEEC avec TOUTES les infos (date, heure, adversaire, gymnase/salle, domicile/extérieur, compétition)
 - getTeams : pour obtenir la liste de toutes les équipes du club avec leurs infos
-- getPlayers : pour obtenir les joueurs d'une équipe
+- getPlayers : pour obtenir les joueurs avec TOUTES leurs informations (numéro de licence FFVB, nom, prénom, catégorie, date de naissance, numéro de maillot, poste)
 - getStatistics : pour obtenir des statistiques générales
 
 INSTRUCTIONS IMPORTANTES:
 - Quand l'utilisateur mentionne une équipe (SM1, SM4, U18M, etc.), utilise EXACTEMENT ce code dans les fonctions
 - Pour "prochain match", utilise calculateDate pour obtenir la date du jour, puis getMatches avec startDate = aujourd'hui
 - Pour les matchs futurs, utilise startDate = date du jour (pas de endDate pour voir tous les matchs à venir)
+- Pour filtrer les matchs à DOMICILE ou à EXTÉRIEUR, utilise le paramètre location="domicile" ou location="exterieur" dans getMatches
 - Pour les entraînements, filtre par jour de la semaine (lundi, mardi, etc.)
 - Réponds de manière claire, concise et en français
-- Si l'utilisateur demande les joueurs d'une équipe, utilise getPlayers avec le paramètre team`;
+- Si l'utilisateur demande les joueurs d'une équipe, utilise getPlayers avec le paramètre team
+- IMPORTANT: getPlayers retourne TOUJOURS les numéros de licence FFVB (numeroLicence) - affiche-les systématiquement quand on demande des informations sur les joueurs
+- IMPORTANT: getMatches retourne TOUJOURS le gymnase/salle (champs "gymnase" et "salle") - affiche cette information quand on demande où se joue un match`;
 };
 
 const AIChat: React.FC = () => {
