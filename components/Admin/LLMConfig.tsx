@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
+import { useAuthStore } from '../../stores/useAuthStore';
 
 interface LLMSettings {
   provider: string;
@@ -26,131 +28,219 @@ interface Provider {
 }
 
 const LLMConfig: React.FC = () => {
+  const { user, session } = useAuthStore();
   const [settings, setSettings] = useState<LLMSettings>(DEFAULT_SETTINGS);
   const [isEditing, setIsEditing] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [testStatus, setTestStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [customModel, setCustomModel] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [hasExistingSettings, setHasExistingSettings] = useState(false);
 
-  // Charger les paramètres depuis le localStorage avec validation et migration
+  // Charger les paramètres depuis Supabase
   useEffect(() => {
-    const stored = localStorage.getItem('llmSettings');
-    if (stored) {
-      const loadedSettings = JSON.parse(stored);
-
-      // Valider que le modèle existe pour le provider
-      const provider = providers.find(p => p.value === loadedSettings.provider);
-      const validModel = provider?.models.find(m => m.value === loadedSettings.model);
-
-      if (!validModel && provider && provider.models.length > 0) {
-        // Modèle invalide - utiliser le modèle par défaut du provider
-        const fixedSettings = {
-          ...loadedSettings,
-          model: provider.models[0].value,
-          endpoint: provider.defaultEndpoint,
-        };
-        setSettings(fixedSettings);
-        localStorage.setItem('llmSettings', JSON.stringify(fixedSettings));
-        console.log(`Configuration migrée: modèle invalide "${loadedSettings.model}" remplacé par "${fixedSettings.model}"`);
-      } else {
-        setSettings(loadedSettings);
-      }
+    if (!user || !session) {
+      setLoading(false);
+      return;
     }
-  }, []);
 
-  const handleSave = () => {
-    if (!settings.apiKey.trim()) {
+    loadSettings();
+  }, [user, session]);
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+
+      // Récupérer la session actuelle depuis Supabase
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+      if (!currentSession) {
+        setHasExistingSettings(false);
+        setLoading(false);
+        return;
+      }
+
+      // Appel direct avec fetch
+      const response = await fetch(
+        'https://odfijihyepuxjzeueiri.supabase.co/functions/v1/get-llm-settings',
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${currentSession.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Error loading settings:', data);
+        setHasExistingSettings(false);
+        return;
+      }
+
+      if (data.settings) {
+        setSettings({
+          provider: data.settings.provider,
+          apiKey: '••••••••••••', // Masqué - ne jamais afficher la vraie clé
+          model: data.settings.model,
+          endpoint: data.settings.endpoint,
+          temperature: data.settings.temperature,
+          maxTokens: data.settings.maxTokens,
+        });
+        setHasExistingSettings(true);
+      } else {
+        setHasExistingSettings(false);
+      }
+    } catch (err) {
+      console.error('Error loading settings:', err);
+      setHasExistingSettings(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!user) {
+      alert('Vous devez être connecté pour sauvegarder vos paramètres');
+      return;
+    }
+
+    // Si on modifie des paramètres existants et que la clé API n'a pas changé, ne pas la renvoyer
+    if (hasExistingSettings && settings.apiKey === '••••••••••••') {
+      alert('Veuillez saisir votre nouvelle clé API ou conserver la clé existante');
+      return;
+    }
+
+    if (!settings.apiKey.trim() || settings.apiKey === '••••••••••••') {
       alert('Veuillez renseigner une clé API');
       return;
     }
 
-    localStorage.setItem('llmSettings', JSON.stringify(settings));
-    setIsEditing(false);
-    alert('Configuration LLM enregistrée avec succès');
+    try {
+      // Récupérer la session actuelle depuis Supabase
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+      if (!currentSession) {
+        alert('Session expirée, veuillez vous reconnecter');
+        return;
+      }
+
+      // Appel direct avec fetch au lieu de supabase.functions.invoke
+      const response = await fetch(
+        'https://odfijihyepuxjzeueiri.supabase.co/functions/v1/save-llm-settings',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentSession.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            provider: settings.provider,
+            apiKey: settings.apiKey,
+            model: settings.model,
+            endpoint: settings.endpoint,
+            temperature: settings.temperature,
+            maxTokens: settings.maxTokens,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Error saving settings:', data);
+        alert(`Erreur lors de la sauvegarde: ${data.error || response.statusText}`);
+        return;
+      }
+
+      if (data.error) {
+        alert(`Erreur: ${data.error}`);
+        return;
+      }
+
+      alert('Configuration LLM enregistrée avec succès');
+      setIsEditing(false);
+      await loadSettings(); // Recharger les paramètres
+    } catch (err: any) {
+      console.error('Error saving settings:', err);
+      alert(`Erreur: ${err.message}`);
+    }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (!window.confirm('Voulez-vous vraiment réinitialiser la configuration ?')) {
       return;
     }
 
     setSettings(DEFAULT_SETTINGS);
-    localStorage.removeItem('llmSettings');
     setIsEditing(false);
+    setHasExistingSettings(false);
+    setCustomModel('');
   };
 
   const handleTestConnection = async () => {
+    if (!user) {
+      setTestStatus({ success: false, message: 'Vous devez être connecté' });
+      return;
+    }
+
     setTestStatus({ success: false, message: 'Test en cours...' });
 
     try {
-      let url = settings.endpoint;
-      let headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-      let body: any = {};
+      // Récupérer la session actuelle depuis Supabase
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
 
-      // Configuration spécifique selon le provider
-      if (settings.provider === 'google') {
-        // Google Gemini API
-        url = `https://generativelanguage.googleapis.com/v1beta/models/${settings.model}:generateContent?key=${settings.apiKey}`;
-        body = {
-          contents: [{
-            parts: [{ text: 'Test' }]
-          }]
-        };
-        // Log pour debug
-        console.log('Testing Google Gemini API:', url);
-      } else if (settings.provider === 'anthropic') {
-        // Anthropic Claude API
-        headers = {
-          'Content-Type': 'application/json',
-          'x-api-key': settings.apiKey,
-          'anthropic-version': '2023-06-01',
-        };
-        body = {
-          model: settings.model,
-          messages: [
-            { role: 'user', content: 'Test' }
-          ],
-          max_tokens: 10,
-        };
-      } else {
-        // OpenAI et custom
-        headers = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${settings.apiKey}`,
-        };
-        body = {
-          model: settings.model,
-          messages: [
-            { role: 'user', content: 'Test' }
-          ],
-          max_tokens: 10,
-        };
+      if (!currentSession) {
+        setTestStatus({ success: false, message: 'Session expirée, veuillez vous reconnecter' });
+        return;
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      });
+      // Appel direct avec fetch au lieu de supabase.functions.invoke
+      const response = await fetch(
+        'https://odfijihyepuxjzeueiri.supabase.co/functions/v1/call-llm',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentSession.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: 'Test' }],
+            maxTokens: 10,
+          }),
+        }
+      );
 
-      if (response.ok) {
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        setTestStatus({
+          success: false,
+          message: `Erreur: ${data.error || response.statusText}`,
+        });
+        return;
+      }
+
+      if (data.error) {
+        setTestStatus({
+          success: false,
+          message: `Erreur: ${data.error}`,
+        });
+        return;
+      }
+
+      if (data.success) {
         setTestStatus({
           success: true,
           message: 'Connexion réussie ! Le LLM est opérationnel.',
         });
-      } else {
-        const error = await response.json();
-        setTestStatus({
-          success: false,
-          message: `Erreur ${response.status}: ${error.error?.message || error.message || response.statusText}`,
-        });
       }
-    } catch (error) {
+    } catch (err: any) {
       setTestStatus({
         success: false,
-        message: `Erreur de connexion: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
+        message: `Erreur de connexion: ${err.message}`,
       });
     }
   };
@@ -220,7 +310,6 @@ const LLMConfig: React.FC = () => {
       model: defaultModel,
     });
     setCustomModel('');
-    console.log(`Provider changed to ${providerValue}, default model set to: ${defaultModel}`);
   };
 
   const handleModelChange = (modelValue: string) => {
@@ -232,6 +321,29 @@ const LLMConfig: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-lg p-6">
+        <p className="text-center">Chargement des paramètres...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-lg p-6">
+        <div className="text-center">
+          <p className="text-lg font-semibold text-red-600 dark:text-red-400">
+            🔒 Connexion requise
+          </p>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Vous devez être connecté pour configurer vos paramètres IA.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-lg p-6">
       <div className="flex justify-between items-center mb-6">
@@ -242,17 +354,18 @@ const LLMConfig: React.FC = () => {
               onClick={() => setIsEditing(true)}
               className="px-4 py-2 bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary rounded-lg hover:opacity-90 transition-opacity"
             >
-              Modifier
+              {hasExistingSettings ? 'Modifier' : 'Configurer'}
             </button>
           ) : (
             <>
               <button
                 onClick={() => {
                   setIsEditing(false);
-                  // Recharger depuis localStorage
-                  const stored = localStorage.getItem('llmSettings');
-                  if (stored) setSettings(JSON.parse(stored));
-                  else setSettings(DEFAULT_SETTINGS);
+                  if (hasExistingSettings) {
+                    loadSettings(); // Recharger les paramètres existants
+                  } else {
+                    setSettings(DEFAULT_SETTINGS);
+                  }
                   setCustomModel('');
                 }}
                 className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors"
@@ -334,7 +447,7 @@ const LLMConfig: React.FC = () => {
               value={settings.apiKey}
               onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
               disabled={!isEditing}
-              placeholder="sk-... ou AIza..."
+              placeholder={hasExistingSettings ? '••••••••••••' : 'sk-... ou AIza...'}
               className="w-full px-3 py-2 pr-24 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <button
@@ -344,6 +457,11 @@ const LLMConfig: React.FC = () => {
               {showApiKey ? 'Masquer' : 'Afficher'}
             </button>
           </div>
+          {hasExistingSettings && isEditing && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Laissez vide pour conserver votre clé API actuelle
+            </p>
+          )}
         </div>
 
         {/* Endpoint */}
@@ -398,48 +516,41 @@ const LLMConfig: React.FC = () => {
         </div>
 
         {/* Test Connection */}
-        <div className="pt-4 border-t border-gray-300 dark:border-gray-600">
-          <button
-            onClick={handleTestConnection}
-            disabled={!settings.apiKey}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Tester la connexion
-          </button>
-
-          {testStatus && (
-            <div
-              className={`mt-3 px-4 py-3 rounded-lg ${
-                testStatus.success
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
-                  : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
-              }`}
+        {hasExistingSettings && (
+          <div className="pt-4 border-t border-gray-300 dark:border-gray-600">
+            <button
+              onClick={handleTestConnection}
+              disabled={!hasExistingSettings}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {testStatus.message}
-            </div>
-          )}
-        </div>
+              Tester la connexion
+            </button>
+
+            {testStatus && (
+              <div
+                className={`mt-3 px-4 py-3 rounded-lg ${
+                  testStatus.success
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                    : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+                }`}
+              >
+                {testStatus.message}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Reset */}
-        <div className="pt-4 border-t border-gray-300 dark:border-gray-600">
-          <button
-            onClick={handleReset}
-            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
-          >
-            Réinitialiser la configuration
-          </button>
-        </div>
-      </div>
-
-      {/* Info */}
-      <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-        <h4 className="font-semibold text-blue-900 dark:text-blue-200 mb-2">
-          ℹ️ Information
-        </h4>
-        <p className="text-sm text-blue-800 dark:text-blue-300">
-          Cette configuration sera utilisée pour les futures fonctionnalités IA du planning :
-          génération automatique de descriptions, suggestions d'organisation, analyse de disponibilités, etc.
-        </p>
+        {hasExistingSettings && (
+          <div className="pt-4 border-t border-gray-300 dark:border-gray-600">
+            <button
+              onClick={handleReset}
+              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
+            >
+              Réinitialiser la configuration
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

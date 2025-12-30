@@ -27,7 +27,10 @@
       "Bash(npx tsc:*)",
       "Bash(git pull:*)",
       "Bash(git stash:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(supabase functions deploy:*)",
+      "Bash(supabase functions logs:*)",
+      "Bash(supabase auth login:*)"
     ],
     "deny": [],
     "ask": []
