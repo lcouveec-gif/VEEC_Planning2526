@@ -136,9 +136,10 @@ const MatchSchedule: React.FC = () => {
     if (selectedTeamIds.length === 0) return validMatches;
 
     // Étape 3 : Filtrer par équipes sélectionnées
+    // Une équipe peut avoir plusieurs NOM_FFVB (un par championnat)
     const selectedTeamNames = teams
       .filter(team => selectedTeamIds.includes(team.IDEQUIPE))
-      .map(team => normalizeString(team.NOM_FFVB));
+      .flatMap(team => team.championships.map(c => normalizeString(c.NOM_FFVB)));
 
     const filtered = validMatches.filter(match => {
       const matchTeamName = normalizeString(match.NOM_FFVB);

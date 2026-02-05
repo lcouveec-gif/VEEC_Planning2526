@@ -175,11 +175,22 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
                       <span className="text-base sm:text-lg font-semibold text-light-primary dark:text-dark-primary">
                         {formatTime(match.Heure)}
                       </span>
-                      {/* Nom de la poule (championnat) - visible uniquement sur desktop */}
-                      {match.equipe?.POULE_NOM && (
-                        <span className="hidden sm:inline text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
-                          {match.equipe.POULE_NOM}
-                        </span>
+                      {/* Nom du championnat - visible uniquement sur desktop */}
+                      {match.championnat_obj?.nom_championnat && (
+                        match.championnat_obj.url_championnat ? (
+                          <a
+                            href={match.championnat_obj.url_championnat}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hidden sm:inline text-xs font-medium text-light-primary dark:text-dark-primary bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded hover:underline"
+                          >
+                            {match.championnat_obj.nom_championnat} ↗
+                          </a>
+                        ) : (
+                          <span className="hidden sm:inline text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
+                            {match.championnat_obj.nom_championnat}
+                          </span>
+                        )
                       )}
                     </div>
                     <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">

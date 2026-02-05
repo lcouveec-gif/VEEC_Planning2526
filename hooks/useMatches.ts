@@ -1,45 +1,83 @@
-import { useQuery } from '@tanstack/react-query';
-import { matchesService, type MatchesFilters } from '../services/matchesService';
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import type { Match } from '../types';
 
-/**
- * Query keys pour les matchs
- */
-export const matchesKeys = {
-  all: ['matches'] as const,
-  lists: () => [...matchesKeys.all, 'list'] as const,
-  list: (filters: MatchesFilters) => [...matchesKeys.lists(), filters] as const,
-};
+interface UseMatchesResult {
+  matches: Match[];
+  loading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+}
 
-/**
- * Hook pour récupérer les matchs avec filtres optionnels
- *
- * @param startDate - Date de début (format YYYY-MM-DD)
- * @param endDate - Date de fin (format YYYY-MM-DD)
- * @param teamIds - IDs des équipes à filtrer
- *
- * Avantages React Query:
- * - Cache par combinaison de filtres
- * - Refetch automatique si les filtres changent
- * - Pas de refetch inutile si les filtres sont identiques
- */
-export function useMatches(startDate?: string, endDate?: string, teamIds?: string[]) {
-  const filters: MatchesFilters = {
-    startDate,
-    endDate,
-    teamIds,
+export function useMatches(startDate?: string, endDate?: string, teamIds?: string[]): UseMatchesResult {
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchMatches = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Requête 1 : matchs
+      let query = supabase
+        .from('matches')
+        .select('*')
+        .order('Date', { ascending: true })
+        .order('Heure', { ascending: true });
+
+      if (startDate) {
+        query = query.gte('Date', startDate);
+      }
+      if (endDate) {
+        query = query.lte('Date', endDate);
+      }
+      if (teamIds && teamIds.length > 0) {
+        query = query.in('idequipe', teamIds);
+      }
+
+      const { data: matchesData, error: matchesError } = await query;
+      if (matchesError) throw matchesError;
+
+      // Requête 2, 3 & 4 : équipes parent + inscriptions FFVB + championnats
+      const { data: teamsData } = await supabase.from('VEEC_Equipes').select('*');
+      const { data: champsData } = await supabase.from('VEEC_Equipes_FFVB').select('*');
+      const { data: championnatsData } = await supabase.from('championnat').select('*');
+
+      // Fusion : associer equipe, equipe_ffvb et championnat
+      const enriched: Match[] = (matchesData || []).map(m => {
+        const equipe_ffvb = (champsData || []).find(c => c.IDEQUIPE === m.idequipe && c.NOM_FFVB === m.NOM_FFVB) || undefined;
+        // Lien direct : match.POULE_TEAM = championnat.code_championnat
+        const championnat_obj = m.POULE_TEAM
+          ? (championnatsData || []).find((ch: any) => ch.code_championnat === m.POULE_TEAM) || undefined
+          : undefined;
+        return {
+          ...m,
+          equipe: (teamsData || []).find(t => t.IDEQUIPE === m.idequipe) || undefined,
+          equipe_ffvb,
+          championnat_obj,
+        };
+      });
+
+      setMatches(enriched);
+    } catch (err: any) {
+      console.error('Error fetching matches:', err);
+      setError(err.message || 'Une erreur est survenue lors du chargement des matchs.');
+      setMatches([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const query = useQuery({
-    queryKey: matchesKeys.list(filters),
-    queryFn: () => matchesService.fetchMatches(filters),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  useEffect(() => {
+    fetchMatches();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, JSON.stringify(teamIds)]);
 
   return {
-    matches: query.data || [],
-    loading: query.isLoading,
-    isFetching: query.isFetching,
-    error: query.error?.message || null,
-    refetch: query.refetch,
+    matches,
+    loading,
+    error,
+    refetch: fetchMatches,
   };
 }

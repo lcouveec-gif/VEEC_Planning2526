@@ -1,101 +1,212 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { teamsService } from '../services/teamsService';
-import type { Team } from '../types';
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import type { Team, TeamFFVB, TeamWithChampionships } from '../types';
 
-/**
- * Query keys pour React Query
- */
-export const teamsKeys = {
-  all: ['teams'] as const,
-  lists: () => [...teamsKeys.all, 'list'] as const,
-  list: (filters?: any) => [...teamsKeys.lists(), { filters }] as const,
-  details: () => [...teamsKeys.all, 'detail'] as const,
-  detail: (id: string) => [...teamsKeys.details(), id] as const,
-};
+interface UseTeamsResult {
+  teams: TeamWithChampionships[];
+  loading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+  // CRUD équipe parent (VEEC_Equipes)
+  createTeam: (team: Team) => Promise<Team | null>;
+  updateTeam: (idequipe: string, updates: Partial<Team>) => Promise<boolean>;
+  deleteTeam: (idequipe: string) => Promise<boolean>;
+  // CRUD championnat (VEEC_Equipes_FFVB)
+  createChampionship: (entry: TeamFFVB) => Promise<TeamFFVB | null>;
+  updateChampionship: (idequipe: string, pouleTeam: string, updates: Partial<TeamFFVB>) => Promise<boolean>;
+  deleteChampionship: (idequipe: string, pouleTeam: string) => Promise<boolean>;
+}
 
-/**
- * Hook pour récupérer toutes les équipes avec React Query
- *
- * Avantages par rapport à l'ancien hook:
- * - Cache automatique (5 min)
- * - Refetch intelligent en arrière-plan
- * - Retry automatique en cas d'erreur
- * - Déduplication des requêtes
- * - isLoading vs isFetching (distinction entre première charge et refetch)
- */
-export function useTeams() {
-  const queryClient = useQueryClient();
+export function useTeams(): UseTeamsResult {
+  const [teams, setTeams] = useState<TeamWithChampionships[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Query pour récupérer les équipes
-  const query = useQuery({
-    queryKey: teamsKeys.lists(),
-    queryFn: teamsService.fetchTeams,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  const fetchTeams = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  // Mutation pour créer une équipe
-  const createTeamMutation = useMutation({
-    mutationFn: teamsService.createTeam,
-    onSuccess: () => {
-      // Invalider le cache pour refetch automatiquement
-      queryClient.invalidateQueries({ queryKey: teamsKeys.lists() });
-    },
-  });
+      // Requête 1 : équipes parent
+      const { data: teamsData, error: teamsError } = await supabase
+        .from('VEEC_Equipes')
+        .select('*')
+        .order('IDEQUIPE', { ascending: true });
 
-  // Mutation pour mettre à jour une équipe
-  const updateTeamMutation = useMutation({
-    mutationFn: ({ idequipe, updates }: { idequipe: string; updates: Partial<Team> }) =>
-      teamsService.updateTeam(idequipe, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: teamsKeys.lists() });
-    },
-  });
+      if (teamsError) throw teamsError;
+      console.log('[useTeams] VEEC_Equipes:', teamsData?.length, 'lignes', teamsData);
 
-  // Mutation pour supprimer une équipe
-  const deleteTeamMutation = useMutation({
-    mutationFn: teamsService.deleteTeam,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: teamsKeys.lists() });
-    },
-  });
+      // Requête 2 : championnats
+      const { data: champsData, error: champsError } = await supabase
+        .from('VEEC_Equipes_FFVB')
+        .select('*');
+
+      if (champsError) throw champsError;
+
+      // Fusion : associer les championnats à chaque équipe
+      const merged: TeamWithChampionships[] = (teamsData || []).map(team => ({
+        ...team,
+        championships: (champsData || []).filter(c => c.IDEQUIPE === team.IDEQUIPE),
+      }));
+
+      setTeams(merged);
+    } catch (err: any) {
+      console.error('Error fetching teams:', err);
+      setError(err.message || 'Une erreur est survenue lors du chargement des équipes.');
+      setTeams([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // --- CRUD Équipe parent (VEEC_Equipes) ---
+
+  const createTeam = async (team: Team): Promise<Team | null> => {
+    try {
+      setError(null);
+      const { data, error: supabaseError } = await supabase
+        .from('VEEC_Equipes')
+        .insert([team])
+        .select()
+        .single();
+
+      if (supabaseError) throw supabaseError;
+
+      await fetchTeams();
+      return data;
+    } catch (err: any) {
+      console.error('Error creating team:', err);
+      setError(err.message || 'Erreur lors de la création de l\'équipe.');
+      return null;
+    }
+  };
+
+  const updateTeam = async (idequipe: string, updates: Partial<Team>): Promise<boolean> => {
+    try {
+      setError(null);
+
+      const { data, error: supabaseError } = await supabase
+        .from('VEEC_Equipes')
+        .update(updates)
+        .eq('IDEQUIPE', idequipe)
+        .select();
+
+      if (supabaseError) throw supabaseError;
+
+      if (!data || data.length === 0) {
+        throw new Error(`Aucune équipe trouvée avec l'IDEQUIPE: "${idequipe}"`);
+      }
+
+      await fetchTeams();
+      return true;
+    } catch (err: any) {
+      console.error('Error updating team:', err);
+      setError(err.message || 'Erreur lors de la mise à jour de l\'équipe.');
+      return false;
+    }
+  };
+
+  const deleteTeam = async (idequipe: string): Promise<boolean> => {
+    try {
+      setError(null);
+      const { error: supabaseError } = await supabase
+        .from('VEEC_Equipes')
+        .delete()
+        .eq('IDEQUIPE', idequipe);
+
+      if (supabaseError) throw supabaseError;
+
+      await fetchTeams();
+      return true;
+    } catch (err: any) {
+      console.error('Error deleting team:', err);
+      setError(err.message || 'Erreur lors de la suppression de l\'équipe.');
+      return false;
+    }
+  };
+
+  // --- CRUD Championnat (VEEC_Equipes_FFVB) ---
+
+  const createChampionship = async (entry: TeamFFVB): Promise<TeamFFVB | null> => {
+    try {
+      setError(null);
+      const { data, error: supabaseError } = await supabase
+        .from('VEEC_Equipes_FFVB')
+        .insert([entry])
+        .select()
+        .single();
+
+      if (supabaseError) throw supabaseError;
+
+      await fetchTeams();
+      return data;
+    } catch (err: any) {
+      console.error('Error creating championship:', err);
+      setError(err.message || 'Erreur lors de la création du championnat.');
+      return null;
+    }
+  };
+
+  const updateChampionship = async (idequipe: string, pouleTeam: string, updates: Partial<TeamFFVB>): Promise<boolean> => {
+    try {
+      setError(null);
+
+      const { data, error: supabaseError } = await supabase
+        .from('VEEC_Equipes_FFVB')
+        .update(updates)
+        .eq('IDEQUIPE', idequipe)
+        .eq('POULE_TEAM', pouleTeam)
+        .select();
+
+      if (supabaseError) throw supabaseError;
+
+      if (!data || data.length === 0) {
+        throw new Error(`Aucun championnat trouvé pour IDEQUIPE="${idequipe}" et POULE_TEAM="${pouleTeam}"`);
+      }
+
+      await fetchTeams();
+      return true;
+    } catch (err: any) {
+      console.error('Error updating championship:', err);
+      setError(err.message || 'Erreur lors de la mise à jour du championnat.');
+      return false;
+    }
+  };
+
+  const deleteChampionship = async (idequipe: string, pouleTeam: string): Promise<boolean> => {
+    try {
+      setError(null);
+      const { error: supabaseError } = await supabase
+        .from('VEEC_Equipes_FFVB')
+        .delete()
+        .eq('IDEQUIPE', idequipe)
+        .eq('POULE_TEAM', pouleTeam);
+
+      if (supabaseError) throw supabaseError;
+
+      await fetchTeams();
+      return true;
+    } catch (err: any) {
+      console.error('Error deleting championship:', err);
+      setError(err.message || 'Erreur lors de la suppression du championnat.');
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    fetchTeams();
+  }, [fetchTeams]);
 
   return {
-    // Données et état de la query
-    teams: query.data || [],
-    loading: query.isLoading, // Première charge uniquement
-    isFetching: query.isFetching, // Inclut refetch en arrière-plan
-    error: query.error?.message || null,
-    refetch: query.refetch,
-
-    // Mutations
-    createTeam: async (team: Team) => {
-      try {
-        const result = await createTeamMutation.mutateAsync(team);
-        return result;
-      } catch (error) {
-        return null;
-      }
-    },
-    updateTeam: async (idequipe: string, updates: Partial<Team>) => {
-      try {
-        await updateTeamMutation.mutateAsync({ idequipe, updates });
-        return true;
-      } catch (error) {
-        return false;
-      }
-    },
-    deleteTeam: async (idequipe: string) => {
-      try {
-        await deleteTeamMutation.mutateAsync(idequipe);
-        return true;
-      } catch (error) {
-        return false;
-      }
-    },
-
-    // États des mutations
-    isCreating: createTeamMutation.isPending,
-    isUpdating: updateTeamMutation.isPending,
-    isDeleting: deleteTeamMutation.isPending,
+    teams,
+    loading,
+    error,
+    refetch: fetchTeams,
+    createTeam,
+    updateTeam,
+    deleteTeam,
+    createChampionship,
+    updateChampionship,
+    deleteChampionship,
   };
 }
