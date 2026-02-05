@@ -7,12 +7,13 @@ import PositionTracker from './components/PositionTracker';
 import TeamView from './components/TeamView';
 import Admin from './components/Admin';
 import Referee from './components/Referee';
+import AIChat from './components/AIChat';
 // import AuthModal from './components/Auth/AuthModal';
 import { useTrainingSessions } from './hooks/useTrainingSessions';
 import type { TrainingSession } from './types';
 import { GYMS, DAYS } from './constants';
 
-type PageType = 'training' | 'matches' | 'position' | 'team' | 'admin' | 'referee';
+type PageType = 'training' | 'matches' | 'position' | 'team' | 'admin' | 'referee' | 'ai';
 
 // For PDF export libraries from CDN
 declare const html2canvas: any;
@@ -267,6 +268,8 @@ const App: React.FC = () => {
         <TeamView onNavigate={handleTeamNavigation} />
       ) : currentPage === 'referee' ? (
         <Referee />
+      ) : currentPage === 'ai' ? (
+        <AIChat />
       ) : (
         <Admin initialSection={adminSection} selectedTeamId={selectedTeamId} />
       )}

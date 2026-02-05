@@ -122,3 +122,30 @@ export interface MatchPositionData {
   players: Player[]; // 12 joueurs
   setLineups: SetLineup[]; // De 3 à 5 sets
 }
+
+// Types pour la gestion des clubs adverses
+export interface Club {
+  code_club: string; // Code à 7 positions (ex: 0775819)
+  nom: string; // Nom complet du club (sans numéro d'équipe)
+  nom_court?: string; // Nom court/abréviation
+  ville?: string;
+  logo_url?: string; // URL du logo dans Supabase Storage (fichier: code_club.png)
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Types pour la gestion des gymnases
+export interface Gymnase {
+  id: string; // UUID
+  nom: string; // Nom du gymnase
+  code_club?: string; // Code du club propriétaire (7 positions, ex: 0775819) - optionnel
+  adresse?: string; // Adresse complète
+  ville?: string; // Ville
+  code_postal?: string; // Code postal
+  latitude?: number; // Latitude GPS
+  longitude?: number; // Longitude GPS
+  notes?: string; // Notes supplémentaires
+  created_at?: string;
+  updated_at?: string;
+  club?: Club; // Relation avec le club (via JOIN)
+}

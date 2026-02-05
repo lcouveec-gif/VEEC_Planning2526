@@ -1,27 +1,29 @@
 
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import ThemeSwitcher from './ThemeSwitcher';
-import { PdfIcon, SpinnerIcon, BellIcon } from './icons/ThemeIcons';
 import Logo from './Logo';
-// import UserMenu from './UserMenu';
-
-type PageType = 'training' | 'matches' | 'position' | 'team' | 'admin' | 'referee';
+import UserMenu from './UserMenu';
 
 interface HeaderProps {
   theme: 'dark' | 'light';
   toggleTheme: () => void;
-  onExportPdf: () => void;
-  isExporting: boolean;
-  onSubscribeToNotifications: () => void;
-  currentPage: PageType;
-  onPageChange: (page: PageType) => void;
-  // onOpenAuth: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExporting, onSubscribeToNotifications, currentPage, onPageChange }) => {
+const Header: React.FC<HeaderProps> = ({ theme, toggleTheme }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Déterminer la page actuelle depuis l'URL
+  const getCurrentPage = () => {
+    const path = location.pathname.split('/')[1] || 'team';
+    return path;
+  };
+
+  const currentPage = getCurrentPage();
 
   // Fermer le menu quand on clique à l'extérieur
   useEffect(() => {
@@ -40,8 +42,8 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
     };
   }, [isMenuOpen]);
 
-  const handlePageChange = (page: PageType) => {
-    onPageChange(page);
+  const handlePageChange = (path: string) => {
+    navigate(path);
     setIsMenuOpen(false);
   };
 
@@ -71,7 +73,9 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                    currentPage === 'matches' ? 'Matchs' :
                    currentPage === 'position' ? 'Position' :
                    currentPage === 'team' ? 'Équipes' :
+                   currentPage === 'links' ? 'Liens' :
                    currentPage === 'referee' ? 'Arbitre' :
+                   currentPage === 'ai' ? 'IA' :
                    'Admin'}
                 </span>
                 <svg
@@ -88,7 +92,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
               {isMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden z-20">
                   <button
-                    onClick={() => handlePageChange('training')}
+                    onClick={() => handlePageChange('/training')}
                     className={`w-full text-left px-4 py-3 text-sm transition-colors ${
                       currentPage === 'training'
                         ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
@@ -98,7 +102,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                     Entraînements
                   </button>
                   <button
-                    onClick={() => handlePageChange('matches')}
+                    onClick={() => handlePageChange('/matches')}
                     className={`w-full text-left px-4 py-3 text-sm transition-colors ${
                       currentPage === 'matches'
                         ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
@@ -108,7 +112,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                     Matchs
                   </button>
                   <button
-                    onClick={() => handlePageChange('position')}
+                    onClick={() => handlePageChange('/position')}
                     className={`w-full text-left px-4 py-3 text-sm transition-colors ${
                       currentPage === 'position'
                         ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
@@ -118,7 +122,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                     Position
                   </button>
                   <button
-                    onClick={() => handlePageChange('team')}
+                    onClick={() => handlePageChange('/team')}
                     className={`w-full text-left px-4 py-3 text-sm transition-colors ${
                       currentPage === 'team'
                         ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
@@ -128,7 +132,17 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                     Équipes
                   </button>
                   <button
-                    onClick={() => handlePageChange('referee')}
+                    onClick={() => handlePageChange('/links')}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                      currentPage === 'links'
+                        ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Liens
+                  </button>
+                  <button
+                    onClick={() => handlePageChange('/referee')}
                     className={`w-full text-left px-4 py-3 text-sm transition-colors ${
                       currentPage === 'referee'
                         ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
@@ -138,7 +152,17 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                     Arbitre
                   </button>
                   <button
-                    onClick={() => handlePageChange('admin')}
+                    onClick={() => handlePageChange('/ai')}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                      currentPage === 'ai'
+                        ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    🤖 IA
+                  </button>
+                  <button
+                    onClick={() => handlePageChange('/admin')}
                     className={`w-full text-left px-4 py-3 text-sm transition-colors ${
                       currentPage === 'admin'
                         ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
@@ -150,23 +174,8 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, onExportPdf, isExpo
                 </div>
               )}
             </div>
-            <button
-              onClick={onSubscribeToNotifications}
-              className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-light-surface dark:focus:ring-offset-dark-surface focus:ring-light-primary dark:focus:ring-dark-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Subscribe to notifications"
-            >
-              <BellIcon className="w-6 h-6" />
-            </button>
-            <button
-              onClick={onExportPdf}
-              disabled={isExporting}
-              className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-light-surface dark:focus:ring-offset-dark-surface focus:ring-light-primary dark:focus:ring-dark-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Export to PDF"
-            >
-              {isExporting ? <SpinnerIcon className="w-6 h-6" /> : <PdfIcon className="w-6 h-6" />}
-            </button>
             <ThemeSwitcher theme={theme} toggleTheme={toggleTheme} />
-            {/* <UserMenu onOpenAuth={onOpenAuth} /> */}
+            <UserMenu />
           </div>
         </div>
       </div>

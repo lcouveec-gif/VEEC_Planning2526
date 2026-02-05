@@ -42,6 +42,14 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
+      - name: Validate secrets
+        run: |
+          echo "Checking required secrets..."
+          if [ -z "${{ secrets.SSH_KEY }}" ]; then echo "ERROR: SSH_KEY is not set"; exit 1; fi
+          if [ -z "${{ secrets.SSH_HOST }}" ]; then echo "ERROR: SSH_HOST is not set"; exit 1; fi
+          if [ -z "${{ secrets.SSH_USER }}" ]; then echo "ERROR: SSH_USER is not set"; exit 1; fi
+          echo "All required secrets are configured ✓"
+
       - name: Write SSH key
         run: |
           echo "${{ secrets.SSH_KEY }}" > key.pem
@@ -50,27 +58,44 @@ jobs:
       - name: Show key fingerprint
         run: ssh-keygen -lf key.pem
 
+      - name: Debug SSH configuration
+        run: |
+          echo "SSH_HOST: ${{ env.SSH_HOST }}"
+          echo "SSH_USER: ${{ env.SSH_USER }}"
+          echo "SSH_PORT: ${SSH_PORT:-22}"
+          echo "Testing SSH connectivity..."
+
       - name: Prepare known_hosts
         run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          ssh-keyscan -p ${SSH_PORT:-22} ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+          mkdir -p ~/.ssh || true
+          chmod 700 ~/.ssh || true
+          touch ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          echo "Running ssh-keyscan on port ${SSH_PORT:-22}..."
+          ssh-keyscan -p ${SSH_PORT:-22} ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts 2>&1 || echo "Warning: ssh-keyscan failed"
+          cat ~/.ssh/known_hosts
+
+      - name: Test SSH connection
+        run: |
+          echo "Testing SSH connection..."
+          ssh -v -i key.pem -p ${SSH_PORT:-22} -o ConnectTimeout=10 -o StrictHostKeyChecking=no \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "echo 'SSH connection successful'" || echo "SSH test failed"
 
       # --- Déploiement FRONTEND ---
       - name: Rsync dist/ to VPS (Prod)
         run: |
-          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" dist/ \
+          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22} -o ConnectTimeout=30 -o StrictHostKeyChecking=no" dist/ \
             ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.FRONTEND_DIR }}/
 
       # --- Déploiement BACKEND ---
       - name: Rsync server/ to VPS (Backend Prod)
         run: |
-          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22}" server/ \
+          rsync -avz --delete -e "ssh -i key.pem -p ${SSH_PORT:-22} -o ConnectTimeout=30 -o StrictHostKeyChecking=no" server/ \
             ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.BACKEND_DIR }}/
 
       - name: Install & restart backend with PM2 (force clean)
         run: |
-          ssh -i key.pem -p ${SSH_PORT:-22} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
+          ssh -i key.pem -p ${SSH_PORT:-22} -o ConnectTimeout=30 -o StrictHostKeyChecking=no ${{ env.SSH_USER }}@${{ env.SSH_HOST }} "
             set -e
             cd ${BACKEND_DIR}
             npm install --production

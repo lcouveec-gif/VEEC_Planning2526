@@ -1,31 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import TeamSetup from './Referee/TeamSetup';
 import CoinToss from './Referee/CoinToss';
 import MatchBoard from './Referee/MatchBoard';
 import type { MatchData, RefereeStep, TeamInfo, CoinTossResult } from '../types/referee';
 
+const STORAGE_KEY_MATCH = 'veec_referee_match_data';
+const STORAGE_KEY_STEP = 'veec_referee_step';
+
+const getInitialMatchData = (): MatchData => ({
+  teamA: {
+    name: '',
+    colorPrimary: '#000000',
+    colorSecondary: '#FFFFFF',
+    players: [],
+  },
+  teamB: {
+    name: '',
+    colorPrimary: '#1E40AF',
+    colorSecondary: '#FFFFFF',
+    players: [],
+  },
+  sets: [],
+  currentSet: 0,
+  setsWon: {
+    A: 0,
+    B: 0,
+  },
+});
+
 const Referee: React.FC = () => {
-  const [step, setStep] = useState<RefereeStep>('setup');
-  const [matchData, setMatchData] = useState<MatchData>({
-    teamA: {
-      name: '',
-      colorPrimary: '#000000',
-      colorSecondary: '#FFFFFF',
-      players: [],
-    },
-    teamB: {
-      name: '',
-      colorPrimary: '#1E40AF',
-      colorSecondary: '#FFFFFF',
-      players: [],
-    },
-    sets: [],
-    currentSet: 0,
-    setsWon: {
-      A: 0,
-      B: 0,
-    },
+  // Charger les données depuis le localStorage au démarrage
+  const [step, setStep] = useState<RefereeStep>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_STEP);
+    return (saved as RefereeStep) || 'setup';
   });
+
+  const [matchData, setMatchData] = useState<MatchData>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_MATCH);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Erreur chargement données match:', e);
+        return getInitialMatchData();
+      }
+    }
+    return getInitialMatchData();
+  });
+
+  // Sauvegarder dans le localStorage à chaque changement
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_STEP, step);
+  }, [step]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_MATCH, JSON.stringify(matchData));
+  }, [matchData]);
 
   const handleTeamsSetup = (teamA: TeamInfo, teamB: TeamInfo) => {
     setMatchData(prev => ({
@@ -78,29 +108,13 @@ const Referee: React.FC = () => {
     setStep('match');
   };
 
-  const handleBackToSetup = () => {
-    if (window.confirm('Voulez-vous vraiment recommencer ? Toutes les données seront perdues.')) {
+  const handleResetMatch = () => {
+    if (window.confirm('Voulez-vous vraiment réinitialiser le match ? Toutes les données seront perdues.')) {
+      const initialData = getInitialMatchData();
       setStep('setup');
-      setMatchData({
-        teamA: {
-          name: '',
-          colorPrimary: '#000000',
-          colorSecondary: '#FFFFFF',
-          players: [],
-        },
-        teamB: {
-          name: '',
-          colorPrimary: '#1E40AF',
-          colorSecondary: '#FFFFFF',
-          players: [],
-        },
-        sets: [],
-        currentSet: 0,
-        setsWon: {
-          A: 0,
-          B: 0,
-        },
-      });
+      setMatchData(initialData);
+      localStorage.removeItem(STORAGE_KEY_MATCH);
+      localStorage.removeItem(STORAGE_KEY_STEP);
     }
   };
 
@@ -118,11 +132,12 @@ const Referee: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-light-background dark:bg-dark-background p-4 sm:p-6">
+    <div className="min-h-screen bg-light-background dark:bg-dark-background p-2 sm:p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Workflow Steps */}
-        <div className="mb-6">
-          <div className="flex items-center justify-center space-x-2 sm:space-x-4 mb-4">
+        {/* En-tête compact avec étapes et bouton réinitialiser */}
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          {/* Workflow Steps */}
+          <div className="flex items-center space-x-2 sm:space-x-4">
             {/* Étape 1 */}
             <div className="flex items-center">
               <div
@@ -178,9 +193,14 @@ const Referee: React.FC = () => {
             </div>
           </div>
 
-          <h2 className="text-xl sm:text-2xl font-bold text-center text-light-onSurface dark:text-dark-onSurface">
-            {getStepTitle()}
-          </h2>
+          {/* Bouton Réinitialiser */}
+          <button
+            onClick={handleResetMatch}
+            className="px-3 py-2 sm:px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2 text-xs sm:text-sm"
+          >
+            <span className="text-base sm:text-lg">🔄</span>
+            <span className="hidden sm:inline">Réinitialiser</span>
+          </button>
         </div>
 
         {step === 'setup' && (
@@ -204,7 +224,6 @@ const Referee: React.FC = () => {
           <MatchBoard
             matchData={matchData}
             setMatchData={setMatchData}
-            onBack={handleBackToSetup}
             onNeedCoinTossForSet5={() => setStep('coinToss')}
           />
         )}

@@ -1,19 +1,7 @@
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { useAuthStore, type UserRole, type VEECProfile } from '../stores/useAuthStore';
 import type { User, Session } from '@supabase/supabase-js';
-
-export type UserRole = 'admin' | 'board' | 'entraineur' | 'joueur' | 'public';
-
-export interface VEECProfile {
-  id: string;
-  user_id: string;
-  email: string;
-  role: UserRole;
-  nom?: string;
-  prenom?: string;
-  created_at: string;
-  updated_at: string;
-}
 
 interface AuthContextType {
   user: User | null;
@@ -29,64 +17,74 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<VEECProfile | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, profile, session, loading, setAuth, setLoading, clearAuth } = useAuthStore();
 
-  // Charger le profil utilisateur depuis veec_profiles
-  const loadProfile = async (userId: string) => {
+  // Charger le profil utilisateur depuis veec_profiles avec timeout
+  const loadProfile = async (userId: string): Promise<VEECProfile | null> => {
     try {
-      const { data, error } = await supabase
+      console.log('🔵 [AuthContext] Chargement du profil pour userId:', userId);
+
+      // Créer une promesse avec timeout de 3 secondes
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout du chargement du profil')), 3000);
+      });
+
+      // Course entre la requête et le timeout
+      const loadPromise = supabase
         .from('veec_profiles')
         .select('*')
         .eq('user_id', userId)
         .single();
 
+      const { data, error } = await Promise.race([loadPromise, timeoutPromise]) as any;
+
       if (error) {
-        console.error('Error loading profile:', error);
+        console.error('❌ [AuthContext] Error loading profile:', error);
         return null;
       }
 
+      console.log('✅ [AuthContext] Profil chargé:', data);
       return data as VEECProfile;
     } catch (err) {
-      console.error('Error loading profile:', err);
+      console.error('❌ [AuthContext] Error loading profile (catch):', err);
       return null;
     }
   };
 
   // Initialiser la session au chargement
   useEffect(() => {
-    // Récupérer la session actuelle
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    console.log('🔵 [AuthContext] Initialisation de la session...');
 
-      if (session?.user) {
-        loadProfile(session.user.id).then(setProfile);
-      }
-
-      setLoading(false);
-    });
+    let isInitialized = false;
 
     // Écouter les changements d'authentification
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      async (event, session) => {
+        console.log('🔵 [AuthContext] Auth state change:', event, session ? 'présente' : 'absente');
 
-        if (session?.user) {
-          const profileData = await loadProfile(session.user.id);
-          setProfile(profileData);
+        // Gérer uniquement INITIAL_SESSION et SIGNED_OUT
+        if (event === 'INITIAL_SESSION') {
+          isInitialized = true;
+
+          if (session?.user) {
+            const profileData = await loadProfile(session.user.id);
+            setAuth(session.user, profileData, session);
+          } else {
+            clearAuth();
+          }
+        } else if (event === 'SIGNED_OUT') {
+          clearAuth();
         } else {
-          setProfile(null);
+          // Ignorer tous les autres événements (SIGNED_IN, TOKEN_REFRESHED, etc.)
+          console.log('⚠️ [AuthContext] Événement ignoré:', event);
         }
-
-        setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Connexion
@@ -99,9 +97,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (error) return { error };
 
-      if (data.user) {
+      if (data.user && data.session) {
         const profileData = await loadProfile(data.user.id);
-        setProfile(profileData);
+        setAuth(data.user, profileData, data.session);
       }
 
       return { error: null };
@@ -126,13 +124,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       // 2. Créer le profil dans veec_profiles
-      // Note: Par défaut, les nouveaux utilisateurs ont le rôle 'public'
+      // Note: Par défaut, les nouveaux utilisateurs ont le rôle 'user'
       const { error: profileError } = await supabase
         .from('veec_profiles')
         .insert({
           user_id: authData.user.id,
           email: email,
-          role: 'public',
+          role: 'user', // Rôle par défaut
           nom: nom,
           prenom: prenom,
         });
@@ -151,9 +149,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Déconnexion
   const signOut = async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setSession(null);
+    clearAuth();
   };
 
   // Vérifier si l'utilisateur a un rôle spécifique

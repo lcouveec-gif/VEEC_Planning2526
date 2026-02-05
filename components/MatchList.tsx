@@ -1,11 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Match } from '../types';
+import ClubLogo from './ClubLogo';
+import MatchDetailModal from './MatchDetailModal';
 
 interface MatchListProps {
   matches: Match[];
 }
 
 const MatchList: React.FC<MatchListProps> = ({ matches }) => {
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('fr-FR', {
@@ -119,8 +123,15 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {sortedDates.map((date) => (
+    <>
+      {selectedMatch && (
+        <MatchDetailModal
+          match={selectedMatch}
+          onClose={() => setSelectedMatch(null)}
+        />
+      )}
+      <div className="space-y-4 sm:space-y-6">
+        {sortedDates.map((date) => (
         <div key={date} className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-md overflow-hidden">
           <div className="bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary px-3 sm:px-4 py-2">
             <h2 className="text-sm sm:text-base font-bold capitalize">{formatDate(date)}</h2>
@@ -154,7 +165,8 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
               return (
               <div
                 key={match.id}
-                className="p-3 sm:p-4 hover:bg-light-background dark:hover:bg-dark-background transition-colors"
+                className="p-3 sm:p-4 hover:bg-light-background dark:hover:bg-dark-background transition-colors cursor-pointer"
+                onClick={() => setSelectedMatch(match)}
               >
                 <div className="flex flex-col gap-2">
                   {/* Ligne 1: Heure et badges */}
@@ -203,14 +215,18 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className={`flex items-center gap-1.5 text-sm sm:text-base truncate ${isTeamA ? 'font-bold' : 'font-semibold'}`}>
-                        {isTeamA && (
-                          <img src="/logo.png" alt="VEEC" className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                        {isTeamA ? (
+                          <ClubLogo codeClub="0775819" clubName="VEEC" size="sm" className="flex-shrink-0" showFallback={false} />
+                        ) : (
+                          <ClubLogo codeClub={match.EQA_no} clubName={match.EQA_nom} size="sm" className="flex-shrink-0" showFallback={false} />
                         )}
                         <span className="truncate">{match.EQA_nom}</span>
                       </div>
                       <div className={`flex items-center gap-1.5 text-sm sm:text-base truncate mt-0.5 ${isTeamB ? 'font-bold' : 'font-semibold'}`}>
-                        {isTeamB && (
-                          <img src="/logo.png" alt="VEEC" className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                        {isTeamB ? (
+                          <ClubLogo codeClub="0775819" clubName="VEEC" size="sm" className="flex-shrink-0" showFallback={false} />
+                        ) : (
+                          <ClubLogo codeClub={match.EQB_no} clubName={match.EQB_nom} size="sm" className="flex-shrink-0" showFallback={false} />
                         )}
                         <span className="truncate">{match.EQB_nom}</span>
                       </div>
@@ -308,7 +324,8 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
           </div>
         </div>
       ))}
-    </div>
+      </div>
+    </>
   );
 };
 

@@ -53,9 +53,9 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
 
     return (
       <div
-        className={`relative bg-white dark:bg-gray-800 rounded-lg p-2 border-2 transition-all cursor-pointer hover:shadow-lg ${
-          isServing ? 'ring-4 ring-yellow-400 ring-opacity-70 shadow-lg' : ''
-        } ${isBeingSubstituted ? 'ring-4 ring-red-500 ring-opacity-70' : ''}`}
+        className={`relative bg-white dark:bg-gray-800 rounded p-1 sm:p-2 border-2 transition-all cursor-pointer hover:shadow-lg ${
+          isServing ? 'ring-2 sm:ring-4 ring-yellow-400 ring-opacity-70 shadow-lg' : ''
+        } ${isBeingSubstituted ? 'ring-2 sm:ring-4 ring-red-500 ring-opacity-70' : ''}`}
         style={{ borderColor: teamData.colorPrimary }}
         onClick={() => onStartSubstitution(team, playerNum)}
         title={
@@ -81,32 +81,32 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
         )}
 
         {/* Numéro dans un cercle */}
-        <div className="flex justify-center mb-1">
+        <div className="flex justify-center mb-0.5 sm:mb-1">
           <div
-            className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center shadow-md"
+            className="w-8 h-8 sm:w-12 sm:h-12 rounded-full flex items-center justify-center shadow-md"
             style={{ backgroundColor: bgColor }}
           >
-            <span className="text-xl sm:text-2xl font-bold" style={{ color: textColor }}>
+            <span className="text-base sm:text-2xl font-bold" style={{ color: textColor }}>
               {playerNum}
             </span>
           </div>
         </div>
 
-        {/* Rôle (plus visible) */}
-        {player?.role && (
-          <div className="text-center text-xs sm:text-sm font-bold mb-0.5" style={{ color: teamData.colorPrimary }}>
-            {player.role}
-          </div>
-        )}
-
         {/* Position */}
-        <div className="text-center text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 font-medium">
+        <div className="text-center text-[8px] sm:text-[10px] text-gray-500 dark:text-gray-400 font-medium">
           {position}
         </div>
 
+        {/* Badge Libéro */}
+        {player?.isLibero && (
+          <div className="text-center text-[7px] sm:text-[9px] font-bold text-blue-600 dark:text-blue-400 mt-0.5">
+            LIBÉRO
+          </div>
+        )}
+
         {/* Capitaine */}
         {player?.isCaptain && (
-          <div className="absolute top-1 right-1 bg-blue-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full">
+          <div className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 bg-blue-600 text-white text-[7px] sm:text-[8px] font-bold px-1 sm:px-1.5 py-0.5 rounded-full">
             C
           </div>
         )}
@@ -140,25 +140,25 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
       : null;
 
     return (
-      <div className={`mt-3 p-3 rounded-lg border-2 transition-all ${
+      <div className={`mt-1 sm:mt-3 p-1.5 sm:p-3 rounded-lg border-2 transition-all ${
         isSubstitutionActive
           ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-600'
           : 'bg-gray-50 dark:bg-gray-900 border-gray-300 dark:border-gray-600'
       }`}>
-        <div className="flex items-center justify-between mb-2">
-          <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300">
-            Banc {isSubstitutionActive && '- Sélectionner remplaçant'}
+        <div className="flex items-center justify-between mb-1 sm:mb-2">
+          <h4 className="text-[9px] sm:text-xs font-bold text-gray-700 dark:text-gray-300">
+            Banc {isSubstitutionActive && '- Sélectionner'}
           </h4>
           {isSubstitutionActive && (
             <button
               onClick={onCancelSubstitution}
-              className="text-xs bg-red-500 text-white px-2 py-0.5 rounded hover:bg-red-600 transition-colors"
+              className="text-[9px] sm:text-xs bg-red-500 text-white px-1.5 sm:px-2 py-0.5 rounded hover:bg-red-600 transition-colors"
             >
               Annuler
             </button>
           )}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1 sm:gap-2">
           {benchPlayers.length === 0 ? (
             <div className="text-xs text-gray-500 dark:text-gray-400 italic">
               Tous les joueurs sont sur le terrain
@@ -190,8 +190,8 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
                   : isSubstitutionActive
                     ? isLiberoGoingOut
                       ? 'Seul le joueur échangé peut remplacer le libéro'
-                      : `Faire entrer ${player.role} #${player.number}`
-                    : `${player.role}`;
+                      : `Faire entrer #${player.number}`
+                    : `#${player.number}`;
 
               return (
                 <div
@@ -200,7 +200,7 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
                   title={tooltipText}
                 >
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center shadow transition-all ${
+                    className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shadow transition-all ${
                       isAutoReplacement
                         ? 'cursor-pointer hover:scale-125 ring-2 ring-purple-500 animate-pulse'
                         : canSubstitute
@@ -216,13 +216,20 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
                       }
                     }}
                   >
-                    <span className="text-sm font-bold" style={{ color: textColor }}>
+                    <span className="text-xs sm:text-sm font-bold" style={{ color: textColor }}>
                       {player.number}
                     </span>
                   </div>
-                  <div className="text-[8px] text-gray-600 dark:text-gray-400 mt-0.5 text-center">
-                    {player.role}
-                  </div>
+                  {player.isLibero && (
+                    <div className="text-[8px] text-blue-600 dark:text-blue-400 mt-0.5 text-center font-bold">
+                      LIB
+                    </div>
+                  )}
+                  {player.isCaptain && (
+                    <div className="text-[8px] text-yellow-600 dark:text-yellow-400 mt-0.5 text-center font-bold">
+                      CAP
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -234,28 +241,28 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
 
   return (
     <div className="max-w-full">
-      <div className="flex flex-col sm:flex-row max-w-6xl mx-auto gap-4">
+      <div className="flex flex-row gap-1 sm:gap-4">
         {/* Équipe A (gauche) */}
         <div className="flex-1">
-          <div className="mb-3 flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
+          <div className="mb-1 sm:mb-3 flex items-center justify-between px-0.5 sm:px-1">
+            <div className="flex items-center gap-1 sm:gap-2">
               <div
-                className="w-4 h-4 rounded-full shadow"
+                className="w-3 h-3 sm:w-4 sm:h-4 rounded-full shadow"
                 style={{ backgroundColor: teamA.colorPrimary }}
               ></div>
-              <span className="font-semibold text-sm">{teamA.name}</span>
+              <span className="font-semibold text-[10px] sm:text-sm truncate max-w-[60px] sm:max-w-none">{teamA.name}</span>
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-0.5 sm:gap-1">
               <button
                 onClick={() => onRotateA('counter')}
-                className="px-2 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors text-sm font-bold"
+                className="px-1 sm:px-2 py-0.5 sm:py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors text-xs sm:text-sm font-bold"
                 title="Rotation anti-horaire"
               >
                 ↺
               </button>
               <button
                 onClick={() => onRotateA('clockwise')}
-                className="px-2 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors text-sm font-bold"
+                className="px-1 sm:px-2 py-0.5 sm:py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors text-xs sm:text-sm font-bold"
                 title="Rotation horaire"
               >
                 ↻
@@ -263,10 +270,10 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1 sm:gap-2">
             {/* Colonne arrière gauche */}
-            <div className="space-y-2">
-              <div className="text-[9px] sm:text-[10px] text-center font-bold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 py-1 rounded">
+            <div className="space-y-1 sm:space-y-2">
+              <div className="text-[7px] sm:text-[10px] text-center font-bold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 py-0.5 sm:py-1 rounded">
                 ARRIÈRE
               </div>
               {renderPlayer('A', 'P5')}
@@ -275,8 +282,8 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
             </div>
 
             {/* Colonne avant gauche (près du filet) */}
-            <div className="space-y-2">
-              <div className="text-[9px] sm:text-[10px] text-center font-bold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 py-1 rounded">
+            <div className="space-y-1 sm:space-y-2">
+              <div className="text-[7px] sm:text-[10px] text-center font-bold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 py-0.5 sm:py-1 rounded">
                 AVANT
               </div>
               {renderPlayer('A', 'P4')}
@@ -289,37 +296,34 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
           {renderBench('A')}
         </div>
 
-        {/* Filet vertical */}
-        <div className="h-1 sm:h-auto sm:w-3 bg-gradient-to-r sm:bg-gradient-to-b from-gray-300 via-gray-400 to-gray-300 dark:from-gray-600 dark:via-gray-500 dark:to-gray-600 rounded-full flex-shrink-0 shadow-lg relative sm:my-0 my-3">
+        {/* Filet vertical - réduit sur mobile */}
+        <div className="w-0.5 sm:w-3 bg-gradient-to-b from-gray-300 via-gray-400 to-gray-300 dark:from-gray-600 dark:via-gray-500 dark:to-gray-600 flex-shrink-0 shadow-lg relative">
           <div className="hidden sm:block absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 px-2 py-1 rounded text-[10px] font-bold whitespace-nowrap -rotate-90 shadow border border-gray-300 dark:border-gray-600">
-            FILET
-          </div>
-          <div className="sm:hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 px-2 py-1 rounded text-[10px] font-bold whitespace-nowrap shadow border border-gray-300 dark:border-gray-600">
             FILET
           </div>
         </div>
 
         {/* Équipe B (droite) */}
         <div className="flex-1">
-          <div className="mb-3 flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
+          <div className="mb-1 sm:mb-3 flex items-center justify-between px-0.5 sm:px-1">
+            <div className="flex items-center gap-1 sm:gap-2">
               <div
-                className="w-4 h-4 rounded-full shadow"
+                className="w-3 h-3 sm:w-4 sm:h-4 rounded-full shadow"
                 style={{ backgroundColor: teamB.colorPrimary }}
               ></div>
-              <span className="font-semibold text-sm">{teamB.name}</span>
+              <span className="font-semibold text-[10px] sm:text-sm truncate max-w-[60px] sm:max-w-none">{teamB.name}</span>
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-0.5 sm:gap-1">
               <button
                 onClick={() => onRotateB('counter')}
-                className="px-2 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors text-sm font-bold"
+                className="px-1 sm:px-2 py-0.5 sm:py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors text-xs sm:text-sm font-bold"
                 title="Rotation anti-horaire"
               >
                 ↺
               </button>
               <button
                 onClick={() => onRotateB('clockwise')}
-                className="px-2 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors text-sm font-bold"
+                className="px-1 sm:px-2 py-0.5 sm:py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors text-xs sm:text-sm font-bold"
                 title="Rotation horaire"
               >
                 ↻
@@ -327,10 +331,10 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1 sm:gap-2">
             {/* Colonne avant droite (près du filet) */}
-            <div className="space-y-2">
-              <div className="text-[9px] sm:text-[10px] text-center font-bold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 py-1 rounded">
+            <div className="space-y-1 sm:space-y-2">
+              <div className="text-[7px] sm:text-[10px] text-center font-bold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 py-0.5 sm:py-1 rounded">
                 AVANT
               </div>
               {renderPlayer('B', 'P2')}
@@ -339,8 +343,8 @@ const CourtDisplay: React.FC<CourtDisplayProps> = ({
             </div>
 
             {/* Colonne arrière droite */}
-            <div className="space-y-2">
-              <div className="text-[9px] sm:text-[10px] text-center font-bold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 py-1 rounded">
+            <div className="space-y-1 sm:space-y-2">
+              <div className="text-[7px] sm:text-[10px] text-center font-bold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 py-0.5 sm:py-1 rounded">
                 ARRIÈRE
               </div>
               {renderPlayer('B', 'P1')}

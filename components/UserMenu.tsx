@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../stores/useAuthStore';
+import { supabase } from '../lib/supabaseClient';
 
-interface UserMenuProps {
-  onOpenAuth: () => void;
-}
-
-const UserMenu: React.FC<UserMenuProps> = ({ onOpenAuth }) => {
-  const { user, profile, signOut } = useAuth();
+const UserMenu: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, profile, isAuthenticated, clearAuth } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -31,12 +30,10 @@ const UserMenu: React.FC<UserMenuProps> = ({ onOpenAuth }) => {
     switch (role) {
       case 'admin':
         return 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400';
-      case 'board':
-        return 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400';
       case 'entraineur':
-        return 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100';
-      case 'joueur':
-        return 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400';
+        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400';
+      case 'user':
+        return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400';
       default:
         return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400';
     }
@@ -45,22 +42,20 @@ const UserMenu: React.FC<UserMenuProps> = ({ onOpenAuth }) => {
   const getRoleLabel = (role: string) => {
     switch (role) {
       case 'admin':
-        return 'Administrateur';
-      case 'board':
-        return 'Bureau';
+        return 'Admin';
       case 'entraineur':
         return 'Entraîneur';
-      case 'joueur':
-        return 'Joueur';
+      case 'user':
+        return 'User';
       default:
-        return 'Public';
+        return 'User';
     }
   };
 
-  if (!user || !profile) {
+  if (!isAuthenticated()) {
     return (
       <button
-        onClick={onOpenAuth}
+        onClick={() => navigate('/login')}
         className="flex items-center gap-2 px-4 py-2 rounded-lg bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary hover:opacity-90 transition-opacity font-medium"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -114,8 +109,10 @@ const UserMenu: React.FC<UserMenuProps> = ({ onOpenAuth }) => {
 
           <button
             onClick={async () => {
-              await signOut();
+              await supabase.auth.signOut();
+              clearAuth();
               setIsOpen(false);
+              navigate('/team');
             }}
             className="w-full text-left px-4 py-3 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
           >

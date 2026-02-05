@@ -1,0 +1,29 @@
+{
+  "name": "mcp-server-veec",
+  "version": "1.0.0",
+  "description": "MCP Server pour accéder aux données VEEC via Supabase",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "supabase",
+    "veec",
+    "volleyball"
+  ],
+  "author": "VEEC",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  }
+}
