@@ -10,6 +10,7 @@ interface TeamViewProps {
 }
 
 const TeamCard: React.FC<{ team: TeamWithChampionships; onNavigate?: (page: 'matches' | 'position' | 'admin' | 'training', teamId?: string, adminSection?: string) => void }> = ({ team, onNavigate }) => {
+  const navigate = useNavigate();
   const [showImageModal, setShowImageModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
