@@ -29,21 +29,52 @@ const PositionTracker: React.FC<PositionTrackerProps> = ({ selectedTeamId: propS
 
   const { teams, loading: loadingTeams, error: errorTeams } = useTeams();
 
-  // Stabiliser la référence du tableau teamIds pour éviter les boucles infinies
-  const teamIds = useMemo(() => {
-    return selectedTeamId ? [selectedTeamId] : undefined;
-  }, [selectedTeamId]);
-
   const { matches, loading: loadingMatches, error: errorMatches } = useMatches(
     selectedDate,
     undefined,
-    teamIds
+    undefined
   );
 
-  // Filtrer les matchs sans score
+  // Normalisation (même logique que MatchSchedule)
+  const normalizeString = (str: string | undefined): string => {
+    if (!str) return '';
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\u00A0/g, ' ')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/[\u2018\u2019\u201A\u201B']/g, "'")
+      .toUpperCase();
+  };
+
+  // Filtrer les matchs sans score ET par équipe sélectionnée (même logique que MatchSchedule)
   const availableMatches = useMemo(() => {
-    return matches.filter(match => !match.Set || match.Set.trim() === '');
-  }, [matches]);
+    // Étape 1 : matchs valides (NOM_FFVB correspond à EQA ou EQB) et sans score
+    const validMatches = matches.filter(match => {
+      const hasNoScore = !match.Set || match.Set.trim() === '';
+      if (!hasNoScore) return false;
+      if (!match.NOM_FFVB) return false;
+      const normalizedNomFFVB = normalizeString(match.NOM_FFVB);
+      const normalizedEQA = normalizeString(match.EQA_nom);
+      const normalizedEQB = normalizeString(match.EQB_nom);
+      return normalizedNomFFVB === normalizedEQA || normalizedNomFFVB === normalizedEQB;
+    });
+
+    // Étape 2 : filtrer par équipe sélectionnée via NOM_FFVB des championnats
+    if (!selectedTeamId) return validMatches;
+
+    const selectedTeam = teams.find(t => t.IDEQUIPE === selectedTeamId);
+    const selectedTeamNames = selectedTeam
+      ? selectedTeam.championships.map(c => normalizeString(c.NOM_FFVB))
+      : [];
+
+    return validMatches.filter(match => {
+      const matchTeamName = normalizeString(match.NOM_FFVB);
+      return selectedTeamNames.includes(matchTeamName);
+    });
+  }, [matches, selectedTeamId, teams]);
 
   const handleMatchSelection = (match: Match) => {
     setSelectedMatch(match);

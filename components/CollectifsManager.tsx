@@ -205,7 +205,7 @@ const CollectifsManager: React.FC<CollectifsManagerProps> = ({ selectedTeamId })
           <option value="">-- Sélectionner une équipe --</option>
           {sortedTeams.map(team => (
             <option key={team.IDEQUIPE} value={team.IDEQUIPE} className="py-2">
-              {team.IDEQUIPE} - {team.NOM_FFVB}
+              {team.IDEQUIPE} - {team.NOM_EQUIPE || team.IDEQUIPE}
             </option>
           ))}
         </select>

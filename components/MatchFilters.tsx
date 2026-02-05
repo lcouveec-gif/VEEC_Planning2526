@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import type { Team } from '../types';
+import type { TeamWithChampionships } from '../types';
 
 interface MatchFiltersProps {
   startDate: string;
   endDate: string;
   selectedTeamIds: string[];
-  teams: Team[];
+  teams: TeamWithChampionships[];
   searchTerm: string;
   locationFilter: 'all' | 'home' | 'away';
   onStartDateChange: (date: string) => void;

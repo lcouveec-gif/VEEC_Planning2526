@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
-import type { Team, Match } from '../../types';
+import type { TeamWithChampionships, Match } from '../../types';
 
 interface MatchSelectionProps {
-  teams: Team[];
+  teams: TeamWithChampionships[];
   selectedTeamId: string;
   selectedDate: string;
   availableMatches: Match[];
@@ -46,7 +46,7 @@ const MatchSelection: React.FC<MatchSelectionProps> = ({
             <option value="">-- Sélectionner une équipe --</option>
             {sortedTeams.map((team) => (
               <option key={team.IDEQUIPE} value={team.IDEQUIPE}>
-                {team.IDEQUIPE} - {team.NOM_FFVB}
+                {team.IDEQUIPE} - {team.NOM_EQUIPE || team.IDEQUIPE}
               </option>
             ))}
           </select>
@@ -114,6 +114,22 @@ const MatchSelection: React.FC<MatchSelectionProps> = ({
                           {match.Salle && (
                             <div className="text-sm text-gray-500 dark:text-gray-500 mt-1">
                               📍 {match.Salle}
+                            </div>
+                          )}
+                          {match.championnat_obj?.nom_championnat && (
+                            <div className="text-sm text-gray-500 dark:text-gray-500 mt-1 flex items-center gap-1">
+                              🏆 {match.championnat_obj.nom_championnat}
+                              {match.championnat_obj.url_championnat && (
+                                <a
+                                  href={match.championnat_obj.url_championnat}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-light-primary dark:text-dark-primary hover:underline ml-1"
+                                >
+                                  ↗
+                                </a>
+                              )}
                             </div>
                           )}
                         </div>

@@ -2,22 +2,23 @@ import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTeams } from '../hooks/useTeams';
 import { useCollectifPlayers } from '../hooks/useCollectifPlayers';
+import type { TeamWithChampionships } from '../types';
 
 interface TeamViewProps {
   onNavigate?: (page: 'matches' | 'position' | 'admin' | 'training', teamId?: string, adminSection?: string) => void;
 }
 
-const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position' | 'admin' | 'training', teamId?: string, adminSection?: string) => void }> = ({ team, onNavigate }) => {
+const TeamCard: React.FC<{ team: TeamWithChampionships; onNavigate?: (page: 'matches' | 'position' | 'admin' | 'training', teamId?: string, adminSection?: string) => void }> = ({ team, onNavigate }) => {
   const [showImageModal, setShowImageModal] = useState(false);
-  const [showQRModal, setShowQRModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const { playerCount, loading: loadingCount } = useCollectifPlayers(team.IDEQUIPE);
 
-  const handleCalendarClick = (url: string | null) => {
+  const handleCalendarClick = (url: string | null | undefined) => {
     if (url) window.open(url, '_blank');
   };
 
-  const handlePouleClick = (url: string | null) => {
+  const handlePouleClick = (url: string | null | undefined) => {
     if (url) window.open(url, '_blank');
   };
 
@@ -53,7 +54,7 @@ const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position'
             >
               <img
                 src={team.image_url}
-                alt={team.NOM_FFVB}
+                alt={team.NOM_EQUIPE || team.IDEQUIPE}
                 className="w-20 h-20 object-cover rounded-lg border-2 border-gray-200 dark:border-gray-600"
               />
             </div>
@@ -64,45 +65,99 @@ const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position'
             <h3 className="text-2xl font-bold text-light-primary dark:text-dark-primary mb-1">
               {team.IDEQUIPE}
             </h3>
-            <p className="text-lg font-medium text-light-onSurface dark:text-dark-onSurface">
-              {team.NOM_FFVB}
-            </p>
+            {team.NOM_EQUIPE && (
+              <p className="text-lg font-medium text-light-onSurface dark:text-dark-onSurface">
+                {team.NOM_EQUIPE}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Championnat */}
-        {team.POULE_NOM && (
-          <div className="mb-3">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Championnat</p>
-            <p className="text-base font-medium text-light-onSurface dark:text-dark-onSurface">
-              {team.POULE_NOM}
+        {/* Liste des championnats */}
+        {team.championships.length > 0 && (
+          <div className="mb-4 space-y-3">
+            <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+              {team.championships.length} championnat{team.championships.length > 1 ? 's' : ''}
             </p>
+            {team.championships.map((champ) => (
+              <div
+                key={`${champ.IDEQUIPE}-${champ.POULE_TEAM}`}
+                className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700"
+              >
+                {/* Nom du championnat */}
+                {champ.POULE_NOM && (
+                  <p className="text-sm font-medium text-light-onSurface dark:text-dark-onSurface mb-1">
+                    {champ.POULE_NOM}
+                  </p>
+                )}
+                {champ.NOM_FFVB && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    {champ.NOM_FFVB}
+                  </p>
+                )}
+
+                {/* Poule + liens */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {champ.POULE_TEAM && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePouleClick(champ.URL_FFVB);
+                      }}
+                      disabled={!champ.URL_FFVB}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                        champ.URL_FFVB
+                          ? 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 cursor-default'
+                      }`}
+                    >
+                      <span>{champ.POULE_TEAM}</span>
+                      {champ.URL_FFVB && (
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
+
+                  {/* Calendrier */}
+                  {champ.QRCODE_URL && (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCalendarClick(champ.QRCODE_URL);
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-light-primary/10 dark:bg-dark-primary/10 text-light-primary dark:text-dark-primary hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span>Calendrier</span>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowQRModal(champ.QRCODE_URL!);
+                        }}
+                        className="p-1 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                        title="Afficher QR Code"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                        </svg>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Poule */}
-        {team.POULE_TEAM && (
-          <div className="mb-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Poule</p>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePouleClick(team.URL_FFVB);
-              }}
-              disabled={!team.URL_FFVB}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                team.URL_FFVB
-                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 cursor-default'
-              }`}
-            >
-              <span>{team.POULE_TEAM}</span>
-              {team.URL_FFVB && (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              )}
-            </button>
+        {team.championships.length === 0 && (
+          <div className="mb-4 text-sm text-gray-500 dark:text-gray-400 italic">
+            Aucun championnat enregistré
           </div>
         )}
 
@@ -119,36 +174,6 @@ const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position'
             )}
           </span>
         </div>
-
-        {/* Actions rapides - Calendrier et QR Code */}
-        {team.NOM_CAL && team.QRCODE_URL && (
-          <div className="flex gap-2 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCalendarClick(team.QRCODE_URL);
-              }}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-light-primary dark:bg-dark-primary text-light-onPrimary dark:text-dark-onPrimary hover:opacity-90 transition-opacity text-sm font-medium"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span>Calendrier</span>
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowQRModal(true);
-              }}
-              className="px-3 py-2 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
-              title="Afficher QR Code"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-              </svg>
-            </button>
-          </div>
-        )}
 
         {/* Navigation vers autres sections */}
         <div className="grid grid-cols-4 gap-2">
@@ -229,19 +254,19 @@ const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position'
             </button>
             <img
               src={team.image_url}
-              alt={team.NOM_FFVB}
+              alt={team.NOM_EQUIPE || team.IDEQUIPE}
               className="rounded-lg max-w-full h-auto"
             />
-            <p className="text-center mt-4 text-white font-medium">{team.NOM_FFVB}</p>
+            <p className="text-center mt-4 text-white font-medium">{team.NOM_EQUIPE || team.IDEQUIPE}</p>
           </div>
         </div>
       )}
 
       {/* Modale pour le QR Code */}
-      {showQRModal && team.QRCODE_URL && (
+      {showQRModal && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowQRModal(false)}
+          onClick={() => setShowQRModal(null)}
         >
           <div
             className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full shadow-xl"
@@ -249,10 +274,10 @@ const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position'
           >
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-light-onSurface dark:text-dark-onSurface">
-                QR Code - {team.NOM_CAL}
+                QR Code - {team.IDEQUIPE}
               </h3>
               <button
-                onClick={() => setShowQRModal(false)}
+                onClick={() => setShowQRModal(null)}
                 className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -262,10 +287,10 @@ const TeamCard: React.FC<{ team: any; onNavigate?: (page: 'matches' | 'position'
             </div>
             <div className="flex flex-col items-center">
               <div className="p-4 bg-white rounded-lg">
-                <QRCodeSVG value={team.QRCODE_URL} size={200} />
+                <QRCodeSVG value={showQRModal} size={200} />
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-center break-all">
-                {team.QRCODE_URL}
+                {showQRModal}
               </p>
             </div>
           </div>
@@ -281,9 +306,13 @@ const TeamView: React.FC<TeamViewProps> = ({ onNavigate }) => {
 
   const filteredTeams = teams
     .filter(team =>
-      team.NOM_FFVB?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      team.NOM_CAL?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      team.POULE_NOM?.toLowerCase().includes(searchTerm.toLowerCase())
+      team.NOM_EQUIPE?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      team.IDEQUIPE?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      team.championships.some(c =>
+        c.NOM_FFVB?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.NOM_CAL?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.POULE_NOM?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
     )
     .sort((a, b) => (a.IDEQUIPE || '').localeCompare(b.IDEQUIPE || ''));
 

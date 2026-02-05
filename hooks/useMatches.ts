@@ -19,38 +19,47 @@ export function useMatches(startDate?: string, endDate?: string, teamIds?: strin
       setLoading(true);
       setError(null);
 
-      // Construction de la requête avec filtres
+      // Requête 1 : matchs
       let query = supabase
         .from('matches')
-        .select(`
-          *,
-          equipe:VEEC_Equipes_FFVB!matches_idequipe_fkey(*)
-        `)
+        .select('*')
         .order('Date', { ascending: true })
         .order('Heure', { ascending: true });
 
-      // Filtre par date de début
       if (startDate) {
         query = query.gte('Date', startDate);
       }
-
-      // Filtre par date de fin
       if (endDate) {
         query = query.lte('Date', endDate);
       }
-
-      // Filtre par équipes (multi-sélection)
       if (teamIds && teamIds.length > 0) {
         query = query.in('idequipe', teamIds);
       }
 
-      const { data, error: supabaseError } = await query;
+      const { data: matchesData, error: matchesError } = await query;
+      if (matchesError) throw matchesError;
 
-      if (supabaseError) {
-        throw supabaseError;
-      }
+      // Requête 2, 3 & 4 : équipes parent + inscriptions FFVB + championnats
+      const { data: teamsData } = await supabase.from('VEEC_Equipes').select('*');
+      const { data: champsData } = await supabase.from('VEEC_Equipes_FFVB').select('*');
+      const { data: championnatsData } = await supabase.from('championnat').select('*');
 
-      setMatches(data || []);
+      // Fusion : associer equipe, equipe_ffvb et championnat
+      const enriched: Match[] = (matchesData || []).map(m => {
+        const equipe_ffvb = (champsData || []).find(c => c.IDEQUIPE === m.idequipe && c.NOM_FFVB === m.NOM_FFVB) || undefined;
+        // Lien direct : match.POULE_TEAM = championnat.code_championnat
+        const championnat_obj = m.POULE_TEAM
+          ? (championnatsData || []).find((ch: any) => ch.code_championnat === m.POULE_TEAM) || undefined
+          : undefined;
+        return {
+          ...m,
+          equipe: (teamsData || []).find(t => t.IDEQUIPE === m.idequipe) || undefined,
+          equipe_ffvb,
+          championnat_obj,
+        };
+      });
+
+      setMatches(enriched);
     } catch (err: any) {
       console.error('Error fetching matches:', err);
       setError(err.message || 'Une erreur est survenue lors du chargement des matchs.');

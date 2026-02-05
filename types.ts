@@ -10,17 +10,41 @@ export interface TrainingSession {
   endTime: string; // "HH:mm"
 }
 
+// Table VEEC_Equipes (équipe parent)
 export interface Team {
   IDEQUIPE: string;
+  NOM_EQUIPE?: string;
+  image_url?: string;
+  scorenco_url?: string;
+}
+
+// Table VEEC_Equipes_FFVB (inscription à un championnat)
+export interface TeamFFVB {
+  IDEQUIPE: string;
+  POULE_TEAM: string; // Partie de la clé composite
   URL_FFVB?: string;
-  NOM_FFVB: string;
+  NOM_FFVB?: string;
   NOM_CAL?: string;
-  POULE_TEAM?: string;
-  POULE_NOM?: string; // Nom du championnat/poule
   CURL_TEAM?: string;
   CALDAV_URL?: string;
   QRCODE_URL?: string;
-  image_url?: string; // URL de l'image stockée dans Supabase Storage
+  POULE_NOM?: string;
+  image_url?: string;
+  scorenco_url?: string;
+}
+
+// Équipe avec ses championnats (vue combinée)
+export interface TeamWithChampionships extends Team {
+  championships: TeamFFVB[];
+}
+
+// Table championnat (référentiel des championnats)
+export interface Championnat {
+  id: number;
+  created_at?: string;
+  code_championnat: string;
+  nom_championnat?: string;
+  url_championnat?: string;
 }
 
 export interface Match {
@@ -46,9 +70,15 @@ export interface Match {
   Arb1?: string;
   Arb2?: string;
   Championnat?: string;
+  Competition?: string;
+  Domicile_Exterieur?: string;
+  Equipe_1?: string;
+  Equipe_2?: string;
   created_at?: string;
   updated_at?: string;
-  equipe?: Team; // Relation avec la table VEEC_Equipes_FFVB
+  equipe?: Team; // Relation avec la table VEEC_Equipes
+  equipe_ffvb?: TeamFFVB; // Relation avec la table VEEC_Equipes_FFVB
+  championnat_obj?: Championnat; // Relation avec la table championnat (via equipe_ffvb.POULE_TEAM = code_championnat)
 }
 
 // Types pour la fonctionnalité Position
