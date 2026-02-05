@@ -6,30 +6,53 @@ import { useChampionnats } from '../hooks/useChampionnats';
 import type { Team, TeamFFVB, TeamWithChampionships, Championnat } from '../types';
 
 type ViewMode = 'list' | 'edit' | 'create';
+type TabMode = 'equipes' | 'championnats';
+
+const emptyTeamForm: Partial<Team> = {
+  IDEQUIPE: '',
+  NOM_EQUIPE: '',
+  image_url: '',
+  scorenco_url: '',
+};
+
+const emptyChampForm: Partial<TeamFFVB> = {
+  IDEQUIPE: '',
+  POULE_TEAM: '',
+  NOM_FFVB: '',
+  NOM_CAL: '',
+  POULE_NOM: '',
+  URL_FFVB: '',
+  CURL_TEAM: '',
+  CALDAV_URL: '',
+  QRCODE_URL: '',
+    scorenco_url: '',
+};
 
 const TeamsManager: React.FC = () => {
-  const { teams, loading, error, createTeam, updateTeam, deleteTeam, refetch } = useTeams();
+  const {
+    teams, loading, error,
+    createTeam, updateTeam, deleteTeam,
+    createChampionship, updateChampionship, deleteChampionship,
+    refetch,
+  } = useTeams();
   const { uploading, error: imageError, uploadTeamImage, deleteTeamImage } = useTeamImage();
+  const {
+    championnats,
+    loading: loadingChampionnats,
+    error: errorChampionnats,
+    createChampionnat,
+    updateChampionnat,
+    deleteChampionnat,
+    refetch: refetchChampionnats,
+  } = useChampionnats();
+
+  const [tabMode, setTabMode] = useState<TabMode>('equipes');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [editingTeam, setEditingTeam] = useState<TeamWithChampionships | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [saving, setSaving] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-
-  // Formulaire
-  const [formData, setFormData] = useState<Partial<Team>>({
-    IDEQUIPE: '',
-    NOM_FFVB: '',
-    NOM_CAL: '',
-    POULE_TEAM: '',
-    POULE_NOM: '',
-    URL_FFVB: '',
-    CURL_TEAM: '',
-    CALDAV_URL: '',
-    QRCODE_URL: '',
-    image_url: '',
-  });
   const [showQRCode, setShowQRCode] = useState<string | null>(null);
 
   // Formulaire équipe parent
@@ -147,14 +170,7 @@ const TeamsManager: React.FC = () => {
     setEditingTeam(team);
     setFormData({
       IDEQUIPE: team.IDEQUIPE || '',
-      NOM_FFVB: team.NOM_FFVB || '',
-      NOM_CAL: team.NOM_CAL || '',
-      POULE_TEAM: team.POULE_TEAM || '',
-      POULE_NOM: team.POULE_NOM || '',
-      URL_FFVB: team.URL_FFVB || '',
-      CURL_TEAM: team.CURL_TEAM || '',
-      CALDAV_URL: team.CALDAV_URL || '',
-      QRCODE_URL: team.QRCODE_URL || '',
+      NOM_EQUIPE: team.NOM_EQUIPE || '',
       image_url: team.image_url || '',
       scorenco_url: team.scorenco_url || '',
     });
@@ -167,18 +183,7 @@ const TeamsManager: React.FC = () => {
 
   const handleCreate = () => {
     setEditingTeam(null);
-    setFormData({
-      IDEQUIPE: '',
-      NOM_FFVB: '',
-      NOM_CAL: '',
-      POULE_TEAM: '',
-      POULE_NOM: '',
-      URL_FFVB: '',
-      CURL_TEAM: '',
-      CALDAV_URL: '',
-      QRCODE_URL: '',
-      image_url: '',
-    });
+    setFormData({ ...emptyTeamForm });
     setSelectedImage(null);
     setImagePreview(null);
     setShowChampionshipForm(false);
@@ -941,53 +946,7 @@ const TeamsManager: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Image de l'equipe
             </label>
-            <input
-              type="url"
-              value={formData.CALDAV_URL || ''}
-              onChange={(e) => setFormData({ ...formData, CALDAV_URL: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary focus:border-transparent"
-              placeholder="https://..."
-            />
-          </div>
 
-          {/* QR Code URL */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              URL QR Code
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="url"
-                value={formData.QRCODE_URL || ''}
-                onChange={(e) => setFormData({ ...formData, QRCODE_URL: e.target.value })}
-                className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-light-primary dark:focus:ring-dark-primary focus:border-transparent"
-                placeholder="https://..."
-              />
-              {formData.QRCODE_URL && (
-                <button
-                  type="button"
-                  onClick={() => handleCalendarClick(formData.QRCODE_URL)}
-                  className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
-                >
-                  Ouvrir
-                </button>
-              )}
-            </div>
-            {formData.QRCODE_URL && (
-              <div className="mt-3 p-4 bg-white rounded-lg border border-gray-200 dark:border-gray-600 inline-block">
-                <QRCodeSVG value={formData.QRCODE_URL} size={128} />
-                <p className="text-xs text-gray-500 mt-2 text-center">Aperçu du QR Code</p>
-              </div>
-            )}
-          </div>
-
-          {/* Image d'équipe */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Image de l'équipe
-            </label>
-
-            {/* Affichage de l'image existante ou du preview */}
             {imagePreview && (
               <div className="mb-3 relative inline-block">
                 <img
