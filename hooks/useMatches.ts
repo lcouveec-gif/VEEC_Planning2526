@@ -75,10 +75,9 @@ export function useMatches(startDate?: string, endDate?: string, teamIds?: strin
   }, [startDate, endDate, JSON.stringify(teamIds)]);
 
   return {
-    matches: query.data || [],
-    loading: query.isLoading,
-    isFetching: query.isFetching,
-    error: query.error?.message || null,
-    refetch: query.refetch,
+    matches,
+    loading,
+    error,
+    refetch: fetchMatches,
   };
 }
