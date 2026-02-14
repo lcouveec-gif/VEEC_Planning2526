@@ -92,6 +92,45 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
     return null;
   };
 
+  // Détecter si un match est un match plateau (heure 00:00)
+  const isPlateauMatch = (m: Match): boolean => {
+    if (!m.Heure) return false;
+    const time = m.Heure.match(/(\d{1,2}:\d{2})/);
+    return time ? time[1] === '0:00' || time[1] === '00:00' : false;
+  };
+
+  // Réordonner les matchs d'une journée pour placer les matchs plateau (00:00)
+  // juste après le match de la même équipe avec un vrai horaire
+  const sortMatchesWithPlateau = (dateMatches: Match[]): Match[] => {
+    const realMatches = dateMatches.filter(m => !isPlateauMatch(m));
+    const plateauMatches = dateMatches.filter(m => isPlateauMatch(m));
+
+    if (plateauMatches.length === 0) return dateMatches;
+
+    const result: Match[] = [];
+    const usedPlateau = new Set<string>();
+
+    for (const match of realMatches) {
+      result.push(match);
+      // Ajouter les matchs plateau de la même équipe juste après
+      for (const pm of plateauMatches) {
+        if (!usedPlateau.has(pm.id) && pm.idequipe === match.idequipe) {
+          result.push(pm);
+          usedPlateau.add(pm.id);
+        }
+      }
+    }
+
+    // Ajouter les matchs plateau restants (sans match "ancre" trouvé)
+    for (const pm of plateauMatches) {
+      if (!usedPlateau.has(pm.id)) {
+        result.push(pm);
+      }
+    }
+
+    return result;
+  };
+
   const groupMatchesByDate = (matches: Match[]) => {
     const grouped: { [key: string]: Match[] } = {};
     matches.forEach((match) => {
@@ -106,6 +145,12 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
       }
       grouped[dateKey].push(match);
     });
+
+    // Réordonner chaque groupe pour positionner les matchs plateau
+    for (const dateKey of Object.keys(grouped)) {
+      grouped[dateKey] = sortMatchesWithPlateau(grouped[dateKey]);
+    }
+
     return grouped;
   };
 
@@ -175,6 +220,12 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
                       <span className="text-base sm:text-lg font-semibold text-light-primary dark:text-dark-primary">
                         {formatTime(match.Heure)}
                       </span>
+                      {/* Nom de l'équipe VEEC */}
+                      {match.equipe && (
+                        <span className="px-2 py-0.5 rounded-md text-sm sm:text-base font-bold bg-light-primary/15 dark:bg-dark-primary/15 text-light-primary dark:text-dark-primary">
+                          {match.equipe.NOM_EQUIPE || match.equipe.IDEQUIPE}
+                        </span>
+                      )}
                       {/* Nom du championnat - visible uniquement sur desktop */}
                       {match.championnat_obj?.nom_championnat && (
                         match.championnat_obj.url_championnat ? (
@@ -265,51 +316,43 @@ const MatchList: React.FC<MatchListProps> = ({ matches }) => {
                     )}
                   </div>
 
-                  {/* Ligne 3: Détail des sets */}
-                  {match.Score && (
-                    <div className="flex items-center gap-2 text-xs sm:text-sm">
-                      <span className="text-gray-600 dark:text-gray-400 font-medium">Sets:</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {match.Score.split(/[\s,]+/).filter(s => s.trim()).map((setScore, idx) => {
-                          const setDetail = parseSetDetail(setScore);
-                          let setWinner: 'A' | 'B' | null = null;
-                          if (setDetail) {
-                            setWinner = setDetail.scoreA > setDetail.scoreB ? 'A' : 'B';
-                          }
+                  {/* Ligne 3: Détail des sets + Salle */}
+                  {(match.Score || match.Salle) && (
+                    <div className="flex items-center justify-between gap-2 text-xs sm:text-sm">
+                      {match.Score ? (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-gray-600 dark:text-gray-400 font-medium">Sets:</span>
+                          {match.Score.split(/[\s,]+/).filter(s => s.trim()).map((setScore, idx) => {
+                            const setDetail = parseSetDetail(setScore);
+                            let setWinner: 'A' | 'B' | null = null;
+                            if (setDetail) {
+                              setWinner = setDetail.scoreA > setDetail.scoreB ? 'A' : 'B';
+                            }
 
-                          // Déterminer la couleur du set basé sur NOM_FFVB
-                          let colorClass = 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
-                          if (setWinner && match.NOM_FFVB && (isTeamA || isTeamB)) {
-                            const teamWonSet = (setWinner === 'A' && isTeamA) || (setWinner === 'B' && isTeamB);
-                            colorClass = teamWonSet
-                              ? 'bg-veec-green/20 text-veec-green border border-veec-green/40 font-semibold'
-                              : 'bg-veec-red/20 text-veec-red border border-veec-red/40 font-semibold';
-                          }
+                            let colorClass = 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
+                            if (setWinner && match.NOM_FFVB && (isTeamA || isTeamB)) {
+                              const teamWonSet = (setWinner === 'A' && isTeamA) || (setWinner === 'B' && isTeamB);
+                              colorClass = teamWonSet
+                                ? 'bg-veec-green text-white font-semibold'
+                                : 'bg-veec-red text-white font-semibold';
+                            }
 
-                          return (
-                            <span
-                              key={idx}
-                              className={`px-2 py-0.5 rounded text-xs font-mono ${colorClass}`}
-                            >
-                              {setScore}
-                            </span>
-                          );
-                        })}
-                      </div>
+                            return (
+                              <span
+                                key={idx}
+                                className={`px-2 py-0.5 rounded text-xs font-mono ${colorClass}`}
+                              >
+                                {setScore}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                      {match.Salle && (
+                        <span className="text-gray-600 dark:text-gray-400 shrink-0">📍 {match.Salle}</span>
+                      )}
                     </div>
                   )}
-
-                  {/* Ligne 4: Infos équipe et salle */}
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                    {match.equipe?.IDEQUIPE && (
-                      <span className="font-medium text-light-primary dark:text-dark-primary">
-                        {match.equipe.IDEQUIPE}
-                      </span>
-                    )}
-                    {match.Salle && (
-                      <span>📍 {match.Salle}</span>
-                    )}
-                  </div>
 
                   {/* Ligne 5: Arbitres */}
                   {(match.Arb1 || match.Arb2) && (

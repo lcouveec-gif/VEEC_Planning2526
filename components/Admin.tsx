@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuthStore } from '../stores/useAuthStore';
-import CollectifsManager from './CollectifsManager';
 import TeamsManager from './TeamsManager';
 import WebhookManager from './Admin/WebhookManager';
 import LLMConfig from './Admin/LLMConfig';
@@ -9,21 +8,30 @@ import PermissionsManager from './Admin/PermissionsManager';
 import LinksManager from './Admin/LinksManager';
 import ClubsManager from './Admin/ClubsManager';
 import GymnasesManager from './Admin/GymnasesManager';
+import EffectifsManager from './Admin/EffectifsManager';
 
-type AdminSection = 'menu' | 'teams' | 'collectifs' | 'planning' | 'automation' | 'permissions' | 'links' | 'clubs' | 'gymnases';
+type AdminSection = 'menu' | 'teams' | 'effectifs' | 'planning' | 'automation' | 'permissions' | 'links' | 'clubs' | 'gymnases';
 
 const Admin: React.FC = () => {
   const { section: initialSection, teamId: selectedTeamId } = useParams<{ section?: string; teamId?: string }>();
   const profile = useAuthStore((state) => state.profile);
   const isAdmin = profile?.role === 'admin';
-  const [currentSection, setCurrentSection] = useState<AdminSection>(
-    (initialSection as AdminSection) || 'menu'
-  );
+
+  // Rétrocompatibilité : rediriger les anciennes sections vers effectifs
+  const mapSection = (s?: string): AdminSection => {
+    if (s === 'collectifs' || s === 'licencies') return 'effectifs';
+    return (s as AdminSection) || 'menu';
+  };
+
+  const [currentSection, setCurrentSection] = useState<AdminSection>(mapSection(initialSection));
 
   // Pré-sélectionner la section si initialSection est fourni
   useEffect(() => {
-    if (initialSection && initialSection !== currentSection) {
-      setCurrentSection(initialSection as AdminSection);
+    if (initialSection) {
+      const mapped = mapSection(initialSection);
+      if (mapped !== currentSection) {
+        setCurrentSection(mapped);
+      }
     }
   }, [initialSection, currentSection]);
 
@@ -59,6 +67,34 @@ const Admin: React.FC = () => {
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Gérer les équipes du club et leurs informations
+          </p>
+        </button>
+
+        {/* Carte Effectifs (Licenciés + Collectifs) */}
+        <button
+          onClick={() => setCurrentSection('effectifs')}
+          className="bg-light-surface dark:bg-dark-surface rounded-lg p-6 shadow-md hover:shadow-lg transition-all border-2 border-transparent hover:border-light-primary dark:hover:border-dark-primary text-left group"
+        >
+          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mb-4 group-hover:scale-110 transition-transform">
+            <svg
+              className="w-8 h-8 text-green-600 dark:text-green-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+              />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-light-onSurface dark:text-dark-onSurface mb-2">
+            Effectifs
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Licenciés et collectifs du club
           </p>
         </button>
 
@@ -149,34 +185,6 @@ const Admin: React.FC = () => {
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Gérer les gymnases et leurs adresses
-          </p>
-        </button>
-
-        {/* Carte Gestion des collectifs */}
-        <button
-          onClick={() => setCurrentSection('collectifs')}
-          className="bg-light-surface dark:bg-dark-surface rounded-lg p-6 shadow-md hover:shadow-lg transition-all border-2 border-transparent hover:border-light-primary dark:hover:border-dark-primary text-left group"
-        >
-          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mb-4 group-hover:scale-110 transition-transform">
-            <svg
-              className="w-8 h-8 text-green-600 dark:text-green-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-              />
-            </svg>
-          </div>
-          <h3 className="text-xl font-bold text-light-onSurface dark:text-dark-onSurface mb-2">
-            Gestion des collectifs
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Gérer les collectifs et leurs membres
           </p>
         </button>
 
@@ -289,7 +297,7 @@ const Admin: React.FC = () => {
           </div>
         );
 
-      case 'collectifs':
+      case 'effectifs':
         return (
           <div className="max-w-6xl mx-auto">
             <div className="mb-6 flex items-center gap-4">
@@ -300,10 +308,13 @@ const Admin: React.FC = () => {
                 ← Retour
               </button>
               <h2 className="text-2xl font-bold text-light-onSurface dark:text-dark-onSurface">
-                Gestion des collectifs
+                Effectifs
               </h2>
             </div>
-            <CollectifsManager selectedTeamId={selectedTeamId} />
+            <EffectifsManager
+              initialTab={initialSection === 'collectifs' ? 'collectifs' : 'licencies'}
+              selectedTeamId={selectedTeamId}
+            />
           </div>
         );
 
