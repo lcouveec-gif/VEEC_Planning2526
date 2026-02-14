@@ -91,6 +91,7 @@ export interface Licencie {
   Nom_Licencie?: string;
   Prenom_Licencie: string;
   Num_Licencie?: string | number; // Peut être string ou number selon la DB
+  Date_Naissance_licencie?: string; // Date de naissance (YYYY-MM-DD)
   Categorie_licencie?: string; // Catégorie du licencié (minuscule comme dans la DB)
   created_at?: string;
 }
