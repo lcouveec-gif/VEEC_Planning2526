@@ -135,7 +135,55 @@ export interface Club {
   updated_at?: string;
 }
 
-// Types pour la gestion des gymnases
+// ─── Module Stage ──────────────────────────────────────────────────────────────
+
+export interface Stage {
+  id: string;
+  nom: string;
+  date_debut: string;          // YYYY-MM-DD
+  date_fin: string;            // YYYY-MM-DD
+  tarif_stage_interne?: number | null;
+  tarif_stage_externe?: number | null;
+  tarif_jour_interne?: number | null;
+  tarif_jour_externe?: number | null;
+  description?: string | null;
+  created_at?: string;
+}
+
+export type StageCategorie = 'M11' | 'M13' | 'M15' | 'M18' | 'Senior';
+export type StageGenre = 'Masculin' | 'Féminin';
+export type StageNiveau = 'Débutant' | 'Confirmé' | 'Expert';
+export type TypeInscription = 'stage_complet' | 'journee';
+export type TypeParticipant = 'interne' | 'externe';
+
+export interface StageInscription {
+  id: string;
+  stage_id: string;
+  // Infos stagiaire
+  nom?: string | null;
+  prenom: string;
+  categorie?: StageCategorie | null;
+  genre?: StageGenre | null;
+  niveau?: StageNiveau | null;
+  num_licence?: string | null;
+  // Infos inscription
+  type_inscription: TypeInscription;
+  type_participant: TypeParticipant;
+  jours?: string[] | null;  // Dates précises de présence (YYYY-MM-DD[])
+  nb_jours?: number | null; // Dérivé de jours.length (calculé automatiquement)
+  montant?: number | null;
+  notes?: string | null;
+  created_at?: string;
+}
+
+export interface ImportInscriptionResult {
+  created: number;
+  updated: number;
+  errors: string[];
+}
+
+// ─── Types pour la gestion des gymnases ───────────────────────────────────────
+
 export interface Gymnase {
   id: string; // UUID
   nom: string; // Nom du gymnase
