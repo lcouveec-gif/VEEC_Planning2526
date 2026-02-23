@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useStages } from '../../hooks/useStages';
 import { useStageInscriptions } from '../../hooks/useStageInscriptions';
+import { useStageEncadrants } from '../../hooks/useStageEncadrants';
 import { useLicencies } from '../../hooks/useLicencies';
 import type {
   Stage,
@@ -11,6 +12,7 @@ import type {
   TypeInscription,
   TypeParticipant,
   ImportInscriptionResult,
+  StageEncadrant,
   Licencie,
 } from '../../types';
 
@@ -178,6 +180,7 @@ const StagesManager: React.FC = () => {
         tarif_jour_interne: stageForm.tarif_jour_interne ?? null,
         tarif_jour_externe: stageForm.tarif_jour_externe ?? null,
         description: stageForm.description?.trim() || null,
+        gymnase: stageForm.gymnase?.trim() || 'David Douillet (Coupvray)',
       };
 
       if (viewMode === 'create-stage') {
@@ -418,7 +421,14 @@ const StageForm: React.FC<StageFormProps> = ({ form, setForm, saving, isEdit, st
               </div>
             </div>
           )}
-          <div className="md:col-span-2">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Gymnase</label>
+            <input type="text" value={form.gymnase ?? 'David Douillet (Coupvray)'}
+              onChange={(e) => setForm(f => ({ ...f, gymnase: e.target.value }))}
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="David Douillet (Coupvray)" />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
             <textarea rows={2} value={form.description || ''}
               onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
@@ -491,6 +501,9 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
   } = useStageInscriptions(stage.id);
 
   const { licencies } = useLicencies();
+  const {
+    encadrants, addEncadrant, updateJours: updateEncadrantJours, deleteEncadrant,
+  } = useStageEncadrants(stage.id);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResult, setImportResult] = useState<ImportInscriptionResult | null>(null);
@@ -878,6 +891,17 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
         ))}
       </div>
 
+      {/* Section Encadrants */}
+      <EncadrantsSection
+        stage={stage}
+        stageDates={stageDates}
+        encadrants={encadrants}
+        licencies={licencies}
+        onAdd={addEncadrant}
+        onUpdateJours={updateEncadrantJours}
+        onDelete={deleteEncadrant}
+      />
+
       {/* Barre d'actions */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
         <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
@@ -1050,6 +1074,166 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
           } : undefined}
           onClose={() => setModalOpen(false)}
         />
+      )}
+    </div>
+  );
+};
+
+// ─── Section Encadrants ────────────────────────────────────────────────────────
+
+interface EncadrantsSectionProps {
+  stage: Stage;
+  stageDates: string[];
+  encadrants: StageEncadrant[];
+  licencies: Licencie[];
+  onAdd: (licencieId: string, jours?: string[] | null) => Promise<StageEncadrant | null>;
+  onUpdateJours: (id: string, jours: string[] | null) => Promise<boolean>;
+  onDelete: (id: string) => Promise<boolean>;
+}
+
+const EncadrantsSection: React.FC<EncadrantsSectionProps> = ({
+  stageDates, encadrants, licencies, onAdd, onUpdateJours, onDelete,
+}) => {
+  const [open, setOpen] = useState(true);
+  const [addingId, setAddingId] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  const licenciesDispos = licencies.filter(
+    l => !encadrants.some(e => e.licencie_id === l.id)
+  );
+
+  const getLicencie = (licencieId: string) => licencies.find(l => l.id === licencieId);
+
+  const handleAdd = async () => {
+    if (!addingId) return;
+    setAdding(true);
+    // Par défaut : tous les jours
+    await onAdd(addingId, null);
+    setAddingId('');
+    setAdding(false);
+  };
+
+  const toggleJourEncadrant = async (enc: StageEncadrant, date: string) => {
+    const current = enc.jours ?? stageDates;
+    let next: string[];
+    if (current.includes(date)) {
+      next = current.filter(d => d !== date);
+    } else {
+      next = [...current, date].sort();
+    }
+    await onUpdateJours(enc.id, next.length > 0 ? next : null);
+  };
+
+  return (
+    <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      {/* En-tête section */}
+      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+        >
+          <svg className={`w-4 h-4 transition-transform ${open ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          Encadrants ({encadrants.length})
+        </button>
+        {open && (
+          <div className="flex items-center gap-2">
+            <select
+              value={addingId}
+              onChange={e => setAddingId(e.target.value)}
+              className="px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface text-xs focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            >
+              <option value="">— Ajouter encadrant —</option>
+              {licenciesDispos
+                .sort((a, b) => (a.Nom_Licencie || '').localeCompare(b.Nom_Licencie || ''))
+                .map(l => (
+                  <option key={l.id} value={l.id}>
+                    {l.Nom_Licencie} {l.Prenom_Licencie}
+                  </option>
+                ))}
+            </select>
+            <button
+              onClick={handleAdd}
+              disabled={!addingId || adding}
+              className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 text-xs font-medium transition-colors"
+            >
+              + Ajouter
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Tableau des encadrants */}
+      {open && (
+        <div className="overflow-x-auto">
+          {encadrants.length === 0 ? (
+            <div className="text-center py-6 text-gray-400 dark:text-gray-500 text-sm">
+              Aucun encadrant associé à ce stage
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-gray-500 dark:text-gray-400">
+                  <th className="px-4 py-2 font-medium">Nom</th>
+                  {stageDates.map(d => (
+                    <th key={d} className="px-2 py-2 font-medium text-center whitespace-nowrap">
+                      {formatDateShort(d)}
+                    </th>
+                  ))}
+                  <th className="px-2 py-2 w-8"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {encadrants.map(enc => {
+                  const lic = getLicencie(enc.licencie_id);
+                  const joursEnc = enc.jours ?? stageDates;
+                  return (
+                    <tr key={enc.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <td className="px-4 py-2 font-medium text-light-onSurface dark:text-dark-onSurface whitespace-nowrap">
+                        {lic ? `${lic.Nom_Licencie || ''} ${lic.Prenom_Licencie}` : '—'}
+                        {enc.jours === null && (
+                          <span className="ml-2 text-xs text-gray-400">(tous)</span>
+                        )}
+                      </td>
+                      {stageDates.map(d => {
+                        const isPresent = joursEnc.includes(d);
+                        return (
+                          <td key={d} className="px-2 py-2 text-center">
+                            <button
+                              onClick={() => toggleJourEncadrant(enc, d)}
+                              className={`w-6 h-6 rounded border-2 flex items-center justify-center mx-auto transition-all ${
+                                isPresent
+                                  ? 'bg-indigo-600 border-indigo-600 text-white'
+                                  : 'border-gray-300 dark:border-gray-600 text-transparent hover:border-indigo-400'
+                              }`}
+                            >
+                              {isPresent && (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
+                          </td>
+                        );
+                      })}
+                      <td className="px-2 py-2">
+                        <button
+                          onClick={() => { if (window.confirm(`Retirer cet encadrant du stage ?`)) onDelete(enc.id); }}
+                          className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
     </div>
   );

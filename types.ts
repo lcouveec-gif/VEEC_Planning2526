@@ -147,6 +147,7 @@ export interface Stage {
   tarif_jour_interne?: number | null;
   tarif_jour_externe?: number | null;
   description?: string | null;
+  gymnase?: string | null;
   created_at?: string;
 }
 
@@ -180,6 +181,39 @@ export interface ImportInscriptionResult {
   created: number;
   updated: number;
   errors: string[];
+}
+
+export interface StagePresence {
+  id: string;
+  stage_id: string;
+  inscription_id: string;
+  date: string;           // YYYY-MM-DD
+  present: boolean;
+  created_at?: string;
+}
+
+export interface StageGroupe {
+  id: string;
+  stage_id: string;
+  date: string;           // YYYY-MM-DD
+  nom: string;
+  terrain?: string | null;
+  created_at?: string;
+}
+
+export interface StageGroupeMembre {
+  id: string;
+  groupe_id: string;
+  inscription_id: string;
+  created_at?: string;
+}
+
+export interface StageEncadrant {
+  id: string;
+  stage_id: string;
+  licencie_id: string;
+  jours?: string[] | null;  // null = tous les jours du stage
+  created_at?: string;
 }
 
 // ─── Types pour la gestion des gymnases ───────────────────────────────────────

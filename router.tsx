@@ -15,6 +15,7 @@ import TrainingPage from './pages/TrainingPage';
 import LoginPage from './pages/LoginPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import LinksPage from './pages/LinksPage';
+import StagePage from './pages/StagePage';
 
 export const router = createBrowserRouter([
   {
@@ -94,6 +95,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['admin', 'entraineur']}>
             <Referee />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'stage',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'entraineur', 'user']}>
+            <StagePage />
           </ProtectedRoute>
         )
       },
