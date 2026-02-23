@@ -9,8 +9,9 @@ import LinksManager from './Admin/LinksManager';
 import ClubsManager from './Admin/ClubsManager';
 import GymnasesManager from './Admin/GymnasesManager';
 import EffectifsManager from './Admin/EffectifsManager';
+import StagesManager from './Admin/StagesManager';
 
-type AdminSection = 'menu' | 'teams' | 'effectifs' | 'planning' | 'automation' | 'permissions' | 'links' | 'clubs' | 'gymnases';
+type AdminSection = 'menu' | 'teams' | 'effectifs' | 'stages' | 'planning' | 'automation' | 'permissions' | 'links' | 'clubs' | 'gymnases';
 
 const Admin: React.FC = () => {
   const { section: initialSection, teamId: selectedTeamId } = useParams<{ section?: string; teamId?: string }>();
@@ -95,6 +96,34 @@ const Admin: React.FC = () => {
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Licenciés et collectifs du club
+          </p>
+        </button>
+
+        {/* Carte Stages */}
+        <button
+          onClick={() => setCurrentSection('stages')}
+          className="bg-light-surface dark:bg-dark-surface rounded-lg p-6 shadow-md hover:shadow-lg transition-all border-2 border-transparent hover:border-light-primary dark:hover:border-dark-primary text-left group"
+        >
+          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-900/30 mb-4 group-hover:scale-110 transition-transform">
+            <svg
+              className="w-8 h-8 text-indigo-600 dark:text-indigo-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"
+              />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-light-onSurface dark:text-dark-onSurface mb-2">
+            Stages
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Gérer les stages et les inscriptions
           </p>
         </button>
 
@@ -315,6 +344,24 @@ const Admin: React.FC = () => {
               initialTab={initialSection === 'collectifs' ? 'collectifs' : 'licencies'}
               selectedTeamId={selectedTeamId}
             />
+          </div>
+        );
+
+      case 'stages':
+        return (
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-6 flex items-center gap-4">
+              <button
+                onClick={() => setCurrentSection('menu')}
+                className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+              >
+                ← Retour
+              </button>
+              <h2 className="text-2xl font-bold text-light-onSurface dark:text-dark-onSurface">
+                Stages
+              </h2>
+            </div>
+            <StagesManager />
           </div>
         );
 
