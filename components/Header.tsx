@@ -75,6 +75,7 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme }) => {
                    currentPage === 'team' ? 'Équipes' :
                    currentPage === 'links' ? 'Liens' :
                    currentPage === 'referee' ? 'Arbitre' :
+                   currentPage === 'stage' ? 'Stage' :
                    currentPage === 'ai' ? 'IA' :
                    'Admin'}
                 </span>
@@ -150,6 +151,16 @@ const Header: React.FC<HeaderProps> = ({ theme, toggleTheme }) => {
                     }`}
                   >
                     Arbitre
+                  </button>
+                  <button
+                    onClick={() => handlePageChange('/stage')}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors ${
+                      currentPage === 'stage'
+                        ? 'bg-gray-100 dark:bg-gray-700 text-black dark:text-white font-medium'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Stage
                   </button>
                   <button
                     onClick={() => handlePageChange('/ai')}
