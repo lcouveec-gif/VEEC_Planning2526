@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import type { StageGroupe, StageGroupeMembre } from '../types';
+import type { StageGroupe, StageGroupeMembre, StageGroupeEncadrant, RoleGroupeEncadrant } from '../types';
 
 interface UseStageGroupesResult {
   groupes: StageGroupe[];
   membres: StageGroupeMembre[];
+  groupeEncadrants: StageGroupeEncadrant[];
   loading: boolean;
   copying: boolean;
   error: string | null;
@@ -13,15 +14,18 @@ interface UseStageGroupesResult {
   updateGroupe: (id: string, updates: Partial<Pick<StageGroupe, 'nom' | 'terrain'>>) => Promise<boolean>;
   deleteGroupe: (id: string) => Promise<boolean>;
   setMembre: (groupeId: string, inscriptionId: string, assign: boolean) => Promise<boolean>;
+  setGroupeEncadrant: (groupeId: string, encadrantId: string, role: RoleGroupeEncadrant | null) => Promise<boolean>;
   copyFromDay: (sourceDate: string, targetDate: string) => Promise<boolean>;
   getGroupesForDate: (date: string) => StageGroupe[];
   getMembresForGroupe: (groupeId: string) => StageGroupeMembre[];
+  getEncadrantsForGroupe: (groupeId: string) => StageGroupeEncadrant[];
   getDatesWithGroupes: () => string[];
 }
 
 export function useStageGroupes(stageId: string): UseStageGroupesResult {
   const [groupes, setGroupes] = useState<StageGroupe[]>([]);
   const [membres, setMembres] = useState<StageGroupeMembre[]>([]);
+  const [groupeEncadrants, setGroupeEncadrants] = useState<StageGroupeEncadrant[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [copying, setCopying] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,18 +53,21 @@ export function useStageGroupes(stageId: string): UseStageGroupesResult {
       const groupesList: StageGroupe[] = groupesData || [];
       setGroupes(groupesList);
 
-      // Fetch membres pour ces groupes
+      // Fetch membres et encadrants pour ces groupes
       if (groupesList.length > 0) {
         const groupeIds = groupesList.map(g => g.id);
-        const { data: membresData, error: mErr } = await supabase
-          .from('stage_groupe_membres')
-          .select('*')
-          .in('groupe_id', groupeIds);
+        const [{ data: membresData, error: mErr }, { data: encData, error: encErr }] = await Promise.all([
+          supabase.from('stage_groupe_membres').select('*').in('groupe_id', groupeIds),
+          supabase.from('stage_groupe_encadrants').select('*').in('groupe_id', groupeIds),
+        ]);
 
         if (mErr) throw mErr;
+        if (encErr) throw encErr;
         setMembres(membresData || []);
+        setGroupeEncadrants(encData || []);
       } else {
         setMembres([]);
+        setGroupeEncadrants([]);
       }
     } catch (err: any) {
       console.error('Error fetching groupes:', err);
@@ -176,6 +183,44 @@ export function useStageGroupes(stageId: string): UseStageGroupesResult {
     }
   };
 
+  const setGroupeEncadrant = async (
+    groupeId: string,
+    encadrantId: string,
+    role: RoleGroupeEncadrant | null,
+  ): Promise<boolean> => {
+    try {
+      if (role === null) {
+        // Retirer l'encadrant du groupe
+        const { error: delErr } = await supabase
+          .from('stage_groupe_encadrants')
+          .delete()
+          .eq('groupe_id', groupeId)
+          .eq('encadrant_id', encadrantId);
+        if (delErr) throw delErr;
+        setGroupeEncadrants(prev =>
+          prev.filter(ge => !(ge.groupe_id === groupeId && ge.encadrant_id === encadrantId))
+        );
+      } else {
+        // Ajouter ou changer le rôle (upsert)
+        const { data, error: upsErr } = await supabase
+          .from('stage_groupe_encadrants')
+          .upsert({ groupe_id: groupeId, encadrant_id: encadrantId, role }, { onConflict: 'groupe_id,encadrant_id' })
+          .select()
+          .single();
+        if (upsErr) throw upsErr;
+        setGroupeEncadrants(prev => {
+          const filtered = prev.filter(ge => !(ge.groupe_id === groupeId && ge.encadrant_id === encadrantId));
+          return [...filtered, data];
+        });
+      }
+      return true;
+    } catch (err: any) {
+      console.error('Error setting groupe encadrant:', err);
+      setError(err.message || 'Erreur lors de la modification de l\'encadrant du groupe.');
+      return false;
+    }
+  };
+
   const copyFromDay = async (sourceDate: string, targetDate: string): Promise<boolean> => {
     const sourceGroupes = groupes.filter(g => g.date === sourceDate);
     if (sourceGroupes.length === 0) return true;
@@ -239,6 +284,9 @@ export function useStageGroupes(stageId: string): UseStageGroupesResult {
   const getMembresForGroupe = (groupeId: string): StageGroupeMembre[] =>
     membres.filter(m => m.groupe_id === groupeId);
 
+  const getEncadrantsForGroupe = (groupeId: string): StageGroupeEncadrant[] =>
+    groupeEncadrants.filter(ge => ge.groupe_id === groupeId);
+
   const getDatesWithGroupes = (): string[] =>
     [...new Set(groupes.map(g => g.date))].sort();
 
@@ -249,6 +297,7 @@ export function useStageGroupes(stageId: string): UseStageGroupesResult {
   return {
     groupes,
     membres,
+    groupeEncadrants,
     loading,
     copying,
     error,
@@ -257,9 +306,11 @@ export function useStageGroupes(stageId: string): UseStageGroupesResult {
     updateGroupe,
     deleteGroupe,
     setMembre,
+    setGroupeEncadrant,
     copyFromDay,
     getGroupesForDate,
     getMembresForGroupe,
+    getEncadrantsForGroupe,
     getDatesWithGroupes,
   };
 }

@@ -502,7 +502,7 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
 
   const { licencies } = useLicencies();
   const {
-    encadrants, addEncadrant, updateJours: updateEncadrantJours, deleteEncadrant,
+    encadrants, addEncadrant, updateJours: updateEncadrantJours, updateRoleStage, deleteEncadrant,
   } = useStageEncadrants(stage.id);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -899,6 +899,7 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
         licencies={licencies}
         onAdd={addEncadrant}
         onUpdateJours={updateEncadrantJours}
+        onUpdateRoleStage={updateRoleStage}
         onDelete={deleteEncadrant}
       />
 
@@ -1088,11 +1089,12 @@ interface EncadrantsSectionProps {
   licencies: Licencie[];
   onAdd: (licencieId: string, jours?: string[] | null) => Promise<StageEncadrant | null>;
   onUpdateJours: (id: string, jours: string[] | null) => Promise<boolean>;
+  onUpdateRoleStage: (id: string, role: 'responsable' | 'encadrant') => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
 }
 
 const EncadrantsSection: React.FC<EncadrantsSectionProps> = ({
-  stageDates, encadrants, licencies, onAdd, onUpdateJours, onDelete,
+  stageDates, encadrants, licencies, onAdd, onUpdateJours, onUpdateRoleStage, onDelete,
 }) => {
   const [open, setOpen] = useState(true);
   const [addingId, setAddingId] = useState('');
@@ -1176,6 +1178,7 @@ const EncadrantsSection: React.FC<EncadrantsSectionProps> = ({
               <thead>
                 <tr className="text-left text-xs text-gray-500 dark:text-gray-400">
                   <th className="px-4 py-2 font-medium">Nom</th>
+                  <th className="px-3 py-2 font-medium text-center whitespace-nowrap">Rôle stage</th>
                   {stageDates.map(d => (
                     <th key={d} className="px-2 py-2 font-medium text-center whitespace-nowrap">
                       {formatDateShort(d)}
@@ -1188,13 +1191,28 @@ const EncadrantsSection: React.FC<EncadrantsSectionProps> = ({
                 {encadrants.map(enc => {
                   const lic = getLicencie(enc.licencie_id);
                   const joursEnc = enc.jours ?? stageDates;
+                  const isResponsable = enc.role_stage === 'responsable';
                   return (
                     <tr key={enc.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                       <td className="px-4 py-2 font-medium text-light-onSurface dark:text-dark-onSurface whitespace-nowrap">
+                        {isResponsable && <span className="mr-1 text-amber-500" title="Responsable du stage">★</span>}
                         {lic ? `${lic.Nom_Licencie || ''} ${lic.Prenom_Licencie}` : '—'}
                         {enc.jours === null && (
                           <span className="ml-2 text-xs text-gray-400">(tous)</span>
                         )}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          onClick={() => onUpdateRoleStage(enc.id, isResponsable ? 'encadrant' : 'responsable')}
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                            isResponsable
+                              ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 hover:bg-amber-200'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          }`}
+                          title={isResponsable ? 'Passer en encadrant' : 'Définir comme responsable du stage'}
+                        >
+                          {isResponsable ? '★ Responsable' : 'Encadrant'}
+                        </button>
                       </td>
                       {stageDates.map(d => {
                         const isPresent = joursEnc.includes(d);

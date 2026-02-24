@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import type { StageEncadrant } from '../types';
+import type { StageEncadrant, RoleStage } from '../types';
 
 interface UseStageEncadrantsResult {
   encadrants: StageEncadrant[];
@@ -9,6 +9,7 @@ interface UseStageEncadrantsResult {
   refetch: () => Promise<void>;
   addEncadrant: (licencieId: string, jours?: string[] | null) => Promise<StageEncadrant | null>;
   updateJours: (id: string, jours: string[] | null) => Promise<boolean>;
+  updateRoleStage: (id: string, role: RoleStage) => Promise<boolean>;
   deleteEncadrant: (id: string) => Promise<boolean>;
 }
 
@@ -89,6 +90,23 @@ export function useStageEncadrants(stageId: string): UseStageEncadrantsResult {
     }
   };
 
+  const updateRoleStage = async (id: string, role: RoleStage): Promise<boolean> => {
+    setEncadrants(prev => prev.map(e => e.id === id ? { ...e, role_stage: role } : e));
+    try {
+      const { error: supabaseError } = await supabase
+        .from('stage_encadrants')
+        .update({ role_stage: role })
+        .eq('id', id);
+      if (supabaseError) throw supabaseError;
+      return true;
+    } catch (err: any) {
+      console.error('Error updating role_stage:', err);
+      setError(err.message || 'Erreur lors de la mise à jour du rôle.');
+      await fetchEncadrants();
+      return false;
+    }
+  };
+
   const deleteEncadrant = async (id: string): Promise<boolean> => {
     try {
       const { error: supabaseError } = await supabase
@@ -117,6 +135,7 @@ export function useStageEncadrants(stageId: string): UseStageEncadrantsResult {
     refetch: fetchEncadrants,
     addEncadrant,
     updateJours,
+    updateRoleStage,
     deleteEncadrant,
   };
 }
