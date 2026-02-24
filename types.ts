@@ -208,11 +208,23 @@ export interface StageGroupeMembre {
   created_at?: string;
 }
 
+export type RoleStage = 'responsable' | 'encadrant';
+export type RoleGroupeEncadrant = 'leader' | 'accompagnant';
+
 export interface StageEncadrant {
   id: string;
   stage_id: string;
   licencie_id: string;
-  jours?: string[] | null;  // null = tous les jours du stage
+  jours?: string[] | null;         // null = tous les jours du stage
+  role_stage?: RoleStage | null;   // responsable du stage ou simple encadrant
+  created_at?: string;
+}
+
+export interface StageGroupeEncadrant {
+  id: string;
+  groupe_id: string;
+  encadrant_id: string;           // FK → stage_encadrants.id
+  role: RoleGroupeEncadrant;
   created_at?: string;
 }
 

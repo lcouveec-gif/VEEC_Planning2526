@@ -5,7 +5,8 @@ import { useStagePresences } from '../hooks/useStagePresences';
 import { useStageGroupes } from '../hooks/useStageGroupes';
 import { useStageEncadrants } from '../hooks/useStageEncadrants';
 import { useLicencies } from '../hooks/useLicencies';
-import type { Stage, StageInscription, StageGroupe, StageCategorie, StageGenre } from '../types';
+import type { Stage, StageInscription, StageGroupe, StageEncadrant, StageCategorie, StageGenre, RoleGroupeEncadrant } from '../types';
+import type { Licencie } from '../types';
 
 const CATEGORIES: StageCategorie[] = ['M11', 'M13', 'M15', 'M18', 'Senior'];
 const GENRES: StageGenre[] = ['Masculin', 'Féminin'];
@@ -250,8 +251,14 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Encadrants :</span>
               {encadrantsJour.map(enc => {
                 const lic = getLicencie(enc.licencie_id);
+                const isResponsable = enc.role_stage === 'responsable';
                 return (
-                  <span key={enc.id} className="px-2 py-0.5 rounded-full text-xs bg-indigo-100 dark:bg-indigo-800/60 text-indigo-700 dark:text-white font-medium">
+                  <span key={enc.id} className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${
+                    isResponsable
+                      ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                      : 'bg-indigo-100 dark:bg-indigo-800/60 text-indigo-700 dark:text-white'
+                  }`}>
+                    {isResponsable && <span title="Responsable du stage">★</span>}
                     {lic ? `${lic.Prenom_Licencie} ${lic.Nom_Licencie || ''}` : '—'}
                   </span>
                 );
@@ -328,6 +335,8 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
           stageDates={stageDates}
           stagiairesJour={stagiairesJour}
           groupesHook={groupesHook}
+          encadrants={encadrants}
+          licencies={licencies}
         />
       )}
     </div>
@@ -342,12 +351,14 @@ interface GroupesViewProps {
   stageDates: string[];
   stagiairesJour: StageInscription[];
   groupesHook: ReturnType<typeof useStageGroupes>;
+  encadrants: StageEncadrant[];
+  licencies: Licencie[];
 }
 
 const MAX_GROUPES = 6;
 
-const GroupesView: React.FC<GroupesViewProps> = ({ stage, date, stageDates, stagiairesJour, groupesHook }) => {
-  const { getGroupesForDate, getMembresForGroupe, createGroupe, updateGroupe, deleteGroupe, setMembre, copyFromDay, getDatesWithGroupes, loading, copying } = groupesHook;
+const GroupesView: React.FC<GroupesViewProps> = ({ stage, date, stageDates, stagiairesJour, groupesHook, encadrants, licencies }) => {
+  const { getGroupesForDate, getMembresForGroupe, getEncadrantsForGroupe, createGroupe, updateGroupe, deleteGroupe, setMembre, setGroupeEncadrant, copyFromDay, getDatesWithGroupes, loading, copying } = groupesHook;
 
   const groupesJour = useMemo(() => getGroupesForDate(date), [groupesHook.groupes, date]);
 
@@ -383,6 +394,27 @@ const GroupesView: React.FC<GroupesViewProps> = ({ stage, date, stageDates, stag
   }, [nonAssignes, filterNom, filterCategorie, filterGenre]);
 
   const hasFilter = filterNom !== '' || filterCategorie !== '' || filterGenre !== '';
+
+  // Encadrants présents ce jour (pour les affecter aux groupes)
+  const encadrantsJour = useMemo(() =>
+    encadrants.filter(enc => !enc.jours || enc.jours.length === 0 || enc.jours.includes(date)),
+    [encadrants, date]
+  );
+  const getLicencie = (licencieId: string) => licencies.find(l => l.id === licencieId);
+  const getEncadrantById = (encId: string) => encadrants.find(e => e.id === encId);
+
+  // Ajout encadrant dans un groupe
+  const [addingEncGroupeId, setAddingEncGroupeId] = useState<string | null>(null);
+  const [newEncId, setNewEncId] = useState('');
+  const [newEncRole, setNewEncRole] = useState<RoleGroupeEncadrant>('accompagnant');
+
+  const handleAddGroupeEncadrant = async (groupeId: string) => {
+    if (!newEncId) return;
+    await setGroupeEncadrant(groupeId, newEncId, newEncRole);
+    setAddingEncGroupeId(null);
+    setNewEncId('');
+    setNewEncRole('accompagnant');
+  };
 
   // Copie depuis un autre jour
   const [showCopy, setShowCopy] = useState(false);
@@ -560,6 +592,20 @@ const GroupesView: React.FC<GroupesViewProps> = ({ stage, date, stageDates, stag
               .map(m => stagiairesJour.find(ins => ins.id === m.inscription_id))
               .filter(Boolean) as StageInscription[];
 
+            // Stats catégorie et genre
+            const catStats: Record<string, number> = {};
+            let nbMasc = 0, nbFem = 0;
+            stagiairesGroupe.forEach(ins => {
+              if (ins.categorie) catStats[ins.categorie] = (catStats[ins.categorie] ?? 0) + 1;
+              if (ins.genre === 'Masculin') nbMasc++;
+              else if (ins.genre === 'Féminin') nbFem++;
+            });
+            const hasStats = stagiairesGroupe.length > 0;
+
+            // Encadrants du groupe
+            const groupeEncList = getEncadrantsForGroupe(g.id);
+            const encDispos = encadrantsJour.filter(enc => !groupeEncList.some(ge => ge.encadrant_id === enc.id));
+
             return (
               <div key={g.id} className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                 {/* Header groupe */}
@@ -587,11 +633,22 @@ const GroupesView: React.FC<GroupesViewProps> = ({ stage, date, stageDates, stag
                     </>
                   ) : (
                     <>
-                      <span className="font-semibold text-indigo-700 dark:text-white flex-1">{g.nom}</span>
+                      <span className="font-semibold text-indigo-700 dark:text-white flex-1 min-w-0">{g.nom}</span>
                       {g.terrain && (
-                        <span className="px-2 py-0.5 rounded text-xs font-bold bg-indigo-600 text-white">{g.terrain}</span>
+                        <span className="px-2 py-0.5 rounded text-xs font-bold bg-indigo-600 text-white shrink-0">{g.terrain}</span>
                       )}
-                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">{stagiairesGroupe.length} joueur{stagiairesGroupe.length > 1 ? 's' : ''}</span>
+                      {/* Stats catégories */}
+                      {hasStats && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0 hidden sm:inline">
+                          {Object.entries(catStats).map(([cat, n]) => `${cat}×${n}`).join(' ')}
+                          {(nbMasc > 0 || nbFem > 0) && (
+                            <span className="ml-1">
+                              {nbMasc > 0 && `♂${nbMasc}`}{nbFem > 0 && `♀${nbFem}`}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{stagiairesGroupe.length} joueur{stagiairesGroupe.length > 1 ? 's' : ''}</span>
                       <button onClick={() => startEdit(g)} className="p-1 rounded text-gray-400 hover:text-indigo-600 hover:bg-white/50 dark:hover:text-white dark:hover:bg-gray-700 transition-colors" title="Modifier">
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -607,14 +664,33 @@ const GroupesView: React.FC<GroupesViewProps> = ({ stage, date, stageDates, stag
                   )}
                 </div>
 
+                {/* Stats inline (mobile) */}
+                {hasStats && (
+                  <div className="px-4 pt-2 pb-0 flex flex-wrap gap-x-3 gap-y-0.5 sm:hidden">
+                    {Object.entries(catStats).map(([cat, n]) => (
+                      <span key={cat} className="text-xs text-gray-500 dark:text-gray-400">{cat}×{n}</span>
+                    ))}
+                    {nbMasc > 0 && <span className="text-xs text-gray-500 dark:text-gray-400">♂{nbMasc}</span>}
+                    {nbFem > 0 && <span className="text-xs text-gray-500 dark:text-gray-400">♀{nbFem}</span>}
+                  </div>
+                )}
+
                 {/* Membres du groupe */}
-                <div className="p-3 flex flex-wrap gap-2">
+                <div className="px-3 pt-2.5 pb-2 flex flex-wrap gap-2">
                   {stagiairesGroupe.map(ins => (
-                    <div key={ins.id} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-800/60 text-indigo-800 dark:text-white text-sm">
-                      <span>{ins.nom ? `${ins.nom} ${ins.prenom}` : ins.prenom}</span>
+                    <div key={ins.id} className="flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-800/60 text-indigo-800 dark:text-white text-sm">
+                      <span className="font-medium">{ins.nom ? `${ins.nom} ${ins.prenom}` : ins.prenom}</span>
+                      {ins.categorie && (
+                        <span className="px-1 rounded text-xs bg-indigo-200 dark:bg-indigo-700 text-indigo-700 dark:text-indigo-200 font-medium">{ins.categorie}</span>
+                      )}
+                      {ins.genre && (
+                        <span className="text-xs text-indigo-500 dark:text-indigo-300 font-medium" title={ins.genre}>
+                          {ins.genre === 'Masculin' ? '♂' : '♀'}
+                        </span>
+                      )}
                       <button
                         onClick={() => setMembre(g.id, ins.id, false)}
-                        className="ml-1 text-indigo-400 dark:text-indigo-200 hover:text-indigo-700 dark:hover:text-white"
+                        className="ml-0.5 text-indigo-400 dark:text-indigo-200 hover:text-indigo-700 dark:hover:text-white"
                         title="Retirer du groupe"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -625,6 +701,96 @@ const GroupesView: React.FC<GroupesViewProps> = ({ stage, date, stageDates, stag
                   ))}
                   {stagiairesGroupe.length === 0 && (
                     <span className="text-xs text-gray-400 dark:text-gray-500 italic">Groupe vide</span>
+                  )}
+                </div>
+
+                {/* Encadrants du groupe */}
+                <div className="px-3 pb-2.5 border-t border-gray-100 dark:border-gray-700/60 pt-2 flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0">Encadrants :</span>
+                  {groupeEncList.map(ge => {
+                    const enc = getEncadrantById(ge.encadrant_id);
+                    const lic = enc ? getLicencie(enc.licencie_id) : null;
+                    const isLeader = ge.role === 'leader';
+                    return (
+                      <div key={ge.id} className={`flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium ${
+                        isLeader
+                          ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                      }`}>
+                        <span>{isLeader ? '★ ' : ''}{lic ? `${lic.Prenom_Licencie} ${lic.Nom_Licencie || ''}` : '—'}</span>
+                        {/* Toggle rôle */}
+                        <button
+                          onClick={() => setGroupeEncadrant(g.id, ge.encadrant_id, isLeader ? 'accompagnant' : 'leader')}
+                          className="px-1 opacity-60 hover:opacity-100 transition-opacity"
+                          title={isLeader ? 'Passer accompagnant' : 'Définir leader'}
+                        >
+                          {isLeader ? '↓' : '↑'}
+                        </button>
+                        <button
+                          onClick={() => setGroupeEncadrant(g.id, ge.encadrant_id, null)}
+                          className="opacity-60 hover:opacity-100 hover:text-red-500 transition-all"
+                          title="Retirer du groupe"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  {/* Ajouter un encadrant */}
+                  {encDispos.length > 0 && (
+                    addingEncGroupeId === g.id ? (
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <select
+                          value={newEncId}
+                          onChange={e => setNewEncId(e.target.value)}
+                          className="px-2 py-0.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs text-light-onSurface dark:text-dark-onSurface focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value="">— Encadrant —</option>
+                          {encDispos.map(enc => {
+                            const lic = getLicencie(enc.licencie_id);
+                            return (
+                              <option key={enc.id} value={enc.id}>
+                                {lic ? `${lic.Prenom_Licencie} ${lic.Nom_Licencie || ''}` : enc.id}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        <select
+                          value={newEncRole}
+                          onChange={e => setNewEncRole(e.target.value as RoleGroupeEncadrant)}
+                          className="px-2 py-0.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs text-light-onSurface dark:text-dark-onSurface focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value="leader">★ Leader</option>
+                          <option value="accompagnant">Accompagnant</option>
+                        </select>
+                        <button
+                          onClick={() => handleAddGroupeEncadrant(g.id)}
+                          disabled={!newEncId}
+                          className="px-2 py-0.5 rounded-lg bg-indigo-600 text-white text-xs hover:bg-indigo-700 disabled:opacity-50"
+                        >OK</button>
+                        <button
+                          onClick={() => { setAddingEncGroupeId(null); setNewEncId(''); }}
+                          className="px-1.5 py-0.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs hover:bg-gray-300"
+                        >✕</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setAddingEncGroupeId(g.id); setNewEncId(''); setNewEncRole('accompagnant'); }}
+                        className="text-xs text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-300 flex items-center gap-0.5 transition-colors"
+                        title="Ajouter un encadrant"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Ajouter
+                      </button>
+                    )
+                  )}
+                  {groupeEncList.length === 0 && encDispos.length === 0 && (
+                    <span className="text-xs text-gray-400 dark:text-gray-500 italic">Aucun encadrant disponible ce jour</span>
                   )}
                 </div>
               </div>
