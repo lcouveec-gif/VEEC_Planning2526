@@ -238,23 +238,18 @@ const PermissionsManager: React.FC = () => {
                           Annuler
                         </button>
                       </div>
+                    ) : isCurrentUser ? (
+                      <span className="text-xs text-gray-400 dark:text-gray-500 italic">
+                        Votre propre rôle ne peut pas être modifié
+                      </span>
                     ) : (
                       <button
                         onClick={() => {
-                          if (isCurrentUser) {
-                            setError('Vous ne pouvez pas modifier votre propre rôle');
-                            return;
-                          }
                           setEditingId(profile.id);
                           setNewRole(profile.role);
                           setError(null);
                         }}
-                        disabled={isCurrentUser}
-                        className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                          isCurrentUser
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500'
-                            : 'bg-blue-600 hover:bg-blue-700 text-white'
-                        }`}
+                        className="px-3 py-1 text-sm rounded-md transition-colors bg-blue-600 hover:bg-blue-700 text-white"
                       >
                         Modifier
                       </button>
