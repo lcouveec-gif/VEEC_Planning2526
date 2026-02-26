@@ -230,7 +230,7 @@ export interface StageGroupeEncadrant {
 
 // ─── Module Questionnaire Stage ──────────────────────────────────────────────
 
-export type TypeQuestion = 'texte_libre' | 'note_5' | 'note_10';
+export type TypeQuestion = 'texte_libre' | 'note_5' | 'note_10' | 'oui_non' | 'date';
 
 export interface QuestionnaireTemplate {
   id: string;

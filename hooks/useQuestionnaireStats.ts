@@ -89,7 +89,7 @@ export function useQuestionnaireStats(templateId: string): UseQuestionnaireStats
 
         const nb_reponses = answers.length;
 
-        if (q.type_question === 'texte_libre') {
+        if (q.type_question === 'texte_libre' || q.type_question === 'oui_non' || q.type_question === 'date') {
           return {
             question_id: q.id,
             libelle: q.libelle,

@@ -7,12 +7,16 @@ const TYPE_LABELS: Record<TypeQuestion, string> = {
   texte_libre: 'Texte libre',
   note_5: 'Note sur 5',
   note_10: 'Note sur 10',
+  oui_non: 'Oui / Non',
+  date: 'Date',
 };
 
 const TYPE_COLORS: Record<TypeQuestion, string> = {
   texte_libre: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   note_5: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   note_10: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  oui_non: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  date: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300',
 };
 
 // ── Composant stats agrégées ────────────────────────────────────────────────
@@ -49,6 +53,11 @@ function StatsView({ templateId }: { templateId: string }) {
 
 function QuestionStatCard({ stat }: { stat: QuestionStats }) {
   const maxNote = stat.type_question === 'note_10' ? 10 : 5;
+  const isTextual = stat.type_question === 'texte_libre' || stat.type_question === 'date';
+
+  // Agrégation Oui/Non
+  const ouiCount = stat.type_question === 'oui_non' ? (stat.textes || []).filter(t => t === 'oui').length : 0;
+  const nonCount = stat.type_question === 'oui_non' ? (stat.textes || []).filter(t => t === 'non').length : 0;
 
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
@@ -60,10 +69,10 @@ function QuestionStatCard({ stat }: { stat: QuestionStats }) {
       </div>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{stat.nb_reponses} réponse{stat.nb_reponses !== 1 ? 's' : ''}</p>
 
-      {stat.type_question === 'texte_libre' ? (
+      {isTextual && (
         <div className="space-y-1 max-h-40 overflow-y-auto">
           {(stat.textes || []).length === 0
-            ? <p className="text-xs text-gray-400 italic">Aucun texte saisi</p>
+            ? <p className="text-xs text-gray-400 italic">Aucune réponse saisie</p>
             : (stat.textes || []).map((t, i) => (
                 <p key={i} className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded px-2 py-1">
                   {t}
@@ -71,7 +80,30 @@ function QuestionStatCard({ stat }: { stat: QuestionStats }) {
               ))
           }
         </div>
-      ) : (
+      )}
+
+      {stat.type_question === 'oui_non' && (
+        <div className="flex gap-4 items-center">
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full bg-green-500 inline-block" />
+            <span className="text-sm font-semibold text-green-700 dark:text-green-400">{ouiCount} Oui</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full bg-red-400 inline-block" />
+            <span className="text-sm font-semibold text-red-600 dark:text-red-400">{nonCount} Non</span>
+          </div>
+          {(ouiCount + nonCount) > 0 && (
+            <div className="flex-1 h-2 rounded-full bg-red-200 dark:bg-red-900/40 overflow-hidden">
+              <div
+                className="h-full bg-green-500 rounded-full transition-all"
+                style={{ width: `${Math.round((ouiCount / (ouiCount + nonCount)) * 100)}%` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {(stat.type_question === 'note_5' || stat.type_question === 'note_10') && (
         <div className="space-y-2">
           {stat.moyenne !== undefined && (
             <div className="flex items-center gap-2">
@@ -79,7 +111,6 @@ function QuestionStatCard({ stat }: { stat: QuestionStats }) {
               <span className="text-xs text-gray-400">/ {maxNote} (moy.) · min {stat.min} · max {stat.max}</span>
             </div>
           )}
-          {/* Barres de distribution */}
           <div className="flex gap-1 items-end h-12">
             {Array.from({ length: maxNote }, (_, i) => i + 1).map(note => {
               const count = stat.distribution?.[note] || 0;
@@ -141,6 +172,8 @@ function QuestionForm({ onAdd, onCancel }: QuestionFormProps) {
           <option value="note_5">Note sur 5</option>
           <option value="note_10">Note sur 10</option>
           <option value="texte_libre">Texte libre</option>
+          <option value="oui_non">Oui / Non</option>
+          <option value="date">Date (JJ/MM/AAAA)</option>
         </select>
         <label className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 cursor-pointer">
           <input

@@ -358,6 +358,8 @@ const TYPE_LABELS_QV: Record<TypeQuestion, string> = {
   texte_libre: 'Texte libre',
   note_5: 'Note / 5',
   note_10: 'Note / 10',
+  oui_non: 'Oui / Non',
+  date: 'Date',
 };
 
 interface ReponseFormProps {
@@ -464,6 +466,38 @@ const ReponseForm: React.FC<ReponseFormProps> = ({ template, existingDetails, sa
                 </button>
               ))}
             </div>
+          )}
+
+          {q.type_question === 'oui_non' && (
+            <div className="flex gap-3">
+              {(['oui', 'non'] as const).map(val => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setTexte(q.id, val)}
+                  className={`px-6 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                    answers[q.id]?.texte === val
+                      ? val === 'oui'
+                        ? 'bg-green-500 text-white shadow-md'
+                        : 'bg-red-500 text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {val === 'oui' ? '✓ Oui' : '✗ Non'}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {q.type_question === 'date' && (
+            <input
+              type="text"
+              value={answers[q.id]?.texte || ''}
+              onChange={e => setTexte(q.id, e.target.value)}
+              placeholder="JJ/MM/AAAA"
+              maxLength={10}
+              className="w-40 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono"
+            />
           )}
         </div>
       ))}
