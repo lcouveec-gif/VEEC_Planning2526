@@ -10,8 +10,9 @@ import ClubsManager from './Admin/ClubsManager';
 import GymnasesManager from './Admin/GymnasesManager';
 import EffectifsManager from './Admin/EffectifsManager';
 import StagesManager from './Admin/StagesManager';
+import QuestionnairesManager from './Admin/QuestionnairesManager';
 
-type AdminSection = 'menu' | 'teams' | 'effectifs' | 'stages' | 'planning' | 'automation' | 'permissions' | 'links' | 'clubs' | 'gymnases';
+type AdminSection = 'menu' | 'teams' | 'effectifs' | 'stages' | 'questionnaires' | 'planning' | 'automation' | 'permissions' | 'links' | 'clubs' | 'gymnases';
 
 const Admin: React.FC = () => {
   const { section: initialSection, teamId: selectedTeamId } = useParams<{ section?: string; teamId?: string }>();
@@ -124,6 +125,31 @@ const Admin: React.FC = () => {
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Gérer les stages et les inscriptions
+          </p>
+        </button>
+
+        {/* Carte Questionnaires */}
+        <button
+          onClick={() => setCurrentSection('questionnaires')}
+          className="bg-light-surface dark:bg-dark-surface rounded-lg p-6 shadow-md hover:shadow-lg transition-all border-2 border-transparent hover:border-light-primary dark:hover:border-dark-primary text-left group"
+        >
+          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-teal-100 dark:bg-teal-900/30 mb-4 group-hover:scale-110 transition-transform">
+            <svg
+              className="w-8 h-8 text-teal-600 dark:text-teal-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+              />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-light-onSurface dark:text-dark-onSurface mb-2">
+            Questionnaires
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Questionnaires de satisfaction des stages
           </p>
         </button>
 
@@ -362,6 +388,24 @@ const Admin: React.FC = () => {
               </h2>
             </div>
             <StagesManager />
+          </div>
+        );
+
+      case 'questionnaires':
+        return (
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-6 flex items-center gap-4">
+              <button
+                onClick={() => setCurrentSection('menu')}
+                className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+              >
+                ← Retour
+              </button>
+              <h2 className="text-2xl font-bold text-light-onSurface dark:text-dark-onSurface">
+                Questionnaires de satisfaction
+              </h2>
+            </div>
+            <QuestionnairesManager />
           </div>
         );
 

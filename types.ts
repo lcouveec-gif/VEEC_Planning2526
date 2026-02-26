@@ -228,6 +228,80 @@ export interface StageGroupeEncadrant {
   created_at?: string;
 }
 
+// ─── Module Questionnaire Stage ──────────────────────────────────────────────
+
+export type TypeQuestion = 'texte_libre' | 'note_5' | 'note_10';
+
+export interface QuestionnaireTemplate {
+  id: string;
+  nom: string;
+  description?: string | null;
+  created_at?: string;
+}
+
+export interface QuestionnaireQuestion {
+  id: string;
+  template_id: string;
+  ordre: number;
+  libelle: string;
+  type_question: TypeQuestion;
+  obligatoire: boolean;
+  created_at?: string;
+}
+
+export interface QuestionnaireTemplateWithQuestions extends QuestionnaireTemplate {
+  questions: QuestionnaireQuestion[];
+}
+
+export interface StageQuestionnaire {
+  id: string;
+  stage_id: string;
+  template_id: string;
+  created_at?: string;
+  template?: QuestionnaireTemplateWithQuestions;
+}
+
+export interface QuestionnaireReponse {
+  id: string;
+  stage_questionnaire_id: string;
+  inscription_id: string;
+  soumis_le?: string;
+  created_at?: string;
+}
+
+export interface QuestionnaireReponseDetail {
+  id: string;
+  reponse_id: string;
+  question_id: string;
+  valeur_texte?: string | null;
+  valeur_note?: number | null;
+  created_at?: string;
+}
+
+export interface QuestionnaireReponseComplete extends QuestionnaireReponse {
+  details: QuestionnaireReponseDetail[];
+}
+
+export interface QuestionStats {
+  question_id: string;
+  libelle: string;
+  type_question: TypeQuestion;
+  nb_reponses: number;
+  moyenne?: number;
+  min?: number;
+  max?: number;
+  distribution?: Record<number, number>;
+  textes?: string[];
+}
+
+export interface QuestionnaireStats {
+  template_id: string;
+  nom_template: string;
+  stages: Array<{ stage_id: string; nom_stage: string; nb_reponses: number }>;
+  total_reponses: number;
+  questions: QuestionStats[];
+}
+
 // ─── Types pour la gestion des gymnases ───────────────────────────────────────
 
 export interface Gymnase {
