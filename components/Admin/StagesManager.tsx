@@ -3,6 +3,8 @@ import { useStages } from '../../hooks/useStages';
 import { useStageInscriptions } from '../../hooks/useStageInscriptions';
 import { useStageEncadrants } from '../../hooks/useStageEncadrants';
 import { useLicencies } from '../../hooks/useLicencies';
+import { useQuestionnaireTemplates } from '../../hooks/useQuestionnaireTemplates';
+import { useStageQuestionnaire } from '../../hooks/useStageQuestionnaire';
 import type {
   Stage,
   StageInscription,
@@ -14,6 +16,10 @@ import type {
   ImportInscriptionResult,
   StageEncadrant,
   Licencie,
+  QuestionnaireTemplateWithQuestions,
+  QuestionnaireReponse,
+  QuestionnaireReponseDetail,
+  TypeQuestion,
 } from '../../types';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -903,6 +909,9 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
         onDelete={deleteEncadrant}
       />
 
+      {/* Section Questionnaires */}
+      <QuestionnairesSection stage={stage} inscriptions={inscriptions} />
+
       {/* Barre d'actions */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
         <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
@@ -1075,6 +1084,211 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
           } : undefined}
           onClose={() => setModalOpen(false)}
         />
+      )}
+    </div>
+  );
+};
+
+// ─── Section Questionnaires ────────────────────────────────────────────────────
+
+const TYPE_LABELS_Q: Record<TypeQuestion, string> = {
+  texte_libre: 'Texte libre',
+  note_5: '★ / 5',
+  note_10: '★ / 10',
+};
+
+interface QuestionnairesSectionProps {
+  stage: Stage;
+  inscriptions: StageInscription[];
+}
+
+const QuestionnairesSection: React.FC<QuestionnairesSectionProps> = ({ stage, inscriptions }) => {
+  const { templates } = useQuestionnaireTemplates();
+  const {
+    stageQuestionnaires, reponses, loading: sqLoading, error: sqError,
+    assignTemplate, removeTemplate, getReponsePourInscription, getStatsForQuestionnaire,
+  } = useStageQuestionnaire(stage.id);
+
+  const [open, setOpen] = useState(true);
+  const [addingTemplateId, setAddingTemplateId] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [expandedSqId, setExpandedSqId] = useState<string | null>(null);
+  const [confirmRemoveSqId, setConfirmRemoveSqId] = useState<string | null>(null);
+
+  // Templates non encore affectés à ce stage
+  const assignedTemplateIds = stageQuestionnaires.map(sq => sq.template_id);
+  const availableTemplates = templates.filter(t => !assignedTemplateIds.includes(t.id));
+
+  const handleAssign = async () => {
+    if (!addingTemplateId) return;
+    setAssigning(true);
+    await assignTemplate(addingTemplateId);
+    setAddingTemplateId('');
+    setAssigning(false);
+  };
+
+  const handleRemove = async (sqId: string) => {
+    await removeTemplate(sqId);
+    setConfirmRemoveSqId(null);
+  };
+
+  return (
+    <div className="border border-teal-200 dark:border-teal-800 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/30 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-teal-800 dark:text-teal-300">
+            📋 Questionnaires ({stageQuestionnaires.length})
+          </span>
+          {stageQuestionnaires.length > 0 && (
+            <span className="text-xs text-teal-600 dark:text-teal-400">
+              · {reponses.length} réponse{reponses.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        <span className="text-teal-600 dark:text-teal-400">{open ? '▼' : '▶'}</span>
+      </button>
+
+      {open && (
+        <div className="p-4 space-y-4">
+          {sqError && <div className="p-2 bg-red-100 text-red-700 rounded text-sm">{sqError}</div>}
+
+          {/* Affecter un nouveau questionnaire */}
+          {availableTemplates.length > 0 && (
+            <div className="flex gap-2">
+              <select
+                value={addingTemplateId}
+                onChange={e => setAddingTemplateId(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="">Sélectionner un questionnaire à affecter…</option>
+                {availableTemplates.map(t => (
+                  <option key={t.id} value={t.id}>{t.nom} ({t.questions.length} questions)</option>
+                ))}
+              </select>
+              <button
+                onClick={handleAssign}
+                disabled={!addingTemplateId || assigning}
+                className="px-3 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-md disabled:opacity-50"
+              >
+                {assigning ? '…' : '+ Affecter'}
+              </button>
+            </div>
+          )}
+
+          {stageQuestionnaires.length === 0 && !sqLoading && (
+            <p className="text-sm text-gray-400 italic text-center py-2">
+              Aucun questionnaire affecté à ce stage.
+            </p>
+          )}
+
+          {/* Liste des questionnaires affectés */}
+          {stageQuestionnaires.map(sq => {
+            const tpl = sq.template as QuestionnaireTemplateWithQuestions | undefined;
+            const sqReponses = reponses.filter(r => r.stage_questionnaire_id === sq.id);
+            const isExpanded = expandedSqId === sq.id;
+            const stats = tpl && isExpanded ? getStatsForQuestionnaire(sq.id, tpl) : [];
+
+            return (
+              <div key={sq.id} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                {/* En-tête questionnaire */}
+                <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-800/50">
+                  <button
+                    onClick={() => setExpandedSqId(isExpanded ? null : sq.id)}
+                    className="flex-1 text-left"
+                  >
+                    <span className="font-medium text-gray-900 dark:text-white text-sm">
+                      {tpl?.nom || 'Questionnaire'}
+                    </span>
+                    <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                      {sqReponses.length}/{inscriptions.length} réponse{sqReponses.length !== 1 ? 's' : ''}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setExpandedSqId(isExpanded ? null : sq.id)}
+                    className="text-gray-400 text-xs"
+                  >{isExpanded ? '▲ Masquer' : '▼ Voir'}</button>
+                  {confirmRemoveSqId === sq.id ? (
+                    <div className="flex gap-1">
+                      <button onClick={() => handleRemove(sq.id)} className="px-2 py-1 text-xs bg-red-600 text-white rounded">Confirmer</button>
+                      <button onClick={() => setConfirmRemoveSqId(null)} className="px-2 py-1 text-xs bg-gray-400 text-white rounded">Annuler</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmRemoveSqId(sq.id)}
+                      className="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-400"
+                    >Désaffecter</button>
+                  )}
+                </div>
+
+                {/* Détail expansible */}
+                {isExpanded && tpl && (
+                  <div className="p-4 space-y-3">
+                    {/* Barre de progression */}
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div
+                          className="bg-teal-500 h-2 rounded-full transition-all"
+                          style={{ width: inscriptions.length > 0 ? `${(sqReponses.length / inscriptions.length) * 100}%` : '0%' }}
+                        />
+                      </div>
+                      <span className="text-gray-500 dark:text-gray-400 text-xs shrink-0">
+                        {inscriptions.length > 0 ? Math.round((sqReponses.length / inscriptions.length) * 100) : 0}% complété
+                      </span>
+                    </div>
+
+                    {/* Liste des inscriptions avec statut */}
+                    <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-64 overflow-y-auto rounded border border-gray-200 dark:border-gray-700">
+                      {inscriptions.map(ins => {
+                        const rep = getReponsePourInscription(sq.id, ins.id);
+                        return (
+                          <div key={ins.id} className="flex items-center gap-3 px-3 py-2">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm text-gray-800 dark:text-gray-200">
+                                {ins.prenom} {ins.nom || ''}
+                              </span>
+                            </div>
+                            {rep ? (
+                              <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">
+                                ✓ Complété
+                              </span>
+                            ) : (
+                              <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                                ○ Non rempli
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Stats rapides */}
+                    {stats.length > 0 && sqReponses.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">Résumé des réponses</p>
+                        {stats.map(s => (
+                          <div key={s.question_id} className="text-xs text-gray-600 dark:text-gray-400">
+                            <span className="font-medium text-gray-700 dark:text-gray-300">{s.libelle}</span>
+                            {s.type_question !== 'texte_libre' && s.moyenne !== undefined && (
+                              <span className="ml-2 text-teal-600 dark:text-teal-400">
+                                Moy. {s.moyenne}/{s.type_question === 'note_10' ? 10 : 5}
+                              </span>
+                            )}
+                            {s.type_question === 'texte_libre' && (
+                              <span className="ml-2 text-gray-400">{s.nb_reponses} texte{s.nb_reponses !== 1 ? 's' : ''}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

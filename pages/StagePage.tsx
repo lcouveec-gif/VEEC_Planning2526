@@ -5,7 +5,11 @@ import { useStagePresences } from '../hooks/useStagePresences';
 import { useStageGroupes } from '../hooks/useStageGroupes';
 import { useStageEncadrants } from '../hooks/useStageEncadrants';
 import { useLicencies } from '../hooks/useLicencies';
-import type { Stage, StageInscription, StageGroupe, StageEncadrant, StageCategorie, StageGenre, RoleGroupeEncadrant } from '../types';
+import { useStageQuestionnaire } from '../hooks/useStageQuestionnaire';
+import type {
+  Stage, StageInscription, StageGroupe, StageEncadrant, StageCategorie, StageGenre, RoleGroupeEncadrant,
+  QuestionnaireTemplateWithQuestions, QuestionnaireReponseDetail, TypeQuestion,
+} from '../types';
 import type { Licencie } from '../types';
 
 const CATEGORIES: StageCategorie[] = ['M11', 'M13', 'M15', 'M18', 'Senior'];
@@ -142,7 +146,7 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
     setSelectedDate(stageDates.includes(today) ? today : (stageDates[0] ?? ''));
   }, [stageDates]);
 
-  const [activeTab, setActiveTab] = useState<'presences' | 'groupes'>('presences');
+  const [activeTab, setActiveTab] = useState<'presences' | 'groupes' | 'questionnaire'>('presences');
 
   const { inscriptions, loading: inscLoading } = useStageInscriptions(stage.id);
   const { presences, togglePresence, getPresencesForDate, error: presenceError } = useStagePresences(stage.id);
@@ -208,7 +212,7 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
 
       {/* Onglets Présences / Groupes */}
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-fit">
-        {(['presences', 'groupes'] as const).map(tab => (
+        {(['presences', 'groupes', 'questionnaire'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -218,7 +222,7 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
             }`}
           >
-            {tab === 'presences' ? 'Présences' : 'Groupes'}
+            {tab === 'presences' ? 'Présences' : tab === 'groupes' ? 'Groupes' : '📋 Questionnaire'}
           </button>
         ))}
       </div>
@@ -338,6 +342,363 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
           encadrants={encadrants}
           licencies={licencies}
         />
+      )}
+
+      {/* Onglet Questionnaire */}
+      {activeTab === 'questionnaire' && (
+        <QuestionnaireView stage={stage} inscriptions={inscriptions} />
+      )}
+    </div>
+  );
+};
+
+// ─── Vue Questionnaire ────────────────────────────────────────────────────────
+
+const TYPE_LABELS_QV: Record<TypeQuestion, string> = {
+  texte_libre: 'Texte libre',
+  note_5: 'Note / 5',
+  note_10: 'Note / 10',
+  oui_non: 'Oui / Non',
+  date: 'Date',
+};
+
+interface ReponseFormProps {
+  template: QuestionnaireTemplateWithQuestions;
+  existingDetails: QuestionnaireReponseDetail[];
+  saving: boolean;
+  onSave: (details: { question_id: string; valeur_texte?: string | null; valeur_note?: number | null }[]) => Promise<void>;
+  onCancel: () => void;
+}
+
+const ReponseForm: React.FC<ReponseFormProps> = ({ template, existingDetails, saving, onSave, onCancel }) => {
+  const [answers, setAnswers] = useState<Record<string, { texte?: string; note?: number }>>(() => {
+    const init: Record<string, { texte?: string; note?: number }> = {};
+    existingDetails.forEach(d => {
+      init[d.question_id] = {
+        texte: d.valeur_texte ?? undefined,
+        note: d.valeur_note ?? undefined,
+      };
+    });
+    return init;
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const details = template.questions.map(q => ({
+      question_id: q.id,
+      valeur_texte: answers[q.id]?.texte ?? null,
+      valeur_note: answers[q.id]?.note ?? null,
+    }));
+    await onSave(details);
+  };
+
+  const setNote = (questionId: string, note: number) => {
+    setAnswers(prev => ({ ...prev, [questionId]: { ...prev[questionId], note } }));
+  };
+
+  const setTexte = (questionId: string, texte: string) => {
+    setAnswers(prev => ({ ...prev, [questionId]: { ...prev[questionId], texte } }));
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {template.questions.map((q, idx) => (
+        <div key={q.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <p className="text-sm font-medium text-gray-900 dark:text-white">
+              <span className="text-gray-400 mr-1">{idx + 1}.</span>
+              {q.libelle}
+              {q.obligatoire && <span className="text-red-500 ml-1">*</span>}
+            </p>
+            <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+              {TYPE_LABELS_QV[q.type_question]}
+            </span>
+          </div>
+
+          {q.type_question === 'texte_libre' && (
+            <textarea
+              value={answers[q.id]?.texte || ''}
+              onChange={e => setTexte(q.id, e.target.value)}
+              rows={3}
+              placeholder="Saisir une réponse…"
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
+            />
+          )}
+
+          {q.type_question === 'note_5' && (
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5].map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setNote(q.id, n)}
+                  className={`w-10 h-10 rounded-full text-sm font-bold transition-colors ${
+                    answers[q.id]?.note === n
+                      ? 'bg-amber-500 text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-amber-100 dark:hover:bg-amber-900/30'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+              {answers[q.id]?.note && (
+                <span className="self-center text-sm text-gray-500 ml-1">
+                  {'⭐'.repeat(answers[q.id]!.note!)}
+                </span>
+              )}
+            </div>
+          )}
+
+          {q.type_question === 'note_10' && (
+            <div className="flex flex-wrap gap-1.5">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setNote(q.id, n)}
+                  className={`w-9 h-9 rounded-md text-sm font-bold transition-colors ${
+                    answers[q.id]?.note === n
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/30'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {q.type_question === 'oui_non' && (
+            <div className="flex gap-3">
+              {(['oui', 'non'] as const).map(val => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setTexte(q.id, val)}
+                  className={`px-6 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                    answers[q.id]?.texte === val
+                      ? val === 'oui'
+                        ? 'bg-green-500 text-white shadow-md'
+                        : 'bg-red-500 text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {val === 'oui' ? '✓ Oui' : '✗ Non'}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {q.type_question === 'date' && (
+            <input
+              type="text"
+              value={answers[q.id]?.texte || ''}
+              onChange={e => setTexte(q.id, e.target.value)}
+              placeholder="JJ/MM/AAAA"
+              maxLength={10}
+              className="w-40 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono"
+            />
+          )}
+        </div>
+      ))}
+
+      <div className="flex gap-3 justify-end pt-2">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+          Annuler
+        </button>
+        <button type="submit" disabled={saving} className="px-4 py-2 text-sm rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-medium disabled:opacity-50">
+          {saving ? 'Enregistrement…' : 'Enregistrer les réponses'}
+        </button>
+      </div>
+    </form>
+  );
+};
+
+interface QuestionnaireViewProps {
+  stage: Stage;
+  inscriptions: StageInscription[];
+}
+
+const QuestionnaireView: React.FC<QuestionnaireViewProps> = ({ stage, inscriptions }) => {
+  const {
+    stageQuestionnaires, reponses, loading, saving, error,
+    saveReponse, deleteReponse,
+    getReponsePourInscription, getDetailsForReponse,
+  } = useStageQuestionnaire(stage.id);
+
+  const [selectedSqId, setSelectedSqId] = useState<string | null>(null);
+  const [fillingInscriptionId, setFillingInscriptionId] = useState<string | null>(null);
+
+  // Auto-sélection du premier questionnaire
+  const activeSq = useMemo(() => {
+    if (selectedSqId) return stageQuestionnaires.find(sq => sq.id === selectedSqId) ?? null;
+    return stageQuestionnaires[0] ?? null;
+  }, [stageQuestionnaires, selectedSqId]);
+
+  const activeTemplate = activeSq?.template as QuestionnaireTemplateWithQuestions | undefined;
+
+  const fillingReponse = useMemo(() => {
+    if (!activeSq || !fillingInscriptionId) return undefined;
+    return getReponsePourInscription(activeSq.id, fillingInscriptionId);
+  }, [activeSq, fillingInscriptionId, reponses]);
+
+  const fillingDetails = useMemo(() => {
+    if (!fillingReponse) return [];
+    return getDetailsForReponse(fillingReponse.id);
+  }, [fillingReponse, reponses]);
+
+  const nbReponses = useMemo(
+    () => activeSq ? reponses.filter(r => r.stage_questionnaire_id === activeSq.id).length : 0,
+    [activeSq, reponses],
+  );
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-3" />
+        <p className="text-gray-400 text-sm">Chargement…</p>
+      </div>
+    );
+  }
+
+  if (stageQuestionnaires.length === 0) {
+    return (
+      <div className="text-center py-12 text-gray-400">
+        <p className="text-4xl mb-3">📋</p>
+        <p className="font-medium text-gray-600 dark:text-gray-300">Aucun questionnaire affecté à ce stage</p>
+        <p className="text-sm mt-1">Affectez un questionnaire depuis l'administration</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {error && <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm">{error}</div>}
+
+      {/* Sélection questionnaire (si plusieurs) */}
+      {stageQuestionnaires.length > 1 && (
+        <div className="flex gap-2 flex-wrap">
+          {stageQuestionnaires.map(sq => (
+            <button
+              key={sq.id}
+              onClick={() => { setSelectedSqId(sq.id); setFillingInscriptionId(null); }}
+              className={`px-4 py-2 text-sm rounded-lg font-medium transition-colors ${
+                activeSq?.id === sq.id
+                  ? 'bg-teal-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-teal-100 dark:hover:bg-teal-900/30'
+              }`}
+            >
+              {sq.template?.nom || 'Questionnaire'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {activeSq && activeTemplate && (
+        <>
+          {/* En-tête */}
+          <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h3 className="font-semibold text-teal-900 dark:text-teal-200">{activeTemplate.nom}</h3>
+                {activeTemplate.description && (
+                  <p className="text-sm text-teal-700 dark:text-teal-400 mt-0.5">{activeTemplate.description}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="text-sm text-teal-700 dark:text-teal-400">
+                  {nbReponses} / {inscriptions.length} réponse{nbReponses !== 1 ? 's' : ''}
+                </div>
+                {inscriptions.length > 0 && (
+                  <div className="w-24 bg-teal-200 dark:bg-teal-800 rounded-full h-2">
+                    <div
+                      className="bg-teal-500 h-2 rounded-full"
+                      style={{ width: `${(nbReponses / inscriptions.length) * 100}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Formulaire de saisie */}
+          {fillingInscriptionId && (
+            <div className="border border-teal-300 dark:border-teal-700 rounded-xl p-4 bg-white dark:bg-gray-800/50">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-semibold text-gray-900 dark:text-white">
+                  {(() => {
+                    const ins = inscriptions.find(i => i.id === fillingInscriptionId);
+                    return ins ? `${ins.prenom} ${ins.nom || ''}` : '';
+                  })()}
+                </h4>
+                {fillingReponse && (
+                  <button
+                    onClick={async () => {
+                      await deleteReponse(fillingReponse.id);
+                      setFillingInscriptionId(null);
+                    }}
+                    className="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-400"
+                  >
+                    Supprimer les réponses
+                  </button>
+                )}
+              </div>
+              <ReponseForm
+                template={activeTemplate}
+                existingDetails={fillingDetails}
+                saving={saving}
+                onSave={async (details) => {
+                  await saveReponse(activeSq.id, fillingInscriptionId, details);
+                  setFillingInscriptionId(null);
+                }}
+                onCancel={() => setFillingInscriptionId(null)}
+              />
+            </div>
+          )}
+
+          {/* Liste des stagiaires */}
+          {!fillingInscriptionId && (
+            <div className="divide-y divide-gray-100 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+              {inscriptions.length === 0 && (
+                <p className="text-center text-gray-400 py-6 text-sm">Aucun stagiaire inscrit</p>
+              )}
+              {inscriptions.map(ins => {
+                const rep = getReponsePourInscription(activeSq.id, ins.id);
+                return (
+                  <div key={ins.id} className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800/30 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {ins.prenom} {ins.nom || ''}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {ins.categorie || ''}{ins.genre ? ` · ${ins.genre}` : ''}
+                      </p>
+                    </div>
+                    {rep ? (
+                      <span className="shrink-0 text-xs px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">
+                        ✓ Complété
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                        ○ Non rempli
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setFillingInscriptionId(ins.id)}
+                      className={`shrink-0 px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                        rep
+                          ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          : 'bg-teal-600 hover:bg-teal-700 text-white'
+                      }`}
+                    >
+                      {rep ? 'Modifier' : 'Remplir'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
