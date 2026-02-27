@@ -9,7 +9,7 @@ import { useLicencies } from '../hooks/useLicencies';
 import { useStageQuestionnaire } from '../hooks/useStageQuestionnaire';
 import type {
   Stage, StageInscription, StageGroupe, StageEncadrant, StageCategorie, StageGenre, RoleGroupeEncadrant,
-  QuestionnaireTemplateWithQuestions, QuestionnaireReponseDetail, TypeQuestion,
+  QuestionnaireTemplateWithQuestions, QuestionnaireReponseDetail, TypeQuestion, MoyenPaiement,
 } from '../types';
 import type { Licencie } from '../types';
 
@@ -804,6 +804,216 @@ const StageSyntheseView: React.FC<StageSyntheseViewProps> = ({ stage, inscriptio
 
   const maxCat = Math.max(...stats.parCategorie.map(x => x.nb), 1);
 
+  const handlePrint = () => {
+    const fmtDate = (d: string) => { const [y, m, dd] = d.split('-'); return `${dd}/${m}/${y}`; };
+    const now = new Date().toLocaleString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const GROUPS: { key: MoyenPaiement | null; label: string }[] = [
+      { key: 'helloasso', label: 'HelloAsso' },
+      { key: 'sumup',     label: 'SumUp' },
+      { key: 'virement',  label: 'Virement' },
+      { key: 'especes',   label: 'Espèces' },
+      { key: null,        label: 'Non précisé' },
+    ];
+
+    const paymentDetailHTML = GROUPS.map(({ key, label }) => {
+      const group = inscriptions.filter(i =>
+        key === null ? !i.moyen_paiement : i.moyen_paiement === key
+      );
+      if (group.length === 0) return '';
+      const groupDu    = group.reduce((s, i) => s + (i.montant       ?? 0), 0);
+      const groupRegle = group.reduce((s, i) => s + (i.montant_regle ?? 0), 0);
+      const rows = group.map(i => {
+        const nbJ = i.jours?.length ?? i.nb_jours ?? '—';
+        const typeLabel = i.type_inscription === 'stage_complet' ? 'Forfait' : 'Journée';
+        const alerte = i.origine_inscription === 'autre' && !i.moyen_paiement ? ' ⚠' : '';
+        return `<tr>
+          <td>${i.nom || ''}</td><td>${i.prenom}</td><td>${i.categorie || '—'}</td>
+          <td>${typeLabel} (${nbJ}j)</td>
+          <td class="right">${i.montant != null ? i.montant + ' €' : '—'}</td>
+          <td class="right">${i.montant_regle != null ? i.montant_regle + ' €' : '—'}</td>
+          <td class="mono">${i.num_commande_helloasso || ''}${alerte}</td>
+        </tr>`;
+      }).join('');
+      return `
+        <div class="group-header">${label} &mdash; ${group.length} inscription${group.length > 1 ? 's' : ''}</div>
+        <table>
+          <thead><tr>
+            <th>Nom</th><th>Prénom</th><th>Cat.</th><th>Type</th>
+            <th class="right">Montant dû</th><th class="right">Réglé</th>
+            <th>${key === 'helloasso' ? 'N° Commande' : ''}</th>
+          </tr></thead>
+          <tbody>
+            ${rows}
+            <tr class="row-subtotal">
+              <td colspan="4">Sous-total ${label}</td>
+              <td class="right">${groupDu} €</td>
+              <td class="right">${groupRegle} €</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>`;
+    }).join('') + `
+      <table style="margin-top:8px">
+        <tbody>
+          <tr class="row-total">
+            <td colspan="4"><strong>TOTAL GÉNÉRAL</strong></td>
+            <td class="right"><strong>${stats.totalDu} €</strong></td>
+            <td class="right"><strong>${stats.totalRegle} €</strong></td>
+            <td style="color:${stats.solde > 0 ? '#fca5a5' : '#86efac'};text-align:right">
+              <strong>${stats.solde > 0 ? '−' + stats.solde : '✓ solde 0'} €</strong>
+            </td>
+          </tr>
+        </tbody>
+      </table>`;
+
+    const alertesHTML = stats.alertes.length > 0 ? `
+      <div class="alert">
+        <div class="alert-title">⚠ ${stats.alertes.length} paiement${stats.alertes.length > 1 ? 's' : ''} non confirmé${stats.alertes.length > 1 ? 's' : ''} (origine "Autre" sans moyen renseigné)</div>
+        ${stats.alertes.map(i => `<div>${i.prenom} ${i.nom || ''}</div>`).join('')}
+      </div>` : '';
+
+    const coachRows = encadrants.map(e => {
+      const lic = licencies.find(l => l.id === e.licencie_id);
+      const nom = lic ? `${lic.Prenom_Licencie} ${lic.Nom_Licencie || ''}` : '—';
+      const nbJours = (e.jours ?? stageDates).length;
+      if (e.indemnisation_jour == null) {
+        return `<tr class="row-nonrem"><td>${nom}</td><td colspan="3">Non rémunéré</td></tr>`;
+      }
+      return `<tr>
+        <td>${nom}</td>
+        <td class="right">${e.indemnisation_jour} €/j</td>
+        <td class="right">${nbJours} jour${nbJours > 1 ? 's' : ''}</td>
+        <td class="right"><strong>${(e.indemnisation_jour * nbJours).toFixed(0)} €</strong></td>
+      </tr>`;
+    }).join('');
+
+    const coachHTML = encadrants.length === 0
+      ? '<p style="color:#9ca3af;font-style:italic">Aucun encadrant associé à ce stage</p>'
+      : `<table>
+          <thead><tr><th>Encadrant</th><th class="right">Tarif/jour</th><th class="right">Nb jours</th><th class="right">Total</th></tr></thead>
+          <tbody>
+            ${coachRows}
+            <tr class="row-total">
+              <td colspan="3"><strong>Total indemnisations</strong></td>
+              <td class="right"><strong>${stats.totalIndemnisation} €</strong></td>
+            </tr>
+          </tbody>
+        </table>
+        <table style="margin-top:6px">
+          <tbody>
+            <tr class="row-total">
+              <td><strong>Résultat net stage (réglé &minus; indemnisations)</strong></td>
+              <td class="right" style="color:${stats.resultatNet >= 0 ? '#86efac' : '#fca5a5'}">
+                <strong>${stats.resultatNet} €</strong>
+              </td>
+            </tr>
+          </tbody>
+        </table>`;
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Synthèse ${stage.nom}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#1a1a2e;padding:22px 26px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;padding-bottom:10px;border-bottom:3px solid #2563eb}
+.header h1{font-size:17px;font-weight:700;color:#1e40af}
+.header .meta{font-size:10px;color:#6b7280;margin-top:3px}
+.header .gen{text-align:right;font-size:9px;color:#9ca3af}
+.section{margin-bottom:16px}
+.section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#4b5563;border-bottom:1.5px solid #e5e7eb;padding-bottom:4px;margin-bottom:8px}
+.kpi-grid{display:grid;gap:7px;margin-bottom:8px}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+.kpi{text-align:center;padding:7px 4px;background:#f8fafc;border-radius:5px;border:1px solid #e2e8f0}
+.kpi-val{font-size:19px;font-weight:700;color:#374151}
+.kpi-label{font-size:9px;color:#6b7280;margin-top:2px}
+.kpi-blue .kpi-val{color:#2563eb}
+.kpi-green .kpi-val{color:#16a34a}
+.kpi-red .kpi-val{color:#dc2626}
+.kpi-ind .kpi-val{color:#4f46e5}
+.kpi-masc{background:#eff6ff;border-color:#bfdbfe}.kpi-masc .kpi-val{color:#2563eb}
+.kpi-fem{background:#fdf2f8;border-color:#fbcfe8}.kpi-fem .kpi-val{color:#db2777}
+table{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:3px}
+thead th{background:#1e40af;color:#fff;padding:5px 7px;text-align:left;font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:.04em}
+thead th.right{text-align:right}
+tbody tr:nth-child(even){background:#f8fafc}
+td{padding:4px 7px;border-bottom:1px solid #e5e7eb;vertical-align:middle}
+td.right{text-align:right;font-variant-numeric:tabular-nums}
+td.mono{font-family:monospace;font-size:9.5px}
+.row-subtotal{background:#dbeafe!important;font-weight:700}
+.row-subtotal td{border-top:1.5px solid #93c5fd;color:#1e40af}
+.row-total{background:#1e40af!important}
+.row-total td{color:#fff;font-weight:700;font-size:11px;border:none}
+.row-nonrem{background:#f1f5f9!important;color:#94a3b8;font-style:italic}
+.group-header{background:#eff6ff;padding:5px 8px;font-weight:700;color:#1e40af;font-size:10px;border-left:3px solid #2563eb;margin:10px 0 3px}
+.alert{background:#fff7ed;border:1px solid #fed7aa;border-radius:4px;padding:7px 10px;color:#c2410c;font-size:10px;margin-top:8px}
+.alert-title{font-weight:700;margin-bottom:3px}
+.footer{margin-top:22px;border-top:1px solid #e5e7eb;padding-top:6px;color:#9ca3af;font-size:9px;display:flex;justify-content:space-between}
+@media print{body{padding:8px 12px}@page{margin:10mm 12mm;size:A4}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-left">
+    <h1>VEEC &mdash; ${stage.nom}</h1>
+    <div class="meta">📅 ${fmtDate(stage.date_debut)} &rarr; ${fmtDate(stage.date_fin)} &nbsp;(${stageDates.length} jour${stageDates.length > 1 ? 's' : ''})${stage.gymnase ? `&nbsp;&nbsp;|&nbsp;&nbsp;📍 ${stage.gymnase}` : ''}</div>
+  </div>
+  <div class="gen">Synthèse comptable<br>Généré le ${now}</div>
+</div>
+
+<div class="section">
+  <div class="section-title">Participants</div>
+  <div class="kpi-grid g4">
+    <div class="kpi kpi-blue"><div class="kpi-val">${stats.totalInscrits}</div><div class="kpi-label">Inscrits</div></div>
+    <div class="kpi kpi-ind"><div class="kpi-val">${stats.nbComplet}</div><div class="kpi-label">Stage complet</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#7c3aed">${stats.nbJournee}</div><div class="kpi-label">À la journée</div></div>
+    <div class="kpi kpi-green"><div class="kpi-val">${stats.nbInterne}</div><div class="kpi-label">Internes</div></div>
+  </div>
+  <div class="kpi-grid g2">
+    <div class="kpi kpi-masc"><div class="kpi-val">${stats.nbMasc}</div><div class="kpi-label">Masculins</div></div>
+    <div class="kpi kpi-fem"><div class="kpi-val">${stats.nbFem}</div><div class="kpi-label">Féminines</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Financier &mdash; Synthèse</div>
+  <div class="kpi-grid g3">
+    <div class="kpi"><div class="kpi-val">${stats.totalDu} €</div><div class="kpi-label">Montant dû</div></div>
+    <div class="kpi kpi-green"><div class="kpi-val">${stats.totalRegle} €</div><div class="kpi-label">Réglé</div></div>
+    <div class="kpi ${stats.solde > 0 ? 'kpi-red' : 'kpi-green'}"><div class="kpi-val">${stats.solde > 0 ? '−' + stats.solde : '✓ 0'} €</div><div class="kpi-label">Solde restant</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Détail des paiements par moyen</div>
+  ${paymentDetailHTML}
+  ${alertesHTML}
+</div>
+
+<div class="section">
+  <div class="section-title">Coachs &amp; Indemnités</div>
+  ${coachHTML}
+</div>
+
+<div class="footer">
+  <span>VEEC &mdash; Document confidentiel &mdash; Usage interne comptabilité</span>
+  <span>Généré le ${now}</span>
+</div>
+<script>window.onload=()=>{window.print();}</script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank', 'width=960,height=750');
+    if (!win) { alert('Autorisez les pop-ups pour générer le PDF.'); return; }
+    win.document.write(html);
+    win.document.close();
+  };
+
   return (
     <div className="space-y-4">
 
@@ -863,7 +1073,19 @@ const StageSyntheseView: React.FC<StageSyntheseViewProps> = ({ stage, inscriptio
       {/* Carte Financier — Admin uniquement */}
       {isAdmin && (
         <div className="bg-light-surface dark:bg-dark-surface rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Financier</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Financier</h3>
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-sm"
+              title="Imprimer / Exporter en PDF"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Imprimer PDF
+            </button>
+          </div>
 
           {/* Section Inscriptions */}
           <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Inscriptions</p>
