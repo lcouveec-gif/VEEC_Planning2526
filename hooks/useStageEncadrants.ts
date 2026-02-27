@@ -7,9 +7,10 @@ interface UseStageEncadrantsResult {
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
-  addEncadrant: (licencieId: string, jours?: string[] | null) => Promise<StageEncadrant | null>;
+  addEncadrant: (licencieId: string, jours?: string[] | null, indemnisation_jour?: number | null) => Promise<StageEncadrant | null>;
   updateJours: (id: string, jours: string[] | null) => Promise<boolean>;
   updateRoleStage: (id: string, role: RoleStage) => Promise<boolean>;
+  updateIndemnisation: (id: string, indemnisation_jour: number | null) => Promise<boolean>;
   deleteEncadrant: (id: string) => Promise<boolean>;
 }
 
@@ -47,6 +48,7 @@ export function useStageEncadrants(stageId: string): UseStageEncadrantsResult {
   const addEncadrant = async (
     licencieId: string,
     jours?: string[] | null,
+    indemnisation_jour?: number | null,
   ): Promise<StageEncadrant | null> => {
     try {
       const { data, error: supabaseError } = await supabase
@@ -55,6 +57,7 @@ export function useStageEncadrants(stageId: string): UseStageEncadrantsResult {
           stage_id: stageId,
           licencie_id: licencieId,
           jours: jours && jours.length > 0 ? jours : null,
+          indemnisation_jour: indemnisation_jour ?? null,
         }])
         .select()
         .single();
@@ -107,6 +110,23 @@ export function useStageEncadrants(stageId: string): UseStageEncadrantsResult {
     }
   };
 
+  const updateIndemnisation = async (id: string, indemnisation_jour: number | null): Promise<boolean> => {
+    setEncadrants(prev => prev.map(e => e.id === id ? { ...e, indemnisation_jour } : e));
+    try {
+      const { error: supabaseError } = await supabase
+        .from('stage_encadrants')
+        .update({ indemnisation_jour })
+        .eq('id', id);
+      if (supabaseError) throw supabaseError;
+      return true;
+    } catch (err: any) {
+      console.error('Error updating indemnisation:', err);
+      setError(err.message || 'Erreur lors de la mise à jour de l\'indemnisation.');
+      await fetchEncadrants();
+      return false;
+    }
+  };
+
   const deleteEncadrant = async (id: string): Promise<boolean> => {
     try {
       const { error: supabaseError } = await supabase
@@ -136,6 +156,7 @@ export function useStageEncadrants(stageId: string): UseStageEncadrantsResult {
     addEncadrant,
     updateJours,
     updateRoleStage,
+    updateIndemnisation,
     deleteEncadrant,
   };
 }

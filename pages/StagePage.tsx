@@ -146,7 +146,7 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
     setSelectedDate(stageDates.includes(today) ? today : (stageDates[0] ?? ''));
   }, [stageDates]);
 
-  const [activeTab, setActiveTab] = useState<'presences' | 'groupes' | 'questionnaire'>('presences');
+  const [activeTab, setActiveTab] = useState<'presences' | 'groupes' | 'questionnaire' | 'synthese'>('presences');
 
   const { inscriptions, loading: inscLoading } = useStageInscriptions(stage.id);
   const { presences, togglePresence, getPresencesForDate, error: presenceError } = useStagePresences(stage.id);
@@ -212,7 +212,7 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
 
       {/* Onglets Présences / Groupes */}
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-fit">
-        {(['presences', 'groupes', 'questionnaire'] as const).map(tab => (
+        {(['presences', 'groupes', 'questionnaire', 'synthese'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -222,7 +222,7 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
             }`}
           >
-            {tab === 'presences' ? 'Présences' : tab === 'groupes' ? 'Groupes' : '📋 Questionnaire'}
+            {tab === 'presences' ? 'Présences' : tab === 'groupes' ? 'Groupes' : tab === 'questionnaire' ? '📋 Questionnaire' : '📊 Synthèse'}
           </button>
         ))}
       </div>
@@ -347,6 +347,17 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
       {/* Onglet Questionnaire */}
       {activeTab === 'questionnaire' && (
         <QuestionnaireView stage={stage} inscriptions={inscriptions} />
+      )}
+
+      {/* Onglet Synthèse */}
+      {activeTab === 'synthese' && (
+        <StageSyntheseView
+          stage={stage}
+          inscriptions={inscriptions}
+          encadrants={encadrants}
+          licencies={licencies}
+          stageDates={stageDates}
+        />
       )}
     </div>
   );
@@ -700,6 +711,241 @@ const QuestionnaireView: React.FC<QuestionnaireViewProps> = ({ stage, inscriptio
           )}
         </>
       )}
+    </div>
+  );
+};
+
+// ─── Vue Synthèse ──────────────────────────────────────────────────────────────
+
+interface StageSyntheseViewProps {
+  stage: Stage;
+  inscriptions: StageInscription[];
+  encadrants: StageEncadrant[];
+  licencies: Licencie[];
+  stageDates: string[];
+}
+
+const MOYEN_LABELS: Record<string, string> = {
+  helloasso: 'HelloAsso',
+  especes: 'Espèces',
+  sumup: 'SumUp',
+  virement: 'Virement',
+};
+
+const StageSyntheseView: React.FC<StageSyntheseViewProps> = ({ stage, inscriptions, encadrants, licencies, stageDates }) => {
+  const { stageQuestionnaires, reponses } = useStageQuestionnaire(stage.id);
+
+  const stats = useMemo(() => {
+    // ── Participants ──
+    const totalInscrits = inscriptions.length;
+    const nbComplet = inscriptions.filter(i => i.type_inscription === 'stage_complet').length;
+    const nbJournee = inscriptions.filter(i => i.type_inscription === 'journee').length;
+    const nbInterne = inscriptions.filter(i => i.type_participant === 'interne').length;
+    const nbExterne = inscriptions.filter(i => i.type_participant === 'externe').length;
+
+    const parCategorie = CATEGORIES.map(cat => ({
+      cat,
+      nb: inscriptions.filter(i => i.categorie === cat).length,
+    })).filter(x => x.nb > 0);
+
+    const nbMasc = inscriptions.filter(i => i.genre === 'Masculin').length;
+    const nbFem = inscriptions.filter(i => i.genre === 'Féminin').length;
+
+    // ── Financier ──
+    const totalDu = inscriptions.reduce((s, i) => s + (i.montant ?? 0), 0);
+    const totalRegle = inscriptions.reduce((s, i) => s + (i.montant_regle ?? 0), 0);
+    const solde = totalDu - totalRegle;
+
+    const MOYENS = ['helloasso', 'especes', 'sumup', 'virement'] as const;
+    const parMoyen = MOYENS.map(m => ({
+      moyen: m,
+      nb: inscriptions.filter(i => i.moyen_paiement === m).length,
+      total: inscriptions.filter(i => i.moyen_paiement === m).reduce((s, i) => s + (i.montant_regle ?? 0), 0),
+    })).filter(x => x.nb > 0);
+
+    const alertes = inscriptions.filter(i => i.origine_inscription === 'autre' && !i.moyen_paiement);
+
+    // ── Coachs & indemnisation ──
+    const nbRemuneres = encadrants.filter(e => e.indemnisation_jour != null).length;
+    const nbNonRemuneres = encadrants.filter(e => e.indemnisation_jour == null).length;
+
+    const indemnisationParCoach = encadrants
+      .filter(e => e.indemnisation_jour != null)
+      .map(e => {
+        const nbJours = (e.jours ?? stageDates).length;
+        const lic = licencies.find(l => l.id === e.licencie_id);
+        return {
+          id: e.id,
+          nom: lic ? `${lic.Prenom_Licencie} ${lic.Nom_Licencie || ''}` : '—',
+          tarifJour: e.indemnisation_jour!,
+          nbJours,
+          total: e.indemnisation_jour! * nbJours,
+        };
+      });
+
+    const totalIndemnisation = indemnisationParCoach.reduce((s, c) => s + c.total, 0);
+    const resultatNet = totalRegle - totalIndemnisation;
+
+    // ── Qualitatif ──
+    const nbQuestionnaires = stageQuestionnaires.length;
+    const nbReponses = reponses.length;
+
+    return {
+      totalInscrits, nbComplet, nbJournee, nbInterne, nbExterne,
+      parCategorie, nbMasc, nbFem,
+      totalDu, totalRegle, solde, parMoyen, alertes,
+      nbRemuneres, nbNonRemuneres, indemnisationParCoach, totalIndemnisation, resultatNet,
+      nbQuestionnaires, nbReponses,
+    };
+  }, [inscriptions, encadrants, licencies, stageDates, stageQuestionnaires, reponses]);
+
+  const maxCat = Math.max(...stats.parCategorie.map(x => x.nb), 1);
+
+  return (
+    <div className="space-y-4">
+
+      {/* Carte Participants */}
+      <div className="bg-light-surface dark:bg-dark-surface rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Participants</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+          {[
+            { label: 'Inscrits', val: stats.totalInscrits, color: 'text-indigo-600 dark:text-indigo-400' },
+            { label: 'Stage complet', val: stats.nbComplet, color: 'text-indigo-500 dark:text-indigo-300' },
+            { label: 'À la journée', val: stats.nbJournee, color: 'text-purple-600 dark:text-purple-400' },
+            { label: 'Internes', val: stats.nbInterne, color: 'text-green-600 dark:text-green-400' },
+          ].map(({ label, val, color }) => (
+            <div key={label} className="text-center">
+              <div className={`text-3xl font-bold ${color}`}>{val}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{label}</div>
+            </div>
+          ))}
+        </div>
+        {stats.parCategorie.length > 0 && (
+          <div className="space-y-1.5">
+            {stats.parCategorie.map(({ cat, nb }) => (
+              <div key={cat} className="flex items-center gap-2">
+                <span className="w-12 text-xs text-gray-500 dark:text-gray-400 text-right shrink-0">{cat}</span>
+                <div className="flex-1 h-4 rounded bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500 rounded transition-all"
+                    style={{ width: `${(nb / maxCat) * 100}%` }}
+                  />
+                </div>
+                <span className="w-6 text-xs font-semibold text-gray-700 dark:text-gray-300">{nb}</span>
+                <div className="flex gap-1 text-xs text-gray-400 ml-1">
+                  {stats.nbMasc > 0 && <span>♂{inscriptions.filter(i => i.categorie === cat && i.genre === 'Masculin').length}</span>}
+                  {stats.nbFem > 0 && <span>♀{inscriptions.filter(i => i.categorie === cat && i.genre === 'Féminin').length}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Carte Financier */}
+      <div className="bg-light-surface dark:bg-dark-surface rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Financier — Inscriptions</h3>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-gray-700 dark:text-gray-200">{stats.totalDu} €</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Montant dû</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.totalRegle} €</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Réglé</div>
+          </div>
+          <div className="text-center">
+            <div className={`text-2xl font-bold ${stats.solde > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+              {stats.solde > 0 ? `−${stats.solde} €` : '✓'}
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Solde restant</div>
+          </div>
+        </div>
+        {stats.parMoyen.length > 0 && (
+          <div className="space-y-1.5 mb-3">
+            {stats.parMoyen.map(({ moyen, nb, total }) => (
+              <div key={moyen} className="flex items-center justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">{MOYEN_LABELS[moyen]} ({nb})</span>
+                <span className="font-semibold text-gray-800 dark:text-gray-200">{total} €</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {stats.alertes.length > 0 && (
+          <div className="mt-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+            <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 mb-1">
+              ⚠ {stats.alertes.length} paiement{stats.alertes.length > 1 ? 's' : ''} non confirmé{stats.alertes.length > 1 ? 's' : ''} (origine Autre, sans moyen de paiement)
+            </p>
+            {stats.alertes.map(i => (
+              <p key={i.id} className="text-xs text-orange-600 dark:text-orange-300">{i.prenom} {i.nom || ''}</p>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Carte Coachs & Indemnisation */}
+      <div className="bg-light-surface dark:bg-dark-surface rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Coachs & Indemnisation</h3>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-gray-700 dark:text-gray-200">{encadrants.length}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Encadrants</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{stats.totalIndemnisation} €</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">À verser</div>
+          </div>
+          <div className="text-center">
+            <div className={`text-2xl font-bold ${stats.resultatNet >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+              {stats.resultatNet} €
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Net (réglé − indemn.)</div>
+          </div>
+        </div>
+        {stats.indemnisationParCoach.length > 0 && (
+          <div className="space-y-1.5">
+            {stats.indemnisationParCoach.map(c => (
+              <div key={c.id} className="flex items-center justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">{c.nom}</span>
+                <span className="text-gray-500 dark:text-gray-500 text-xs">{c.tarifJour} €/j × {c.nbJours} j</span>
+                <span className="font-semibold text-indigo-700 dark:text-indigo-300">{c.total} €</span>
+              </div>
+            ))}
+            {stats.nbNonRemuneres > 0 && (
+              <p className="text-xs text-gray-400 italic mt-1">+ {stats.nbNonRemuneres} encadrant{stats.nbNonRemuneres > 1 ? 's' : ''} non rémunéré{stats.nbNonRemuneres > 1 ? 's' : ''}</p>
+            )}
+          </div>
+        )}
+        {encadrants.length === 0 && (
+          <p className="text-sm text-gray-400 italic">Aucun encadrant associé à ce stage</p>
+        )}
+      </div>
+
+      {/* Carte Qualitatif */}
+      <div className="bg-light-surface dark:bg-dark-surface rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Qualitatif — Questionnaire</h3>
+        {stats.nbQuestionnaires === 0 ? (
+          <p className="text-sm text-gray-400 italic">Aucun questionnaire affecté à ce stage</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                <div
+                  className="h-full bg-teal-500 rounded-full transition-all"
+                  style={{ width: `${inscriptions.length > 0 ? Math.round((stats.nbReponses / inscriptions.length) * 100) : 0}%` }}
+                />
+              </div>
+              <span className="text-sm font-semibold text-teal-700 dark:text-teal-400 whitespace-nowrap">
+                {stats.nbReponses} / {inscriptions.length} réponses
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {stats.nbQuestionnaires} questionnaire{stats.nbQuestionnaires > 1 ? 's' : ''} affecté{stats.nbQuestionnaires > 1 ? 's' : ''} — consultez l'onglet Questionnaire pour les détails
+            </p>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 };

@@ -62,6 +62,11 @@ export function useStageInscriptions(stageId: string): UseStageInscriptionsResul
     nb_jours: data.jours && data.jours.length > 0 ? data.jours.length : (data.nb_jours ?? null),
     montant: data.montant ?? null,
     notes: data.notes || null,
+    origine_inscription: data.origine_inscription ?? null,
+    num_commande_helloasso: data.num_commande_helloasso || null,
+    moyen_paiement: data.moyen_paiement ?? null,
+    montant_regle: data.montant_regle ?? null,
+    email_commanditaire: data.email_commanditaire || null,
   });
 
   const createInscription = async (

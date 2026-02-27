@@ -157,6 +157,9 @@ export type StageNiveau = 'Débutant' | 'Confirmé' | 'Expert';
 export type TypeInscription = 'stage_complet' | 'journee';
 export type TypeParticipant = 'interne' | 'externe';
 
+export type OrigineInscription = 'helloasso' | 'autre';
+export type MoyenPaiement = 'helloasso' | 'especes' | 'sumup' | 'virement';
+
 export interface StageInscription {
   id: string;
   stage_id: string;
@@ -174,6 +177,12 @@ export interface StageInscription {
   nb_jours?: number | null; // Dérivé de jours.length (calculé automatiquement)
   montant?: number | null;
   notes?: string | null;
+  // Traçabilité paiement
+  origine_inscription?: OrigineInscription | null;
+  num_commande_helloasso?: string | null;
+  moyen_paiement?: MoyenPaiement | null;
+  montant_regle?: number | null;
+  email_commanditaire?: string | null;
   created_at?: string;
 }
 
@@ -217,6 +226,7 @@ export interface StageEncadrant {
   licencie_id: string;
   jours?: string[] | null;         // null = tous les jours du stage
   role_stage?: RoleStage | null;   // responsable du stage ou simple encadrant
+  indemnisation_jour?: number | null; // null = non rémunéré
   created_at?: string;
 }
 
