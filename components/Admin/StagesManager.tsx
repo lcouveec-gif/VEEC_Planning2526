@@ -1745,7 +1745,13 @@ const InscriptionModal: React.FC<InscriptionModalProps> = ({
                       <button
                         key={val}
                         type="button"
-                        onClick={() => onChange('origine_inscription', form.origine_inscription === val ? null : val)}
+                        onClick={() => {
+                          const newOrigine = form.origine_inscription === val ? null : val as OrigineInscription;
+                          onChange('origine_inscription', newOrigine);
+                          if (val === 'helloasso' && newOrigine === 'helloasso' && !form.moyen_paiement) {
+                            onChange('moyen_paiement', 'helloasso');
+                          }
+                        }}
                         className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
                           form.origine_inscription === val
                             ? val === 'helloasso'
@@ -1779,7 +1785,15 @@ const InscriptionModal: React.FC<InscriptionModalProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Montant réglé</label>
+                  <div className="flex items-center gap-2 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Montant réglé</label>
+                    {form.montant != null && (
+                      <button type="button" onClick={() => onChange('montant_regle', form.montant)}
+                        className="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-800/60 transition-colors">
+                        = {form.montant} € (auto)
+                      </button>
+                    )}
+                  </div>
                   <div className="relative">
                     <input type="number" min="0" step="0.5" value={form.montant_regle ?? ''}
                       onChange={(e) => onChange('montant_regle', e.target.value ? parseFloat(e.target.value) : null)}
