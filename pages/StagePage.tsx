@@ -149,6 +149,11 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
 
   const [activeTab, setActiveTab] = useState<'presences' | 'groupes' | 'questionnaire' | 'synthese'>('presences');
 
+  // Filtres onglet Présences
+  const [presFilterNom, setPresFilterNom]       = useState('');
+  const [presFilterCategorie, setPresFilterCategorie] = useState('');
+  const [presFilterGenre, setPresFilterGenre]   = useState('');
+
   const { inscriptions, loading: inscLoading } = useStageInscriptions(stage.id);
   const { presences, togglePresence, getPresencesForDate, error: presenceError } = useStagePresences(stage.id);
   const groupesHook = useStageGroupes(stage.id);
@@ -271,64 +276,126 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
             </div>
           )}
 
+          {/* Filtres */}
+          {stagiairesJour.length > 0 && (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={presFilterNom}
+                onChange={e => setPresFilterNom(e.target.value)}
+                placeholder="Rechercher nom / prénom…"
+                className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+              />
+              <select value={presFilterCategorie} onChange={e => setPresFilterCategorie(e.target.value)}
+                className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 text-sm">
+                <option value="">Toutes catégories</option>
+                {CATEGORIES.map(c => (
+                  <option key={c} value={c}>{c} ({stagiairesJour.filter(i => i.categorie === c).length})</option>
+                ))}
+              </select>
+              <select value={presFilterGenre} onChange={e => setPresFilterGenre(e.target.value)}
+                className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 text-sm">
+                <option value="">Tous sexes</option>
+                <option value="Masculin">Masculin ({stagiairesJour.filter(i => i.genre === 'Masculin').length})</option>
+                <option value="Féminin">Féminin ({stagiairesJour.filter(i => i.genre === 'Féminin').length})</option>
+              </select>
+              {(presFilterNom || presFilterCategorie || presFilterGenre) && (
+                <button
+                  onClick={() => { setPresFilterNom(''); setPresFilterCategorie(''); setPresFilterGenre(''); }}
+                  className="px-3 py-1.5 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 border border-gray-300 dark:border-gray-600 hover:border-red-300 transition-colors whitespace-nowrap"
+                >
+                  Réinitialiser
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Liste des stagiaires */}
           {stagiairesJour.length === 0 ? (
             <div className="text-center py-10 text-gray-500 dark:text-gray-400 text-sm">
               Aucun stagiaire inscrit pour ce jour
             </div>
-          ) : (
-            <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
-              {stagiairesJour.map(ins => {
-                const presence = presencesJour.find(p => p.inscription_id === ins.id);
-                const isPresent = presence?.present ?? false;
-                return (
-                  <div key={ins.id} className="flex items-center gap-3 px-4 py-3">
-                    <button
-                      onClick={() => togglePresence(ins.id, selectedDate, isPresent)}
-                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                        isPresent
-                          ? 'bg-green-500 text-white hover:bg-green-600'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                      }`}
-                      title={isPresent ? 'Marquer absent' : 'Marquer présent'}
-                    >
-                      {isPresent ? (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      )}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-light-onSurface dark:text-dark-onSurface">
-                        {ins.nom ? `${ins.nom} ${ins.prenom}` : ins.prenom}
-                        {ins.num_licence && (
-                          <span className="ml-2 text-xs font-mono text-gray-400">{ins.num_licence}</span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-1 mt-0.5">
-                        {ins.categorie && (
-                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">{ins.categorie}</span>
-                        )}
-                        <span className={`px-1.5 py-0.5 rounded text-xs ${ins.type_inscription === 'stage_complet' ? 'bg-indigo-50 dark:bg-indigo-800/50 text-indigo-600 dark:text-white' : 'bg-purple-50 dark:bg-purple-800/50 text-purple-600 dark:text-white'}`}>
-                          {ins.type_inscription === 'stage_complet' ? 'Stage' : 'Journée'}
-                        </span>
-                        <span className={`px-1.5 py-0.5 rounded text-xs ${ins.type_participant === 'interne' ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'}`}>
-                          {ins.type_participant === 'interne' ? 'Interne' : 'Externe'}
-                        </span>
-                      </div>
+          ) : (() => {
+            const filtered = stagiairesJour.filter(ins => {
+              if (presFilterCategorie && ins.categorie !== presFilterCategorie) return false;
+              if (presFilterGenre && ins.genre !== presFilterGenre) return false;
+              if (presFilterNom) {
+                const q = presFilterNom.toLowerCase();
+                if (!`${ins.prenom} ${ins.nom ?? ''}`.toLowerCase().includes(q)) return false;
+              }
+              return true;
+            });
+            return (
+              <>
+                {(presFilterNom || presFilterCategorie || presFilterGenre) && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {filtered.length} / {stagiairesJour.length} stagiaire{stagiairesJour.length > 1 ? 's' : ''}
+                  </p>
+                )}
+                <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+                  {filtered.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+                      Aucun stagiaire pour ces filtres
                     </div>
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${isPresent ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400'}`}>
-                      {isPresent ? 'Présent' : 'Absent'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  ) : filtered.map(ins => {
+                    const presence = presencesJour.find(p => p.inscription_id === ins.id);
+                    const isPresent = presence?.present ?? false;
+                    return (
+                      <div key={ins.id} className="flex items-center gap-3 px-4 py-3">
+                        <button
+                          onClick={() => togglePresence(ins.id, selectedDate, isPresent)}
+                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                            isPresent
+                              ? 'bg-green-500 text-white hover:bg-green-600'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                          title={isPresent ? 'Marquer absent' : 'Marquer présent'}
+                        >
+                          {isPresent ? (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-light-onSurface dark:text-dark-onSurface">
+                            {ins.nom ? `${ins.nom} ${ins.prenom}` : ins.prenom}
+                            {ins.num_licence && (
+                              <span className="ml-2 text-xs font-mono text-gray-400">{ins.num_licence}</span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {ins.categorie && (
+                              <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">{ins.categorie}</span>
+                            )}
+                            {ins.genre === 'Masculin' && (
+                              <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">♂ M</span>
+                            )}
+                            {ins.genre === 'Féminin' && (
+                              <span className="px-1.5 py-0.5 rounded text-xs bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300">♀ F</span>
+                            )}
+                            <span className={`px-1.5 py-0.5 rounded text-xs ${ins.type_inscription === 'stage_complet' ? 'bg-indigo-50 dark:bg-indigo-800/50 text-indigo-600 dark:text-white' : 'bg-purple-50 dark:bg-purple-800/50 text-purple-600 dark:text-white'}`}>
+                              {ins.type_inscription === 'stage_complet' ? 'Stage' : 'Journée'}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-xs ${ins.type_participant === 'interne' ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'}`}>
+                              {ins.type_participant === 'interne' ? 'Interne' : 'Externe'}
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${isPresent ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400'}`}>
+                          {isPresent ? 'Présent' : 'Absent'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
@@ -816,38 +883,62 @@ const StageSyntheseView: React.FC<StageSyntheseViewProps> = ({ stage, inscriptio
       { key: null,        label: 'Non précisé' },
     ];
 
+    // Expand inscriptions → lignes de paiement individuelles
+    // Une inscription avec 2 paiements génère 2 lignes dans 2 groupes distincts
+    interface PrintPmtRow {
+      nom: string; prenom: string; cat: string; typeLabel: string; nbJ: number | string;
+      montantDu: number | null; montantPaiement: number;
+      moyen: MoyenPaiement | null; numCommande: string | null; alerte: boolean;
+    }
+    const allPmtRows: PrintPmtRow[] = [];
+    for (const i of inscriptions) {
+      const nbJ = i.jours?.length ?? i.nb_jours ?? '—';
+      const typeLabel = i.type_inscription === 'stage_complet' ? 'Forfait' : 'Journée';
+      if (i.paiements && i.paiements.length > 0) {
+        for (const p of i.paiements) {
+          allPmtRows.push({
+            nom: i.nom || '', prenom: i.prenom, cat: i.categorie || '—',
+            typeLabel, nbJ, montantDu: i.montant ?? null,
+            montantPaiement: p.montant, moyen: p.moyen,
+            numCommande: p.num_commande_helloasso || null, alerte: false,
+          });
+        }
+      } else {
+        // Ancienne inscription sans paiements[] → ligne unique depuis les champs plats
+        allPmtRows.push({
+          nom: i.nom || '', prenom: i.prenom, cat: i.categorie || '—',
+          typeLabel, nbJ, montantDu: i.montant ?? null,
+          montantPaiement: i.montant_regle ?? 0, moyen: i.moyen_paiement ?? null,
+          numCommande: i.num_commande_helloasso || null,
+          alerte: i.origine_inscription === 'autre' && !i.moyen_paiement,
+        });
+      }
+    }
+
     const paymentDetailHTML = GROUPS.map(({ key, label }) => {
-      const group = inscriptions.filter(i =>
-        key === null ? !i.moyen_paiement : i.moyen_paiement === key
-      );
-      if (group.length === 0) return '';
-      const groupDu    = group.reduce((s, i) => s + (i.montant       ?? 0), 0);
-      const groupRegle = group.reduce((s, i) => s + (i.montant_regle ?? 0), 0);
-      const rows = group.map(i => {
-        const nbJ = i.jours?.length ?? i.nb_jours ?? '—';
-        const typeLabel = i.type_inscription === 'stage_complet' ? 'Forfait' : 'Journée';
-        const alerte = i.origine_inscription === 'autre' && !i.moyen_paiement ? ' ⚠' : '';
-        return `<tr>
-          <td>${i.nom || ''}</td><td>${i.prenom}</td><td>${i.categorie || '—'}</td>
-          <td>${typeLabel} (${nbJ}j)</td>
-          <td class="right">${i.montant != null ? i.montant + ' €' : '—'}</td>
-          <td class="right">${i.montant_regle != null ? i.montant_regle + ' €' : '—'}</td>
-          <td class="mono">${i.num_commande_helloasso || ''}${alerte}</td>
-        </tr>`;
-      }).join('');
+      const groupRows = allPmtRows.filter(r => key === null ? !r.moyen : r.moyen === key);
+      if (groupRows.length === 0) return '';
+      const groupRegle = groupRows.reduce((s, r) => s + r.montantPaiement, 0);
+      const rows = groupRows.map(r => `<tr>
+          <td>${r.nom}</td><td>${r.prenom}</td><td>${r.cat}</td>
+          <td>${r.typeLabel} (${r.nbJ}j)</td>
+          <td class="right" style="color:#9ca3af">${r.montantDu != null ? r.montantDu + ' €' : '—'}</td>
+          <td class="right"><strong>${r.montantPaiement} €</strong></td>
+          <td class="mono">${r.numCommande || ''}${r.alerte ? ' ⚠' : ''}</td>
+        </tr>`).join('');
       return `
-        <div class="group-header">${label} &mdash; ${group.length} inscription${group.length > 1 ? 's' : ''}</div>
+        <div class="group-header">${label} &mdash; ${groupRows.length} paiement${groupRows.length > 1 ? 's' : ''}</div>
         <table>
           <thead><tr>
             <th>Nom</th><th>Prénom</th><th>Cat.</th><th>Type</th>
-            <th class="right">Montant dû</th><th class="right">Réglé</th>
+            <th class="right" style="opacity:.75">Montant dû</th>
+            <th class="right">Réglé (ce moyen)</th>
             <th>${key === 'helloasso' ? 'N° Commande' : ''}</th>
           </tr></thead>
           <tbody>
             ${rows}
             <tr class="row-subtotal">
-              <td colspan="4">Sous-total ${label}</td>
-              <td class="right">${groupDu} €</td>
+              <td colspan="5">Sous-total ${label}</td>
               <td class="right">${groupRegle} €</td>
               <td></td>
             </tr>

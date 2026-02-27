@@ -484,8 +484,9 @@ CREATE TABLE IF NOT EXISTS stage_inscriptions (
   origine_inscription     TEXT CHECK (origine_inscription IN ('helloasso', 'autre')),
   num_commande_helloasso  TEXT,          -- ex: 168413774
   moyen_paiement          TEXT CHECK (moyen_paiement IN ('helloasso', 'especes', 'sumup', 'virement')),
-  montant_regle           NUMERIC,       -- peut être partiel (paiement en plusieurs fois)
+  montant_regle           NUMERIC,       -- somme de paiements[].montant (calculé au save)
   email_commanditaire     TEXT,          -- email du parent / commanditaire
+  paiements               JSONB,         -- [{moyen, montant, num_commande_helloasso?}] multi-paiement
   created_at              TIMESTAMPTZ DEFAULT NOW()
 );
 

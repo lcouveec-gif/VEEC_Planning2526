@@ -160,6 +160,12 @@ export type TypeParticipant = 'interne' | 'externe';
 export type OrigineInscription = 'helloasso' | 'autre';
 export type MoyenPaiement = 'helloasso' | 'especes' | 'sumup' | 'virement';
 
+export interface PaiementLine {
+  moyen: MoyenPaiement;
+  montant: number;
+  num_commande_helloasso?: string | null;
+}
+
 export interface StageInscription {
   id: string;
   stage_id: string;
@@ -179,10 +185,11 @@ export interface StageInscription {
   notes?: string | null;
   // Traçabilité paiement
   origine_inscription?: OrigineInscription | null;
-  num_commande_helloasso?: string | null;
-  moyen_paiement?: MoyenPaiement | null;
-  montant_regle?: number | null;
+  num_commande_helloasso?: string | null;   // 1er paiement HelloAsso (rétrocompatibilité)
+  moyen_paiement?: MoyenPaiement | null;    // moyen unique ou null si multi
+  montant_regle?: number | null;            // somme de paiements[].montant
   email_commanditaire?: string | null;
+  paiements?: PaiementLine[] | null;        // lignes de paiement (multi-moyen)
   created_at?: string;
 }
 

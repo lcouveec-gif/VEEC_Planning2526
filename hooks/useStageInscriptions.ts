@@ -67,6 +67,7 @@ export function useStageInscriptions(stageId: string): UseStageInscriptionsResul
     moyen_paiement: data.moyen_paiement ?? null,
     montant_regle: data.montant_regle ?? null,
     email_commanditaire: data.email_commanditaire || null,
+    paiements: data.paiements && data.paiements.length > 0 ? data.paiements : null,
   });
 
   const createInscription = async (
