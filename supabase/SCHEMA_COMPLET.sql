@@ -1,6 +1,6 @@
 -- ============================================================
 --  VEEC Planning 2025/2026 — Schéma Supabase COMPLET
---  Généré le : 2026-02-25
+--  Généré le : 2026-02-27 (mis à jour)
 --  Usage : recréer from scratch une base Supabase vierge
 --
 --  ORDRE D'EXÉCUTION OBLIGATOIRE (dépendances FK) :
@@ -23,9 +23,14 @@
 --   17. stage_groupe_membres  (FK → stage_groupes, stage_inscriptions)
 --   18. stage_encadrants  (FK → stages, VEEC_Licencie)
 --   19. stage_groupe_encadrants  (FK → stage_groupes, stage_encadrants)
---   20. Fonctions et triggers
---   21. Politiques RLS
---   22. Fonction is_admin_user (helper RLS)
+--   20. questionnaire_templates
+--   21. questionnaire_questions  (FK → questionnaire_templates)
+--   22. stage_questionnaires  (FK → stages, questionnaire_templates)
+--   23. questionnaire_reponses  (FK → stage_questionnaires, stage_inscriptions)
+--   24. questionnaire_reponses_details  (FK → questionnaire_reponses, questionnaire_questions)
+--   25. Fonctions et triggers
+--   26. Politiques RLS
+--   27. Fonction is_admin_user (helper RLS)
 --
 --  NOTES :
 --  - RLS désactivé sur VEEC_Equipes (accès anonyme requis)
@@ -461,21 +466,28 @@ CREATE POLICY "Auth access stages"
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS stage_inscriptions (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  stage_id          UUID NOT NULL REFERENCES stages (id) ON DELETE CASCADE,
-  nom               TEXT,
-  prenom            TEXT NOT NULL,
-  categorie         TEXT CHECK (categorie IN ('M11', 'M13', 'M15', 'M18', 'Senior')),
-  genre             TEXT CHECK (genre IN ('Masculin', 'Féminin')),
-  niveau            TEXT CHECK (niveau IN ('Débutant', 'Confirmé', 'Expert')),
-  num_licence       TEXT,
-  type_inscription  TEXT NOT NULL CHECK (type_inscription IN ('stage_complet', 'journee')),
-  type_participant  TEXT NOT NULL CHECK (type_participant IN ('interne', 'externe')),
-  jours             TEXT[],        -- YYYY-MM-DD[] dates de présence prévues
-  nb_jours          INTEGER,       -- calculé = length(jours)
-  montant           NUMERIC,
-  notes             TEXT,
-  created_at        TIMESTAMPTZ DEFAULT NOW()
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stage_id                UUID NOT NULL REFERENCES stages (id) ON DELETE CASCADE,
+  nom                     TEXT,
+  prenom                  TEXT NOT NULL,
+  categorie               TEXT CHECK (categorie IN ('M11', 'M13', 'M15', 'M18', 'Senior')),
+  genre                   TEXT CHECK (genre IN ('Masculin', 'Féminin')),
+  niveau                  TEXT CHECK (niveau IN ('Débutant', 'Confirmé', 'Expert')),
+  num_licence             TEXT,
+  type_inscription        TEXT NOT NULL CHECK (type_inscription IN ('stage_complet', 'journee')),
+  type_participant        TEXT NOT NULL CHECK (type_participant IN ('interne', 'externe')),
+  jours                   TEXT[],        -- YYYY-MM-DD[] dates de présence prévues
+  nb_jours                INTEGER,       -- calculé = length(jours)
+  montant                 NUMERIC,
+  notes                   TEXT,
+  -- Traçabilité paiement
+  origine_inscription     TEXT CHECK (origine_inscription IN ('helloasso', 'autre')),
+  num_commande_helloasso  TEXT,          -- ex: 168413774
+  moyen_paiement          TEXT CHECK (moyen_paiement IN ('helloasso', 'especes', 'sumup', 'virement')),
+  montant_regle           NUMERIC,       -- somme de paiements[].montant (calculé au save)
+  email_commanditaire     TEXT,          -- email du parent / commanditaire
+  paiements               JSONB,         -- [{moyen, montant, num_commande_helloasso?}] multi-paiement
+  created_at              TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_stage_inscriptions_stage_id ON stage_inscriptions (stage_id);
@@ -560,12 +572,13 @@ CREATE POLICY "Auth access stage_groupe_membres"
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS stage_encadrants (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  stage_id     UUID NOT NULL REFERENCES stages (id) ON DELETE CASCADE,
-  licencie_id  UUID NOT NULL,   -- → VEEC_Licencie.id (pas de FK formelle)
-  jours        TEXT[],          -- NULL = tous les jours du stage
-  role_stage   TEXT DEFAULT 'encadrant' CHECK (role_stage IN ('responsable', 'encadrant')),
-  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stage_id           UUID NOT NULL REFERENCES stages (id) ON DELETE CASCADE,
+  licencie_id        UUID NOT NULL,   -- → VEEC_Licencie.id (pas de FK formelle)
+  jours              TEXT[],          -- NULL = tous les jours du stage
+  role_stage         TEXT DEFAULT 'encadrant' CHECK (role_stage IN ('responsable', 'encadrant')),
+  indemnisation_jour NUMERIC,         -- montant en € par jour ; NULL = non rémunéré
+  created_at         TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (stage_id, licencie_id)
 );
 
@@ -601,7 +614,126 @@ CREATE POLICY "Auth access stage_groupe_encadrants"
 
 
 -- ============================================================
--- 19. FONCTIONS UTILITAIRES
+-- 19. questionnaire_templates  (modèles de questionnaire)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS questionnaire_templates (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nom         TEXT NOT NULL,
+  description TEXT,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE questionnaire_templates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Auth access questionnaire_templates"
+  ON questionnaire_templates FOR ALL TO authenticated
+  USING (true) WITH CHECK (true);
+
+
+-- ============================================================
+-- 20. questionnaire_questions  (questions d'un modèle)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS questionnaire_questions (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  questionnaire_id     UUID NOT NULL REFERENCES questionnaire_templates (id) ON DELETE CASCADE,
+  ordre                INTEGER NOT NULL DEFAULT 0,
+  texte_question       TEXT NOT NULL,
+  type_question        TEXT NOT NULL CHECK (type_question IN ('texte_libre', 'note_5', 'note_10', 'oui_non', 'date')),
+  obligatoire          BOOLEAN NOT NULL DEFAULT false,
+  created_at           TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_questionnaire_questions_questionnaire_id ON questionnaire_questions (questionnaire_id);
+
+ALTER TABLE questionnaire_questions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Auth access questionnaire_questions"
+  ON questionnaire_questions FOR ALL TO authenticated
+  USING (true) WITH CHECK (true);
+
+
+-- ============================================================
+-- 21. stage_questionnaires  (questionnaire affecté à un stage)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS stage_questionnaires (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stage_id             UUID NOT NULL REFERENCES stages (id) ON DELETE CASCADE,
+  questionnaire_id     UUID NOT NULL REFERENCES questionnaire_templates (id) ON DELETE CASCADE,
+  created_at           TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (stage_id, questionnaire_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stage_questionnaires_stage_id ON stage_questionnaires (stage_id);
+
+ALTER TABLE stage_questionnaires ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Auth access stage_questionnaires"
+  ON stage_questionnaires FOR ALL TO authenticated
+  USING (true) WITH CHECK (true);
+
+
+-- ============================================================
+-- 22. questionnaire_reponses  (réponse d'un participant à un questionnaire)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS questionnaire_reponses (
+  id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stage_questionnaire_id   UUID NOT NULL REFERENCES stage_questionnaires (id) ON DELETE CASCADE,
+  inscription_id           UUID,  -- → stage_inscriptions.id (pas de FK formelle)
+  repondant_nom            TEXT,
+  repondant_prenom         TEXT,
+  repondant_categorie      TEXT,
+  submitted_at             TIMESTAMPTZ DEFAULT NOW(),
+  created_at               TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_questionnaire_reponses_stage_questionnaire_id ON questionnaire_reponses (stage_questionnaire_id);
+
+ALTER TABLE questionnaire_reponses ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Auth access questionnaire_reponses"
+  ON questionnaire_reponses FOR ALL TO authenticated
+  USING (true) WITH CHECK (true);
+
+-- Politique publique pour la soumission de réponses (participants non authentifiés)
+CREATE POLICY "Public submit questionnaire_reponses"
+  ON questionnaire_reponses FOR INSERT TO anon
+  WITH CHECK (true);
+
+
+-- ============================================================
+-- 23. questionnaire_reponses_details  (détail par question)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS questionnaire_reponses_details (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reponse_id      UUID NOT NULL REFERENCES questionnaire_reponses (id) ON DELETE CASCADE,
+  question_id     UUID NOT NULL REFERENCES questionnaire_questions (id) ON DELETE CASCADE,
+  valeur_note     INTEGER,                -- pour note_5 / note_10
+  valeur_texte    TEXT,                   -- pour texte_libre / oui_non / date
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (reponse_id, question_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_questionnaire_reponses_details_reponse_id ON questionnaire_reponses_details (reponse_id);
+
+ALTER TABLE questionnaire_reponses_details ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Auth access questionnaire_reponses_details"
+  ON questionnaire_reponses_details FOR ALL TO authenticated
+  USING (true) WITH CHECK (true);
+
+-- Politique publique pour la soumission de réponses (participants non authentifiés)
+CREATE POLICY "Public submit questionnaire_reponses_details"
+  ON questionnaire_reponses_details FOR INSERT TO anon
+  WITH CHECK (true);
+
+
+-- ============================================================
+-- 24. FONCTIONS UTILITAIRES
 -- ============================================================
 
 -- Fonction générique pour updated_at
@@ -790,6 +922,8 @@ BEGIN
   RAISE NOTICE '  - stages, stage_inscriptions, stage_presences';
   RAISE NOTICE '  - stage_groupes, stage_groupe_membres';
   RAISE NOTICE '  - stage_encadrants, stage_groupe_encadrants';
+  RAISE NOTICE '  - questionnaire_templates, questionnaire_questions';
+  RAISE NOTICE '  - stage_questionnaires, questionnaire_reponses, questionnaire_reponses_details';
   RAISE NOTICE '';
   RAISE NOTICE 'Étapes post-installation :';
   RAISE NOTICE '  1. Créer les buckets Storage : club-logos, team-images';

@@ -20,6 +20,9 @@ import type {
   QuestionnaireReponse,
   QuestionnaireReponseDetail,
   TypeQuestion,
+  OrigineInscription,
+  MoyenPaiement,
+  PaiementLine,
 } from '../../types';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -141,6 +144,12 @@ const emptyInscription = (stageId: string): InscriptionFormData => ({
   nb_jours: null,
   montant: null,
   notes: '',
+  origine_inscription: null,
+  num_commande_helloasso: null,
+  moyen_paiement: null,
+  montant_regle: null,
+  email_commanditaire: null,
+  paiements: [],
 });
 
 // ─── Composant principal ───────────────────────────────────────────────────────
@@ -508,13 +517,16 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
 
   const { licencies } = useLicencies();
   const {
-    encadrants, addEncadrant, updateJours: updateEncadrantJours, updateRoleStage, deleteEncadrant,
+    encadrants, addEncadrant, updateJours: updateEncadrantJours, updateRoleStage, updateIndemnisation, deleteEncadrant,
   } = useStageEncadrants(stage.id);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResult, setImportResult] = useState<ImportInscriptionResult | null>(null);
   const [importing, setImporting] = useState(false);
-  const [filterType, setFilterType] = useState<string>('');
+  const [filterType, setFilterType]         = useState<string>('');
+  const [filterNomPrenom, setFilterNomPrenom] = useState<string>('');
+  const [filterCategorie, setFilterCategorie] = useState<string>('');
+  const [filterGenre, setFilterGenre]         = useState<string>('');
 
   // Modal inscription
   const [modalOpen, setModalOpen] = useState(false);
@@ -525,8 +537,15 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
   const stageDates = getDatesInRange(stage.date_debut, stage.date_fin);
 
   const filtered = inscriptions.filter(ins => {
-    if (!filterType) return true;
-    return ins.type_inscription === filterType || ins.type_participant === filterType;
+    if (filterType && ins.type_inscription !== filterType && ins.type_participant !== filterType) return false;
+    if (filterCategorie && ins.categorie !== filterCategorie) return false;
+    if (filterGenre && ins.genre !== filterGenre) return false;
+    if (filterNomPrenom) {
+      const q = filterNomPrenom.toLowerCase();
+      const full = `${ins.prenom} ${ins.nom ?? ''}`.toLowerCase();
+      if (!full.includes(q)) return false;
+    }
+    return true;
   });
 
   const totalMontant = inscriptions.reduce((s, i) => s + (i.montant ?? 0), 0);
@@ -548,6 +567,13 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
 
   const openEditModal = (ins: StageInscription) => {
     setEditingId(ins.id);
+    // Construire paiements : si déjà en JSONB → utiliser tel quel
+    // Sinon migrer les anciens champs individuels vers une ligne synthétique
+    const paiements: PaiementLine[] = ins.paiements && ins.paiements.length > 0
+      ? ins.paiements
+      : ins.moyen_paiement && ins.montant_regle != null
+        ? [{ moyen: ins.moyen_paiement, montant: ins.montant_regle, num_commande_helloasso: ins.num_commande_helloasso || null }]
+        : [];
     setInscForm({
       stage_id: ins.stage_id,
       nom: ins.nom ?? '',
@@ -562,6 +588,12 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
       nb_jours: ins.nb_jours ?? null,
       montant: ins.montant ?? null,
       notes: ins.notes ?? '',
+      origine_inscription: ins.origine_inscription ?? null,
+      num_commande_helloasso: ins.num_commande_helloasso ?? null,
+      moyen_paiement: ins.moyen_paiement ?? null,
+      montant_regle: ins.montant_regle ?? null,
+      email_commanditaire: ins.email_commanditaire ?? null,
+      paiements,
     });
     setModalOpen(true);
   };
@@ -629,6 +661,18 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
         nb_jours: inscForm.jours ? inscForm.jours.length : null,
         montant: inscForm.montant ?? null,
         notes: inscForm.notes?.trim() || null,
+        origine_inscription: inscForm.origine_inscription ?? null,
+        email_commanditaire: inscForm.email_commanditaire?.trim() || null,
+        paiements: inscForm.paiements && inscForm.paiements.length > 0 ? inscForm.paiements : null,
+        // Champs plats dérivés de paiements[] pour rétrocompatibilité et filtrage
+        montant_regle: inscForm.paiements && inscForm.paiements.length > 0
+          ? inscForm.paiements.reduce((s, p) => s + p.montant, 0)
+          : null,
+        moyen_paiement: (() => {
+          const moyens = [...new Set((inscForm.paiements || []).map(p => p.moyen))];
+          return moyens.length === 1 ? moyens[0] : null;
+        })(),
+        num_commande_helloasso: (inscForm.paiements || []).find(p => p.moyen === 'helloasso')?.num_commande_helloasso?.trim() || null,
       };
 
       if (editingId) {
@@ -655,14 +699,14 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
     // Nouveau format : 1 ligne par stagiaire pour forfait, 1 ligne par jour pour journée
     const day1 = stageDates[0] || '';
     const day2 = stageDates[1] || stageDates[0] || '';
-    const header = 'Nom;Prenom;Num_Licence;Categorie;Genre;Niveau;Type_Inscription;Date;Notes';
+    const header = 'Nom;Prenom;Num_Licence;Categorie;Genre;Niveau;Type_Inscription;Date;Notes;Origine;Num_Commande_Helloasso;Moyen_Paiement;Montant_Regle;Email_Commanditaire';
     // Exemples : DUPONT forfait licencié (1 ligne), MARTIN forfait externe (1 ligne),
     //            DURAND journée externe (2 lignes = 2 jours)
     const examples = [
-      `DUPONT;Jean;2412345;Senior;Masculin;Confirmé;Licenciés: Forfait;;`,
-      `MARTIN;Marie;;Senior;Féminin;Débutant;Externes: Forfait;;`,
-      `DURAND;Lucas;;M15;Masculin;Débutant;Externes: 1 Jour;${day1};`,
-      `DURAND;Lucas;;M15;Masculin;Débutant;Externes: 1 Jour;${day2};`,
+      `DUPONT;Jean;2412345;Senior;Masculin;Confirmé;Licenciés: Forfait;;;helloasso;168413774;helloasso;80;jean.dupont@email.com`,
+      `MARTIN;Marie;;Senior;Féminin;Débutant;Externes: Forfait;;;autre;;;80;marie.martin@email.com`,
+      `DURAND;Lucas;;M15;Masculin;Débutant;Externes: 1 Jour;${day1};;;autre;;especes;25;`,
+      `DURAND;Lucas;;M15;Masculin;Débutant;Externes: 1 Jour;${day2};;;;;;;`,
     ];
     const csv = [header, ...examples].join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -701,6 +745,11 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
         typeInscription: columns.findIndex(c => c.includes('type_insc') || c === 'type_inscription'),
         date: columns.findIndex(c => c === 'date'),
         notes: columns.findIndex(c => c === 'notes'),
+        origine: columns.findIndex(c => c === 'origine' || c === 'origine_inscription'),
+        numCommande: columns.findIndex(c => c === 'num_commande' || c === 'num_commande_helloasso' || c === 'commande_helloasso'),
+        moyenPaiement: columns.findIndex(c => c === 'moyen_paiement' || c === 'paiement'),
+        montantRegle: columns.findIndex(c => c === 'montant_regle' || c === 'regle' || c === 'paye'),
+        email: columns.findIndex(c => c === 'email' || c === 'email_commanditaire' || c === 'mail'),
       };
 
       if (idx.prenom === -1) {
@@ -730,6 +779,11 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
         type_inscription: TypeInscription; type_participant: TypeParticipant;
         date: string | null; // date précise pour "1 Jour", null pour forfait
         notes: string | null;
+        origine_inscription: OrigineInscription | null;
+        num_commande_helloasso: string | null;
+        moyen_paiement: MoyenPaiement | null;
+        montant_regle: number | null;
+        email_commanditaire: string | null;
       }
 
       const rawRows: RawRow[] = [];
@@ -745,6 +799,14 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
         const dateRaw = idx.date >= 0 ? vals[idx.date] || '' : '';
         const date = parseDateStr(dateRaw);
 
+        const origineRaw = (idx.origine >= 0 ? vals[idx.origine] || '' : '').toLowerCase();
+        const origine: OrigineInscription | null = origineRaw === 'helloasso' ? 'helloasso' : origineRaw === 'autre' ? 'autre' : null;
+        const moyenRaw = (idx.moyenPaiement >= 0 ? vals[idx.moyenPaiement] || '' : '').toLowerCase();
+        const MOYENS: MoyenPaiement[] = ['helloasso', 'especes', 'sumup', 'virement'];
+        const moyen: MoyenPaiement | null = MOYENS.includes(moyenRaw as MoyenPaiement) ? moyenRaw as MoyenPaiement : null;
+        const montantRegleRaw = idx.montantRegle >= 0 ? vals[idx.montantRegle] || '' : '';
+        const montantRegle = montantRegleRaw ? parseFloat(montantRegleRaw.replace(',', '.')) : null;
+
         rawRows.push({
           nom: idx.nom >= 0 ? vals[idx.nom] || null : null,
           prenom,
@@ -756,6 +818,11 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
           type_participant,
           date,
           notes: idx.notes >= 0 ? vals[idx.notes] || null : null,
+          origine_inscription: origine,
+          num_commande_helloasso: idx.numCommande >= 0 ? vals[idx.numCommande] || null : null,
+          moyen_paiement: moyen,
+          montant_regle: isNaN(montantRegle as number) ? null : montantRegle,
+          email_commanditaire: idx.email >= 0 ? vals[idx.email] || null : null,
         });
       }
 
@@ -808,6 +875,11 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
           nb_jours: jours ? jours.length : null,
           montant,
           notes: first.notes,
+          origine_inscription: first.origine_inscription,
+          num_commande_helloasso: first.num_commande_helloasso,
+          moyen_paiement: first.moyen_paiement,
+          montant_regle: first.montant_regle,
+          email_commanditaire: first.email_commanditaire,
         });
       }
 
@@ -906,49 +978,84 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
         onAdd={addEncadrant}
         onUpdateJours={updateEncadrantJours}
         onUpdateRoleStage={updateRoleStage}
+        onUpdateIndemnisation={updateIndemnisation}
         onDelete={deleteEncadrant}
       />
 
       {/* Section Questionnaires */}
       <QuestionnairesSection stage={stage} inscriptions={inscriptions} />
 
-      {/* Barre d'actions */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-        <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
-          className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm">
-          <option value="">Tous ({inscriptions.length})</option>
-          <option value="stage_complet">Stage complet ({inscriptions.filter(i => i.type_inscription === 'stage_complet').length})</option>
-          <option value="journee">À la journée ({inscriptions.filter(i => i.type_inscription === 'journee').length})</option>
-          <option value="interne">Internes ({inscriptions.filter(i => i.type_participant === 'interne').length})</option>
-          <option value="externe">Externes ({inscriptions.filter(i => i.type_participant === 'externe').length})</option>
-        </select>
-
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={refetch} disabled={loading}
-            className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 text-sm">
-            Actualiser
-          </button>
-          <button onClick={handleDownloadTemplate}
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 text-sm">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span className="hidden sm:inline">Modèle CSV</span>
-          </button>
-          <label className={`px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors font-medium flex items-center gap-2 cursor-pointer text-sm ${importing ? 'opacity-50 pointer-events-none' : ''}`}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            <span className="hidden sm:inline">{importing ? 'Import...' : 'Import CSV'}</span>
-            <input ref={fileInputRef} type="file" accept=".csv,.txt" onChange={handleImportCsv} className="hidden" disabled={importing} />
-          </label>
-          <button onClick={openCreateModal}
-            className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors font-medium flex items-center gap-2 text-sm">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span className="hidden sm:inline">Nouveau</span>
-          </button>
+      {/* Barre de filtres */}
+      <div className="flex flex-col gap-2">
+        {/* Ligne 1 : recherche texte */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={filterNomPrenom}
+            onChange={(e) => setFilterNomPrenom(e.target.value)}
+            placeholder="Rechercher nom / prénom…"
+            className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+          />
+          <select value={filterCategorie} onChange={(e) => setFilterCategorie(e.target.value)}
+            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm">
+            <option value="">Toutes catégories</option>
+            {CATEGORIES.map(c => <option key={c} value={c}>{c} ({inscriptions.filter(i => i.categorie === c).length})</option>)}
+          </select>
+          <select value={filterGenre} onChange={(e) => setFilterGenre(e.target.value)}
+            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm">
+            <option value="">Tous sexes</option>
+            <option value="Masculin">Masculin ({inscriptions.filter(i => i.genre === 'Masculin').length})</option>
+            <option value="Féminin">Féminin ({inscriptions.filter(i => i.genre === 'Féminin').length})</option>
+          </select>
+          <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
+            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm">
+            <option value="">Toutes formules</option>
+            <option value="stage_complet">Stage complet ({inscriptions.filter(i => i.type_inscription === 'stage_complet').length})</option>
+            <option value="journee">À la journée ({inscriptions.filter(i => i.type_inscription === 'journee').length})</option>
+            <option value="interne">Internes ({inscriptions.filter(i => i.type_participant === 'interne').length})</option>
+            <option value="externe">Externes ({inscriptions.filter(i => i.type_participant === 'externe').length})</option>
+          </select>
+          {(filterNomPrenom || filterCategorie || filterGenre || filterType) && (
+            <button
+              onClick={() => { setFilterNomPrenom(''); setFilterCategorie(''); setFilterGenre(''); setFilterType(''); }}
+              className="px-3 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 border border-gray-300 dark:border-gray-600 hover:border-red-300 transition-colors whitespace-nowrap"
+            >
+              Réinitialiser
+            </button>
+          )}
+        </div>
+        {/* Ligne 2 : compteur + boutons d'action */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {filtered.length} / {inscriptions.length} inscription{inscriptions.length > 1 ? 's' : ''}
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={refetch} disabled={loading}
+              className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 text-sm">
+              Actualiser
+            </button>
+            <button onClick={handleDownloadTemplate}
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium flex items-center gap-2 text-sm">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="hidden sm:inline">Modèle CSV</span>
+            </button>
+            <label className={`px-4 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors font-medium flex items-center gap-2 cursor-pointer text-sm ${importing ? 'opacity-50 pointer-events-none' : ''}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              <span className="hidden sm:inline">{importing ? 'Import...' : 'Import CSV'}</span>
+              <input ref={fileInputRef} type="file" accept=".csv,.txt" onChange={handleImportCsv} className="hidden" disabled={importing} />
+            </label>
+            <button onClick={openCreateModal}
+              className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors font-medium flex items-center gap-2 text-sm">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="hidden sm:inline">Nouveau</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -996,10 +1103,10 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
                   <th className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Nom</th>
                   <th className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Prénom</th>
                   <th className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300 hidden sm:table-cell">Cat.</th>
-                  <th className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">Niveau</th>
+                  <th className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">Sexe</th>
                   <th className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Formule</th>
                   <th className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Jours de présence</th>
-                  <th className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Montant</th>
+                  <th className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">Montant / Réglé</th>
                   <th className="px-4 py-3 w-12"></th>
                 </tr>
               </thead>
@@ -1015,7 +1122,11 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
                         <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{ins.categorie}</span>
                       ) : '-'}
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell text-gray-600 dark:text-gray-400 text-xs">{ins.niveau || '-'}</td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      {ins.genre === 'Masculin' && <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">♂ M</span>}
+                      {ins.genre === 'Féminin'  && <span className="px-1.5 py-0.5 rounded text-xs bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300">♀ F</span>}
+                      {!ins.genre && <span className="text-gray-400 text-xs">—</span>}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-0.5">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium w-fit ${ins.type_inscription === 'stage_complet' ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'}`}>
@@ -1043,8 +1154,30 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
                         <span className="text-gray-400 text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-semibold text-light-onSurface dark:text-dark-onSurface">
-                      {ins.montant != null ? `${ins.montant.toFixed(0)} €` : '-'}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          {ins.origine_inscription === 'autre' && !ins.moyen_paiement && (
+                            <span title="Paiement non confirmé" className="text-red-500 text-xs font-bold">⚠</span>
+                          )}
+                          <span className="font-semibold text-sm text-light-onSurface dark:text-dark-onSurface">
+                            {ins.montant != null ? `${ins.montant.toFixed(0)} €` : '-'}
+                          </span>
+                          {ins.montant_regle != null && ins.montant_regle !== ins.montant && (
+                            <span className={`text-xs ${ins.montant_regle >= (ins.montant ?? 0) ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                              / {ins.montant_regle.toFixed(0)} €
+                            </span>
+                          )}
+                          {ins.montant_regle != null && ins.montant_regle === ins.montant && ins.montant != null && (
+                            <span className="text-xs text-green-600 dark:text-green-400">✓</span>
+                          )}
+                        </div>
+                        {ins.moyen_paiement && (
+                          <span className="text-xs text-gray-400 dark:text-gray-500 uppercase">
+                            {ins.moyen_paiement === 'helloasso' ? 'HA' : ins.moyen_paiement === 'especes' ? 'ESP' : ins.moyen_paiement === 'sumup' ? 'SUM' : 'VIR'}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => handleDeleteInscription(ins)}
@@ -1061,7 +1194,7 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
           </div>
           {filtered.length === 0 && (
             <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-              {filterType ? 'Aucune inscription pour ce filtre' : 'Aucune inscription pour ce stage'}
+              {(filterType || filterNomPrenom || filterCategorie || filterGenre) ? 'Aucune inscription pour ces filtres' : 'Aucune inscription pour ce stage'}
             </div>
           )}
         </div>
@@ -1095,6 +1228,8 @@ const TYPE_LABELS_Q: Record<TypeQuestion, string> = {
   texte_libre: 'Texte libre',
   note_5: '★ / 5',
   note_10: '★ / 10',
+  oui_non: 'Oui/Non',
+  date: 'Date',
 };
 
 interface QuestionnairesSectionProps {
@@ -1301,18 +1436,21 @@ interface EncadrantsSectionProps {
   stageDates: string[];
   encadrants: StageEncadrant[];
   licencies: Licencie[];
-  onAdd: (licencieId: string, jours?: string[] | null) => Promise<StageEncadrant | null>;
+  onAdd: (licencieId: string, jours?: string[] | null, indemnisation_jour?: number | null) => Promise<StageEncadrant | null>;
   onUpdateJours: (id: string, jours: string[] | null) => Promise<boolean>;
   onUpdateRoleStage: (id: string, role: 'responsable' | 'encadrant') => Promise<boolean>;
+  onUpdateIndemnisation: (id: string, indemnisation_jour: number | null) => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
 }
 
 const EncadrantsSection: React.FC<EncadrantsSectionProps> = ({
-  stageDates, encadrants, licencies, onAdd, onUpdateJours, onUpdateRoleStage, onDelete,
+  stageDates, encadrants, licencies, onAdd, onUpdateJours, onUpdateRoleStage, onUpdateIndemnisation, onDelete,
 }) => {
   const [open, setOpen] = useState(true);
   const [addingId, setAddingId] = useState('');
   const [adding, setAdding] = useState(false);
+  const [editingIndemnisationId, setEditingIndemnisationId] = useState<string | null>(null);
+  const [indemnisationDraft, setIndemnisationDraft] = useState<string>('');
 
   const licenciesDispos = licencies.filter(
     l => !encadrants.some(e => e.licencie_id === l.id)
@@ -1398,6 +1536,7 @@ const EncadrantsSection: React.FC<EncadrantsSectionProps> = ({
                       {formatDateShort(d)}
                     </th>
                   ))}
+                  <th className="px-3 py-2 font-medium text-center whitespace-nowrap">Indemn./j</th>
                   <th className="px-2 py-2 w-8"></th>
                 </tr>
               </thead>
@@ -1449,6 +1588,47 @@ const EncadrantsSection: React.FC<EncadrantsSectionProps> = ({
                           </td>
                         );
                       })}
+                      <td className="px-3 py-2 text-center">
+                        {editingIndemnisationId === enc.id ? (
+                          <div className="flex items-center gap-1 justify-center">
+                            <input
+                              type="number"
+                              min="0"
+                              step="5"
+                              value={indemnisationDraft}
+                              onChange={e => setIndemnisationDraft(e.target.value)}
+                              onBlur={async () => {
+                                const val = indemnisationDraft.trim();
+                                const num = val ? parseFloat(val) : null;
+                                await onUpdateIndemnisation(enc.id, isNaN(num as number) ? null : num);
+                                setEditingIndemnisationId(null);
+                              }}
+                              onKeyDown={async (e) => {
+                                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                if (e.key === 'Escape') setEditingIndemnisationId(null);
+                              }}
+                              autoFocus
+                              className="w-16 px-1.5 py-0.5 text-xs border border-indigo-400 rounded bg-white dark:bg-gray-800 text-center"
+                            />
+                            <span className="text-xs text-gray-400">€</span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setEditingIndemnisationId(enc.id);
+                              setIndemnisationDraft(enc.indemnisation_jour != null ? String(enc.indemnisation_jour) : '');
+                            }}
+                            className="text-xs px-2 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            title="Cliquer pour modifier"
+                          >
+                            {enc.indemnisation_jour != null ? (
+                              <span className="text-indigo-600 dark:text-indigo-400 font-medium">{enc.indemnisation_jour} €</span>
+                            ) : (
+                              <span className="text-gray-400 italic">—</span>
+                            )}
+                          </button>
+                        )}
+                      </td>
                       <td className="px-2 py-2">
                         <button
                           onClick={() => { if (window.confirm(`Retirer cet encadrant du stage ?`)) onDelete(enc.id); }}
@@ -1465,6 +1645,20 @@ const EncadrantsSection: React.FC<EncadrantsSectionProps> = ({
               </tbody>
             </table>
           )}
+          {/* Total indemnisations */}
+          {encadrants.some(e => e.indemnisation_jour != null) && (() => {
+            const total = encadrants.reduce((sum, e) => {
+              if (e.indemnisation_jour == null) return sum;
+              const nbJours = (e.jours ?? stageDates).length;
+              return sum + e.indemnisation_jour * nbJours;
+            }, 0);
+            return (
+              <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-right">
+                <span className="text-xs text-gray-500 dark:text-gray-400">Total encadrement à verser : </span>
+                <span className="text-sm font-bold text-indigo-700 dark:text-indigo-400">{total} €</span>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
@@ -1486,10 +1680,41 @@ interface InscriptionModalProps {
   onClose: () => void;
 }
 
+const MOYEN_OPTIONS: { value: MoyenPaiement; label: string }[] = [
+  { value: 'helloasso', label: 'HelloAsso' },
+  { value: 'especes',   label: 'Espèces' },
+  { value: 'sumup',     label: 'SumUp' },
+  { value: 'virement',  label: 'Virement' },
+];
+
 const InscriptionModal: React.FC<InscriptionModalProps> = ({
   form, onChange, toggleJour, stageDates, stage, editingId, saving, onSave, onDelete, onClose,
 }) => {
   const selectedJours = form.jours ?? [];
+  const paiements = form.paiements ?? [];
+  const totalRegle = paiements.reduce((s, p) => s + p.montant, 0);
+
+  const updatePaiements = (updated: PaiementLine[]) => onChange('paiements', updated);
+
+  const addPaiementLine = () =>
+    updatePaiements([...paiements, { moyen: 'especes', montant: 0 }]);
+
+  const removePaiementLine = (idx: number) =>
+    updatePaiements(paiements.filter((_, i) => i !== idx));
+
+  const updatePaiementField = <K extends keyof PaiementLine>(idx: number, key: K, value: PaiementLine[K]) => {
+    const next = paiements.map((p, i) => i === idx ? { ...p, [key]: value } : p);
+    updatePaiements(next);
+  };
+
+  const autoFillTotal = () => {
+    if (form.montant == null) return;
+    if (paiements.length === 0) {
+      updatePaiements([{ moyen: 'especes', montant: form.montant }]);
+    } else if (paiements.length === 1) {
+      updatePaiements([{ ...paiements[0], montant: form.montant }]);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -1596,6 +1821,126 @@ const InscriptionModal: React.FC<InscriptionModalProps> = ({
                     className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
                     placeholder="Remarques..." />
                 </div>
+              </div>
+            </div>
+
+            {/* Paiement */}
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Paiement</h4>
+
+              {/* Alerte */}
+              {form.origine_inscription === 'autre' && paiements.length === 0 && (
+                <div className="mb-3 px-3 py-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300 text-xs">
+                  ⚠ Origine "Autre" — vérifier que le paiement a bien été encaissé
+                </div>
+              )}
+
+              {/* Email + Origine */}
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email commanditaire (parent…)</label>
+                  <input type="email" value={form.email_commanditaire || ''} onChange={(e) => onChange('email_commanditaire', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                    placeholder="parent@email.com" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Origine</label>
+                  <div className="flex gap-2">
+                    {(['helloasso', 'autre'] as OrigineInscription[]).map(val => (
+                      <button key={val} type="button"
+                        onClick={() => {
+                          const newOrigine = form.origine_inscription === val ? null : val as OrigineInscription;
+                          onChange('origine_inscription', newOrigine);
+                          if (val === 'helloasso' && newOrigine === 'helloasso' && paiements.length === 0) {
+                            updatePaiements([{ moyen: 'helloasso', montant: 0 }]);
+                          }
+                        }}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                          form.origine_inscription === val
+                            ? val === 'helloasso' ? 'bg-teal-600 border-teal-600 text-white' : 'bg-gray-600 border-gray-600 text-white'
+                            : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+                        }`}>
+                        {val === 'helloasso' ? 'HelloAsso' : 'Autre'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Lignes de paiement */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Paiements reçus</label>
+                  {form.montant != null && (
+                    <button type="button" onClick={autoFillTotal}
+                      className="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-800/60 transition-colors">
+                      = {form.montant} € (auto)
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {paiements.map((p, idx) => (
+                    <div key={idx} className="flex gap-2 items-start">
+                      {/* Moyen */}
+                      <select value={p.moyen} onChange={(e) => updatePaiementField(idx, 'moyen', e.target.value as MoyenPaiement)}
+                        className="flex-shrink-0 w-32 px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 text-sm">
+                        {MOYEN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                      {/* Montant */}
+                      <div className="relative w-28 flex-shrink-0">
+                        <input type="number" min="0" step="0.5" value={p.montant || ''}
+                          onChange={(e) => updatePaiementField(idx, 'montant', parseFloat(e.target.value) || 0)}
+                          className="w-full pl-2 pr-6 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 text-sm"
+                          placeholder="0" />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">€</span>
+                      </div>
+                      {/* N° commande HelloAsso */}
+                      {p.moyen === 'helloasso' && (
+                        <input type="text" value={p.num_commande_helloasso || ''}
+                          onChange={(e) => updatePaiementField(idx, 'num_commande_helloasso', e.target.value || null)}
+                          className="flex-1 px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 text-sm font-mono"
+                          placeholder="N° commande HelloAsso" />
+                      )}
+                      {/* Supprimer */}
+                      <button type="button" onClick={() => removePaiementLine(idx)}
+                        className="flex-shrink-0 p-2 text-gray-400 hover:text-red-500 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Bouton ajouter */}
+                <button type="button" onClick={addPaiementLine}
+                  className="mt-2 flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Ajouter un paiement
+                </button>
+
+                {/* Total */}
+                {paiements.length > 0 && (
+                  <div className={`mt-2 text-right text-sm font-semibold ${
+                    form.montant != null && totalRegle === form.montant ? 'text-green-600 dark:text-green-400'
+                    : form.montant != null && totalRegle > form.montant ? 'text-red-500 dark:text-red-400'
+                    : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Total réglé : {totalRegle} €
+                    {form.montant != null && totalRegle === form.montant && ' ✓'}
+                    {form.montant != null && totalRegle < form.montant && (
+                      <span className="ml-1 text-orange-500 dark:text-orange-400 font-normal text-xs">
+                        ({(form.montant - totalRegle).toFixed(0)} € restant)
+                      </span>
+                    )}
+                    {form.montant != null && totalRegle > form.montant && (
+                      <span className="ml-1 font-normal text-xs">(trop-perçu)</span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

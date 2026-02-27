@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useAuthStore } from '../stores/useAuthStore';
 import { useStages } from '../hooks/useStages';
 import { useStageInscriptions } from '../hooks/useStageInscriptions';
 import { useStagePresences } from '../hooks/useStagePresences';
@@ -8,7 +9,7 @@ import { useLicencies } from '../hooks/useLicencies';
 import { useStageQuestionnaire } from '../hooks/useStageQuestionnaire';
 import type {
   Stage, StageInscription, StageGroupe, StageEncadrant, StageCategorie, StageGenre, RoleGroupeEncadrant,
-  QuestionnaireTemplateWithQuestions, QuestionnaireReponseDetail, TypeQuestion,
+  QuestionnaireTemplateWithQuestions, QuestionnaireReponseDetail, TypeQuestion, MoyenPaiement,
 } from '../types';
 import type { Licencie } from '../types';
 
@@ -146,7 +147,12 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
     setSelectedDate(stageDates.includes(today) ? today : (stageDates[0] ?? ''));
   }, [stageDates]);
 
-  const [activeTab, setActiveTab] = useState<'presences' | 'groupes' | 'questionnaire'>('presences');
+  const [activeTab, setActiveTab] = useState<'presences' | 'groupes' | 'questionnaire' | 'synthese'>('presences');
+
+  // Filtres onglet Présences
+  const [presFilterNom, setPresFilterNom]       = useState('');
+  const [presFilterCategorie, setPresFilterCategorie] = useState('');
+  const [presFilterGenre, setPresFilterGenre]   = useState('');
 
   const { inscriptions, loading: inscLoading } = useStageInscriptions(stage.id);
   const { presences, togglePresence, getPresencesForDate, error: presenceError } = useStagePresences(stage.id);
@@ -212,7 +218,7 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
 
       {/* Onglets Présences / Groupes */}
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-fit">
-        {(['presences', 'groupes', 'questionnaire'] as const).map(tab => (
+        {(['presences', 'groupes', 'questionnaire', 'synthese'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -222,7 +228,7 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
             }`}
           >
-            {tab === 'presences' ? 'Présences' : tab === 'groupes' ? 'Groupes' : '📋 Questionnaire'}
+            {tab === 'presences' ? 'Présences' : tab === 'groupes' ? 'Groupes' : tab === 'questionnaire' ? '📋 Questionnaire' : '📊 Synthèse'}
           </button>
         ))}
       </div>
@@ -270,64 +276,126 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
             </div>
           )}
 
+          {/* Filtres */}
+          {stagiairesJour.length > 0 && (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={presFilterNom}
+                onChange={e => setPresFilterNom(e.target.value)}
+                placeholder="Rechercher nom / prénom…"
+                className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+              />
+              <select value={presFilterCategorie} onChange={e => setPresFilterCategorie(e.target.value)}
+                className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 text-sm">
+                <option value="">Toutes catégories</option>
+                {CATEGORIES.map(c => (
+                  <option key={c} value={c}>{c} ({stagiairesJour.filter(i => i.categorie === c).length})</option>
+                ))}
+              </select>
+              <select value={presFilterGenre} onChange={e => setPresFilterGenre(e.target.value)}
+                className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface focus:ring-2 focus:ring-indigo-500 text-sm">
+                <option value="">Tous sexes</option>
+                <option value="Masculin">Masculin ({stagiairesJour.filter(i => i.genre === 'Masculin').length})</option>
+                <option value="Féminin">Féminin ({stagiairesJour.filter(i => i.genre === 'Féminin').length})</option>
+              </select>
+              {(presFilterNom || presFilterCategorie || presFilterGenre) && (
+                <button
+                  onClick={() => { setPresFilterNom(''); setPresFilterCategorie(''); setPresFilterGenre(''); }}
+                  className="px-3 py-1.5 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 border border-gray-300 dark:border-gray-600 hover:border-red-300 transition-colors whitespace-nowrap"
+                >
+                  Réinitialiser
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Liste des stagiaires */}
           {stagiairesJour.length === 0 ? (
             <div className="text-center py-10 text-gray-500 dark:text-gray-400 text-sm">
               Aucun stagiaire inscrit pour ce jour
             </div>
-          ) : (
-            <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
-              {stagiairesJour.map(ins => {
-                const presence = presencesJour.find(p => p.inscription_id === ins.id);
-                const isPresent = presence?.present ?? false;
-                return (
-                  <div key={ins.id} className="flex items-center gap-3 px-4 py-3">
-                    <button
-                      onClick={() => togglePresence(ins.id, selectedDate, isPresent)}
-                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                        isPresent
-                          ? 'bg-green-500 text-white hover:bg-green-600'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                      }`}
-                      title={isPresent ? 'Marquer absent' : 'Marquer présent'}
-                    >
-                      {isPresent ? (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      )}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-light-onSurface dark:text-dark-onSurface">
-                        {ins.nom ? `${ins.nom} ${ins.prenom}` : ins.prenom}
-                        {ins.num_licence && (
-                          <span className="ml-2 text-xs font-mono text-gray-400">{ins.num_licence}</span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-1 mt-0.5">
-                        {ins.categorie && (
-                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">{ins.categorie}</span>
-                        )}
-                        <span className={`px-1.5 py-0.5 rounded text-xs ${ins.type_inscription === 'stage_complet' ? 'bg-indigo-50 dark:bg-indigo-800/50 text-indigo-600 dark:text-white' : 'bg-purple-50 dark:bg-purple-800/50 text-purple-600 dark:text-white'}`}>
-                          {ins.type_inscription === 'stage_complet' ? 'Stage' : 'Journée'}
-                        </span>
-                        <span className={`px-1.5 py-0.5 rounded text-xs ${ins.type_participant === 'interne' ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'}`}>
-                          {ins.type_participant === 'interne' ? 'Interne' : 'Externe'}
-                        </span>
-                      </div>
+          ) : (() => {
+            const filtered = stagiairesJour.filter(ins => {
+              if (presFilterCategorie && ins.categorie !== presFilterCategorie) return false;
+              if (presFilterGenre && ins.genre !== presFilterGenre) return false;
+              if (presFilterNom) {
+                const q = presFilterNom.toLowerCase();
+                if (!`${ins.prenom} ${ins.nom ?? ''}`.toLowerCase().includes(q)) return false;
+              }
+              return true;
+            });
+            return (
+              <>
+                {(presFilterNom || presFilterCategorie || presFilterGenre) && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {filtered.length} / {stagiairesJour.length} stagiaire{stagiairesJour.length > 1 ? 's' : ''}
+                  </p>
+                )}
+                <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+                  {filtered.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+                      Aucun stagiaire pour ces filtres
                     </div>
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${isPresent ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400'}`}>
-                      {isPresent ? 'Présent' : 'Absent'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  ) : filtered.map(ins => {
+                    const presence = presencesJour.find(p => p.inscription_id === ins.id);
+                    const isPresent = presence?.present ?? false;
+                    return (
+                      <div key={ins.id} className="flex items-center gap-3 px-4 py-3">
+                        <button
+                          onClick={() => togglePresence(ins.id, selectedDate, isPresent)}
+                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                            isPresent
+                              ? 'bg-green-500 text-white hover:bg-green-600'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                          title={isPresent ? 'Marquer absent' : 'Marquer présent'}
+                        >
+                          {isPresent ? (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-light-onSurface dark:text-dark-onSurface">
+                            {ins.nom ? `${ins.nom} ${ins.prenom}` : ins.prenom}
+                            {ins.num_licence && (
+                              <span className="ml-2 text-xs font-mono text-gray-400">{ins.num_licence}</span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {ins.categorie && (
+                              <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">{ins.categorie}</span>
+                            )}
+                            {ins.genre === 'Masculin' && (
+                              <span className="px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">♂ M</span>
+                            )}
+                            {ins.genre === 'Féminin' && (
+                              <span className="px-1.5 py-0.5 rounded text-xs bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300">♀ F</span>
+                            )}
+                            <span className={`px-1.5 py-0.5 rounded text-xs ${ins.type_inscription === 'stage_complet' ? 'bg-indigo-50 dark:bg-indigo-800/50 text-indigo-600 dark:text-white' : 'bg-purple-50 dark:bg-purple-800/50 text-purple-600 dark:text-white'}`}>
+                              {ins.type_inscription === 'stage_complet' ? 'Stage' : 'Journée'}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-xs ${ins.type_participant === 'interne' ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'}`}>
+                              {ins.type_participant === 'interne' ? 'Interne' : 'Externe'}
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${isPresent ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400'}`}>
+                          {isPresent ? 'Présent' : 'Absent'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
@@ -347,6 +415,17 @@ const StageView: React.FC<StageViewProps> = ({ stage }) => {
       {/* Onglet Questionnaire */}
       {activeTab === 'questionnaire' && (
         <QuestionnaireView stage={stage} inscriptions={inscriptions} />
+      )}
+
+      {/* Onglet Synthèse */}
+      {activeTab === 'synthese' && (
+        <StageSyntheseView
+          stage={stage}
+          inscriptions={inscriptions}
+          encadrants={encadrants}
+          licencies={licencies}
+          stageDates={stageDates}
+        />
       )}
     </div>
   );
@@ -700,6 +779,517 @@ const QuestionnaireView: React.FC<QuestionnaireViewProps> = ({ stage, inscriptio
           )}
         </>
       )}
+    </div>
+  );
+};
+
+// ─── Vue Synthèse ──────────────────────────────────────────────────────────────
+
+interface StageSyntheseViewProps {
+  stage: Stage;
+  inscriptions: StageInscription[];
+  encadrants: StageEncadrant[];
+  licencies: Licencie[];
+  stageDates: string[];
+}
+
+const MOYEN_LABELS: Record<string, string> = {
+  helloasso: 'HelloAsso',
+  especes: 'Espèces',
+  sumup: 'SumUp',
+  virement: 'Virement',
+};
+
+const StageSyntheseView: React.FC<StageSyntheseViewProps> = ({ stage, inscriptions, encadrants, licencies, stageDates }) => {
+  const { stageQuestionnaires, reponses } = useStageQuestionnaire(stage.id);
+  const profile = useAuthStore((state) => state.profile);
+  const isAdmin = profile?.role === 'admin';
+
+  const stats = useMemo(() => {
+    // ── Participants ──
+    const totalInscrits = inscriptions.length;
+    const nbComplet = inscriptions.filter(i => i.type_inscription === 'stage_complet').length;
+    const nbJournee = inscriptions.filter(i => i.type_inscription === 'journee').length;
+    const nbInterne = inscriptions.filter(i => i.type_participant === 'interne').length;
+    const nbExterne = inscriptions.filter(i => i.type_participant === 'externe').length;
+
+    const parCategorie = CATEGORIES.map(cat => ({
+      cat,
+      nb: inscriptions.filter(i => i.categorie === cat).length,
+    })).filter(x => x.nb > 0);
+
+    const nbMasc = inscriptions.filter(i => i.genre === 'Masculin').length;
+    const nbFem = inscriptions.filter(i => i.genre === 'Féminin').length;
+
+    // ── Financier ──
+    const totalDu = inscriptions.reduce((s, i) => s + (i.montant ?? 0), 0);
+    const totalRegle = inscriptions.reduce((s, i) => s + (i.montant_regle ?? 0), 0);
+    const solde = totalDu - totalRegle;
+
+    const MOYENS = ['helloasso', 'especes', 'sumup', 'virement'] as const;
+    const parMoyen = MOYENS.map(m => ({
+      moyen: m,
+      nb: inscriptions.filter(i => i.moyen_paiement === m).length,
+      total: inscriptions.filter(i => i.moyen_paiement === m).reduce((s, i) => s + (i.montant_regle ?? 0), 0),
+    })).filter(x => x.nb > 0);
+
+    const alertes = inscriptions.filter(i => i.origine_inscription === 'autre' && !i.moyen_paiement);
+
+    // ── Coachs & indemnisation ──
+    const nbRemuneres = encadrants.filter(e => e.indemnisation_jour != null).length;
+    const nbNonRemuneres = encadrants.filter(e => e.indemnisation_jour == null).length;
+
+    const indemnisationParCoach = encadrants
+      .filter(e => e.indemnisation_jour != null)
+      .map(e => {
+        const nbJours = (e.jours ?? stageDates).length;
+        const lic = licencies.find(l => l.id === e.licencie_id);
+        return {
+          id: e.id,
+          nom: lic ? `${lic.Prenom_Licencie} ${lic.Nom_Licencie || ''}` : '—',
+          tarifJour: e.indemnisation_jour!,
+          nbJours,
+          total: e.indemnisation_jour! * nbJours,
+        };
+      });
+
+    const totalIndemnisation = indemnisationParCoach.reduce((s, c) => s + c.total, 0);
+    const resultatNet = totalRegle - totalIndemnisation;
+
+    // ── Qualitatif ──
+    const nbQuestionnaires = stageQuestionnaires.length;
+    const nbReponses = reponses.length;
+
+    return {
+      totalInscrits, nbComplet, nbJournee, nbInterne, nbExterne,
+      parCategorie, nbMasc, nbFem,
+      totalDu, totalRegle, solde, parMoyen, alertes,
+      nbRemuneres, nbNonRemuneres, indemnisationParCoach, totalIndemnisation, resultatNet,
+      nbQuestionnaires, nbReponses,
+    };
+  }, [inscriptions, encadrants, licencies, stageDates, stageQuestionnaires, reponses]);
+
+  const maxCat = Math.max(...stats.parCategorie.map(x => x.nb), 1);
+
+  const handlePrint = () => {
+    const fmtDate = (d: string) => { const [y, m, dd] = d.split('-'); return `${dd}/${m}/${y}`; };
+    const now = new Date().toLocaleString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const GROUPS: { key: MoyenPaiement | null; label: string }[] = [
+      { key: 'helloasso', label: 'HelloAsso' },
+      { key: 'sumup',     label: 'SumUp' },
+      { key: 'virement',  label: 'Virement' },
+      { key: 'especes',   label: 'Espèces' },
+      { key: null,        label: 'Non précisé' },
+    ];
+
+    // Expand inscriptions → lignes de paiement individuelles
+    // Une inscription avec 2 paiements génère 2 lignes dans 2 groupes distincts
+    interface PrintPmtRow {
+      nom: string; prenom: string; cat: string; typeLabel: string; nbJ: number | string;
+      montantDu: number | null; montantPaiement: number;
+      moyen: MoyenPaiement | null; numCommande: string | null; alerte: boolean;
+    }
+    const allPmtRows: PrintPmtRow[] = [];
+    for (const i of inscriptions) {
+      const nbJ = i.jours?.length ?? i.nb_jours ?? '—';
+      const typeLabel = i.type_inscription === 'stage_complet' ? 'Forfait' : 'Journée';
+      if (i.paiements && i.paiements.length > 0) {
+        for (const p of i.paiements) {
+          allPmtRows.push({
+            nom: i.nom || '', prenom: i.prenom, cat: i.categorie || '—',
+            typeLabel, nbJ, montantDu: i.montant ?? null,
+            montantPaiement: p.montant, moyen: p.moyen,
+            numCommande: p.num_commande_helloasso || null, alerte: false,
+          });
+        }
+      } else {
+        // Ancienne inscription sans paiements[] → ligne unique depuis les champs plats
+        allPmtRows.push({
+          nom: i.nom || '', prenom: i.prenom, cat: i.categorie || '—',
+          typeLabel, nbJ, montantDu: i.montant ?? null,
+          montantPaiement: i.montant_regle ?? 0, moyen: i.moyen_paiement ?? null,
+          numCommande: i.num_commande_helloasso || null,
+          alerte: i.origine_inscription === 'autre' && !i.moyen_paiement,
+        });
+      }
+    }
+
+    const paymentDetailHTML = GROUPS.map(({ key, label }) => {
+      const groupRows = allPmtRows.filter(r => key === null ? !r.moyen : r.moyen === key);
+      if (groupRows.length === 0) return '';
+      const groupRegle = groupRows.reduce((s, r) => s + r.montantPaiement, 0);
+      const rows = groupRows.map(r => `<tr>
+          <td>${r.nom}</td><td>${r.prenom}</td><td>${r.cat}</td>
+          <td>${r.typeLabel} (${r.nbJ}j)</td>
+          <td class="right" style="color:#9ca3af">${r.montantDu != null ? r.montantDu + ' €' : '—'}</td>
+          <td class="right"><strong>${r.montantPaiement} €</strong></td>
+          <td class="mono">${r.numCommande || ''}${r.alerte ? ' ⚠' : ''}</td>
+        </tr>`).join('');
+      return `
+        <div class="group-header">${label} &mdash; ${groupRows.length} paiement${groupRows.length > 1 ? 's' : ''}</div>
+        <table>
+          <thead><tr>
+            <th>Nom</th><th>Prénom</th><th>Cat.</th><th>Type</th>
+            <th class="right" style="opacity:.75">Montant dû</th>
+            <th class="right">Réglé (ce moyen)</th>
+            <th>${key === 'helloasso' ? 'N° Commande' : ''}</th>
+          </tr></thead>
+          <tbody>
+            ${rows}
+            <tr class="row-subtotal">
+              <td colspan="5">Sous-total ${label}</td>
+              <td class="right">${groupRegle} €</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>`;
+    }).join('') + `
+      <table style="margin-top:8px">
+        <tbody>
+          <tr class="row-total">
+            <td colspan="4"><strong>TOTAL GÉNÉRAL</strong></td>
+            <td class="right"><strong>${stats.totalDu} €</strong></td>
+            <td class="right"><strong>${stats.totalRegle} €</strong></td>
+            <td style="color:${stats.solde > 0 ? '#fca5a5' : '#86efac'};text-align:right">
+              <strong>${stats.solde > 0 ? '−' + stats.solde : '✓ solde 0'} €</strong>
+            </td>
+          </tr>
+        </tbody>
+      </table>`;
+
+    const alertesHTML = stats.alertes.length > 0 ? `
+      <div class="alert">
+        <div class="alert-title">⚠ ${stats.alertes.length} paiement${stats.alertes.length > 1 ? 's' : ''} non confirmé${stats.alertes.length > 1 ? 's' : ''} (origine "Autre" sans moyen renseigné)</div>
+        ${stats.alertes.map(i => `<div>${i.prenom} ${i.nom || ''}</div>`).join('')}
+      </div>` : '';
+
+    const coachRows = encadrants.map(e => {
+      const lic = licencies.find(l => l.id === e.licencie_id);
+      const nom = lic ? `${lic.Prenom_Licencie} ${lic.Nom_Licencie || ''}` : '—';
+      const nbJours = (e.jours ?? stageDates).length;
+      if (e.indemnisation_jour == null) {
+        return `<tr class="row-nonrem"><td>${nom}</td><td colspan="3">Non rémunéré</td></tr>`;
+      }
+      return `<tr>
+        <td>${nom}</td>
+        <td class="right">${e.indemnisation_jour} €/j</td>
+        <td class="right">${nbJours} jour${nbJours > 1 ? 's' : ''}</td>
+        <td class="right"><strong>${(e.indemnisation_jour * nbJours).toFixed(0)} €</strong></td>
+      </tr>`;
+    }).join('');
+
+    const coachHTML = encadrants.length === 0
+      ? '<p style="color:#9ca3af;font-style:italic">Aucun encadrant associé à ce stage</p>'
+      : `<table>
+          <thead><tr><th>Encadrant</th><th class="right">Tarif/jour</th><th class="right">Nb jours</th><th class="right">Total</th></tr></thead>
+          <tbody>
+            ${coachRows}
+            <tr class="row-total">
+              <td colspan="3"><strong>Total indemnisations</strong></td>
+              <td class="right"><strong>${stats.totalIndemnisation} €</strong></td>
+            </tr>
+          </tbody>
+        </table>
+        <table style="margin-top:6px">
+          <tbody>
+            <tr class="row-total">
+              <td><strong>Résultat net stage (réglé &minus; indemnisations)</strong></td>
+              <td class="right" style="color:${stats.resultatNet >= 0 ? '#86efac' : '#fca5a5'}">
+                <strong>${stats.resultatNet} €</strong>
+              </td>
+            </tr>
+          </tbody>
+        </table>`;
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Synthèse ${stage.nom}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#1a1a2e;padding:22px 26px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;padding-bottom:10px;border-bottom:3px solid #2563eb}
+.header h1{font-size:17px;font-weight:700;color:#1e40af}
+.header .meta{font-size:10px;color:#6b7280;margin-top:3px}
+.header .gen{text-align:right;font-size:9px;color:#9ca3af}
+.section{margin-bottom:16px}
+.section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#4b5563;border-bottom:1.5px solid #e5e7eb;padding-bottom:4px;margin-bottom:8px}
+.kpi-grid{display:grid;gap:7px;margin-bottom:8px}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+.kpi{text-align:center;padding:7px 4px;background:#f8fafc;border-radius:5px;border:1px solid #e2e8f0}
+.kpi-val{font-size:19px;font-weight:700;color:#374151}
+.kpi-label{font-size:9px;color:#6b7280;margin-top:2px}
+.kpi-blue .kpi-val{color:#2563eb}
+.kpi-green .kpi-val{color:#16a34a}
+.kpi-red .kpi-val{color:#dc2626}
+.kpi-ind .kpi-val{color:#4f46e5}
+.kpi-masc{background:#eff6ff;border-color:#bfdbfe}.kpi-masc .kpi-val{color:#2563eb}
+.kpi-fem{background:#fdf2f8;border-color:#fbcfe8}.kpi-fem .kpi-val{color:#db2777}
+table{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:3px}
+thead th{background:#1e40af;color:#fff;padding:5px 7px;text-align:left;font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:.04em}
+thead th.right{text-align:right}
+tbody tr:nth-child(even){background:#f8fafc}
+td{padding:4px 7px;border-bottom:1px solid #e5e7eb;vertical-align:middle}
+td.right{text-align:right;font-variant-numeric:tabular-nums}
+td.mono{font-family:monospace;font-size:9.5px}
+.row-subtotal{background:#dbeafe!important;font-weight:700}
+.row-subtotal td{border-top:1.5px solid #93c5fd;color:#1e40af}
+.row-total{background:#1e40af!important}
+.row-total td{color:#fff;font-weight:700;font-size:11px;border:none}
+.row-nonrem{background:#f1f5f9!important;color:#94a3b8;font-style:italic}
+.group-header{background:#eff6ff;padding:5px 8px;font-weight:700;color:#1e40af;font-size:10px;border-left:3px solid #2563eb;margin:10px 0 3px}
+.alert{background:#fff7ed;border:1px solid #fed7aa;border-radius:4px;padding:7px 10px;color:#c2410c;font-size:10px;margin-top:8px}
+.alert-title{font-weight:700;margin-bottom:3px}
+.footer{margin-top:22px;border-top:1px solid #e5e7eb;padding-top:6px;color:#9ca3af;font-size:9px;display:flex;justify-content:space-between}
+@media print{body{padding:8px 12px}@page{margin:10mm 12mm;size:A4}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-left">
+    <h1>VEEC &mdash; ${stage.nom}</h1>
+    <div class="meta">📅 ${fmtDate(stage.date_debut)} &rarr; ${fmtDate(stage.date_fin)} &nbsp;(${stageDates.length} jour${stageDates.length > 1 ? 's' : ''})${stage.gymnase ? `&nbsp;&nbsp;|&nbsp;&nbsp;📍 ${stage.gymnase}` : ''}</div>
+  </div>
+  <div class="gen">Synthèse comptable<br>Généré le ${now}</div>
+</div>
+
+<div class="section">
+  <div class="section-title">Participants</div>
+  <div class="kpi-grid g4">
+    <div class="kpi kpi-blue"><div class="kpi-val">${stats.totalInscrits}</div><div class="kpi-label">Inscrits</div></div>
+    <div class="kpi kpi-ind"><div class="kpi-val">${stats.nbComplet}</div><div class="kpi-label">Stage complet</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#7c3aed">${stats.nbJournee}</div><div class="kpi-label">À la journée</div></div>
+    <div class="kpi kpi-green"><div class="kpi-val">${stats.nbInterne}</div><div class="kpi-label">Internes</div></div>
+  </div>
+  <div class="kpi-grid g2">
+    <div class="kpi kpi-masc"><div class="kpi-val">${stats.nbMasc}</div><div class="kpi-label">Masculins</div></div>
+    <div class="kpi kpi-fem"><div class="kpi-val">${stats.nbFem}</div><div class="kpi-label">Féminines</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Financier &mdash; Synthèse</div>
+  <div class="kpi-grid g3">
+    <div class="kpi"><div class="kpi-val">${stats.totalDu} €</div><div class="kpi-label">Montant dû</div></div>
+    <div class="kpi kpi-green"><div class="kpi-val">${stats.totalRegle} €</div><div class="kpi-label">Réglé</div></div>
+    <div class="kpi ${stats.solde > 0 ? 'kpi-red' : 'kpi-green'}"><div class="kpi-val">${stats.solde > 0 ? '−' + stats.solde : '✓ 0'} €</div><div class="kpi-label">Solde restant</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Détail des paiements par moyen</div>
+  ${paymentDetailHTML}
+  ${alertesHTML}
+</div>
+
+<div class="section">
+  <div class="section-title">Coachs &amp; Indemnités</div>
+  ${coachHTML}
+</div>
+
+<div class="footer">
+  <span>VEEC &mdash; Document confidentiel &mdash; Usage interne comptabilité</span>
+  <span>Généré le ${now}</span>
+</div>
+<script>window.onload=()=>{window.print();}</script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank', 'width=960,height=750');
+    if (!win) { alert('Autorisez les pop-ups pour générer le PDF.'); return; }
+    win.document.write(html);
+    win.document.close();
+  };
+
+  return (
+    <div className="space-y-4">
+
+      {/* Carte Participants */}
+      <div className="bg-light-surface dark:bg-dark-surface rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Participants</h3>
+        {/* KPI row 1 : volumes */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3">
+          {[
+            { label: 'Inscrits', val: stats.totalInscrits, color: 'text-indigo-600 dark:text-indigo-400' },
+            { label: 'Stage complet', val: stats.nbComplet, color: 'text-indigo-500 dark:text-indigo-300' },
+            { label: 'À la journée', val: stats.nbJournee, color: 'text-purple-600 dark:text-purple-400' },
+            { label: 'Internes', val: stats.nbInterne, color: 'text-green-600 dark:text-green-400' },
+          ].map(({ label, val, color }) => (
+            <div key={label} className="text-center">
+              <div className={`text-3xl font-bold ${color}`}>{val}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{label}</div>
+            </div>
+          ))}
+        </div>
+        {/* KPI row 2 : genre */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="text-center rounded-lg bg-blue-50 dark:bg-blue-900/20 py-2">
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.nbMasc}</div>
+            <div className="text-xs text-blue-500 dark:text-blue-300 mt-0.5">Masculins</div>
+          </div>
+          <div className="text-center rounded-lg bg-pink-50 dark:bg-pink-900/20 py-2">
+            <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">{stats.nbFem}</div>
+            <div className="text-xs text-pink-500 dark:text-pink-300 mt-0.5">Féminines</div>
+          </div>
+        </div>
+        {/* Barres par catégorie */}
+        {stats.parCategorie.length > 0 && (
+          <div className="space-y-1.5">
+            {stats.parCategorie.map(({ cat, nb }) => {
+              const nbM = inscriptions.filter(i => i.categorie === cat && i.genre === 'Masculin').length;
+              const nbF = inscriptions.filter(i => i.categorie === cat && i.genre === 'Féminin').length;
+              return (
+                <div key={cat} className="flex items-center gap-2">
+                  <span className="w-12 text-xs text-gray-500 dark:text-gray-400 text-right shrink-0">{cat}</span>
+                  <div className="flex-1 h-4 rounded bg-gray-100 dark:bg-gray-700 overflow-hidden flex">
+                    <div className="h-full bg-blue-500 transition-all" style={{ width: `${(nbM / maxCat) * 100}%` }} />
+                    <div className="h-full bg-pink-400 transition-all" style={{ width: `${(nbF / maxCat) * 100}%` }} />
+                  </div>
+                  <span className="w-6 text-xs font-semibold text-gray-700 dark:text-gray-300">{nb}</span>
+                  <div className="flex gap-2 text-xs ml-1">
+                    {nbM > 0 && <span className="text-blue-500 dark:text-blue-400">♂{nbM}</span>}
+                    {nbF > 0 && <span className="text-pink-500 dark:text-pink-400">♀{nbF}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Carte Financier — Admin uniquement */}
+      {isAdmin && (
+        <div className="bg-light-surface dark:bg-dark-surface rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Financier</h3>
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-sm"
+              title="Imprimer / Exporter en PDF"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Imprimer PDF
+            </button>
+          </div>
+
+          {/* Section Inscriptions */}
+          <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Inscriptions</p>
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-700 dark:text-gray-200">{stats.totalDu} €</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Montant dû</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.totalRegle} €</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Réglé</div>
+            </div>
+            <div className="text-center">
+              <div className={`text-2xl font-bold ${stats.solde > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                {stats.solde > 0 ? `−${stats.solde} €` : '✓'}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Solde restant</div>
+            </div>
+          </div>
+
+          {/* Section Coachs & Indemnisation */}
+          <div className="border-t border-gray-100 dark:border-gray-700 pt-4 mb-4">
+            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Coachs & Indemnisation</p>
+            <div className="grid grid-cols-3 gap-4 mb-3">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-700 dark:text-gray-200">{encadrants.length}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Encadrants</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{stats.totalIndemnisation} €</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">À verser</div>
+              </div>
+              <div className="text-center">
+                <div className={`text-2xl font-bold ${stats.resultatNet >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {stats.resultatNet} €
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Net (réglé − indemn.)</div>
+              </div>
+            </div>
+            {stats.indemnisationParCoach.length > 0 && (
+              <div className="space-y-1">
+                {stats.indemnisationParCoach.map(c => (
+                  <div key={c.id} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">{c.nom}</span>
+                    <span className="text-gray-400 dark:text-gray-500 text-xs">{c.tarifJour} €/j × {c.nbJours} j</span>
+                    <span className="font-semibold text-indigo-700 dark:text-indigo-300">{c.total} €</span>
+                  </div>
+                ))}
+                {stats.nbNonRemuneres > 0 && (
+                  <p className="text-xs text-gray-400 italic mt-1">+ {stats.nbNonRemuneres} encadrant{stats.nbNonRemuneres > 1 ? 's' : ''} non rémunéré{stats.nbNonRemuneres > 1 ? 's' : ''}</p>
+                )}
+              </div>
+            )}
+            {encadrants.length === 0 && (
+              <p className="text-xs text-gray-400 italic">Aucun encadrant associé à ce stage</p>
+            )}
+          </div>
+
+          {/* Section Détail moyens de paiement */}
+          {stats.parMoyen.length > 0 && (
+            <div className="border-t border-gray-100 dark:border-gray-700 pt-4 mb-3">
+              <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Détail par moyen de paiement</p>
+              <div className="space-y-1.5">
+                {stats.parMoyen.map(({ moyen, nb, total }) => (
+                  <div key={moyen} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">{MOYEN_LABELS[moyen]}</span>
+                    <span className="text-gray-400 dark:text-gray-500 text-xs">{nb} inscription{nb > 1 ? 's' : ''}</span>
+                    <span className="font-semibold text-gray-800 dark:text-gray-200">{total} €</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Alertes paiements non confirmés */}
+          {stats.alertes.length > 0 && (
+            <div className="mt-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+              <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 mb-1">
+                ⚠ {stats.alertes.length} paiement{stats.alertes.length > 1 ? 's' : ''} non confirmé{stats.alertes.length > 1 ? 's' : ''} (origine Autre, sans moyen de paiement)
+              </p>
+              {stats.alertes.map(i => (
+                <p key={i.id} className="text-xs text-orange-600 dark:text-orange-300">{i.prenom} {i.nom || ''}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Carte Qualitatif */}
+      <div className="bg-light-surface dark:bg-dark-surface rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Qualitatif — Questionnaire</h3>
+        {stats.nbQuestionnaires === 0 ? (
+          <p className="text-sm text-gray-400 italic">Aucun questionnaire affecté à ce stage</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                <div
+                  className="h-full bg-teal-500 rounded-full transition-all"
+                  style={{ width: `${inscriptions.length > 0 ? Math.round((stats.nbReponses / inscriptions.length) * 100) : 0}%` }}
+                />
+              </div>
+              <span className="text-sm font-semibold text-teal-700 dark:text-teal-400 whitespace-nowrap">
+                {stats.nbReponses} / {inscriptions.length} réponses
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {stats.nbQuestionnaires} questionnaire{stats.nbQuestionnaires > 1 ? 's' : ''} affecté{stats.nbQuestionnaires > 1 ? 's' : ''} — consultez l'onglet Questionnaire pour les détails
+            </p>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 };
