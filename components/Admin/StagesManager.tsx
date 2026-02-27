@@ -636,6 +636,11 @@ const StageDetail: React.FC<StageDetailProps> = ({ stage, onBack, onEdit }) => {
         nb_jours: inscForm.jours ? inscForm.jours.length : null,
         montant: inscForm.montant ?? null,
         notes: inscForm.notes?.trim() || null,
+        origine_inscription: inscForm.origine_inscription ?? null,
+        num_commande_helloasso: inscForm.num_commande_helloasso?.trim() || null,
+        moyen_paiement: inscForm.moyen_paiement ?? null,
+        montant_regle: inscForm.montant_regle ?? null,
+        email_commanditaire: inscForm.email_commanditaire?.trim() || null,
       };
 
       if (editingId) {
