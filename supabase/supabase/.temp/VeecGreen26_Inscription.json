@@ -1,0 +1,212 @@
+{
+  "name": "VeecGreen26_Inscription",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Import inscriptions tournoi",
+        "formDescription": "Importer un export HelloAsso (.xlsx) pour alimenter la base Supabase",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Tournoi ID",
+              "fieldType": "number",
+              "placeholder": "1",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Fichier Excel HelloAsso",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".xlsx",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "99d75c9b-d275-42ab-b290-6d40db2ead95",
+      "name": "Formulaire d'import",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "767f87ec-895d-4821-977a-09965f750e60"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Récupérer le fichier uploadé depuis le formulaire\nconst formData = $input.first().json;\nconst tournoi_id = parseInt(formData['Tournoi ID']) || 1;\n\n// Le fichier est dans les binary data\nconst binaryKey = Object.keys($input.first().binary || {})[0];\n\nif (!binaryKey) {\n  throw new Error('Aucun fichier trouvé dans le formulaire');\n}\n\nreturn [{\n  json: { tournoi_id },\n  binary: $input.first().binary\n}];"
+      },
+      "id": "0cc2766f-b488-4762-87f8-8f65b4f935e3",
+      "name": "Préparer le fichier",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "={{ Object.keys($binary)[0] }}",
+        "fileFormat": "xlsx",
+        "options": {
+          "headerRow": true,
+          "sheetName": "Feuille 1"
+        }
+      },
+      "id": "14b5e136-dade-4428-ba7a-9bf3547fc366",
+      "name": "Lire le fichier Excel",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Conversion date Excel → ISO\nfunction excelDateToISO(excelDate) {\n  if (!excelDate) return null;\n  if (typeof excelDate === 'string' && excelDate.includes('-')) return excelDate;\n  if (excelDate instanceof Date) return excelDate.toISOString();\n  const date = new Date((excelDate - 25569) * 86400 * 1000);\n  return date.toISOString();\n}\n\nconst items = [];\nlet tournoi_id = 1;\ntry {\n  tournoi_id = parseInt($('Préparer le fichier').first().json.tournoi_id) || 1;\n} catch(e) {}\n\nfor (const item of $input.all()) {\n  const row = item.json;\n  if (!row['Numéro de billet']) continue;\n\n  // Email et Téléphone sont des champs variables HelloAsso (col Q+) → custom_fields\n  const inscription = {\n    numero_billet:      parseInt(row['Numéro de billet']),\n    tournoi_id:         tournoi_id,\n    reference_commande: parseInt(row['Référence commande']) || null,\n    date_commande:      excelDateToISO(row['Date de la commande']),\n    statut_commande:    row['Statut de la commande'] || null,\n    nom_participant:    row['Nom participant'] || null,\n    prenom_participant: row['Prénom participant'] || null,\n    nom_payeur:         row['Nom payeur'] || null,\n    prenom_payeur:      row['Prénom payeur'] || null,\n    email_payeur:       row['Email payeur'] || null,\n    moyen_paiement:     row['Moyen de paiement'] || null,\n    tarif:              row['Tarif'] || null,\n    montant_tarif:      parseFloat(row['Montant tarif']) || null,\n    code_promo:         row['Code Promo'] || null,\n    montant_code_promo: parseFloat(row['Montant code promo']) || null,\n    custom_fields: Object.fromEntries(\n      Object.entries({\n        email:          row['Email'] || null,\n        telephone:      row['Téléphone'] || null,\n        equipe:         row['Equipe'] || null,\n        niveau_equipe:  row[\"Niveau de l'équipe\"] || null,\n        nom_equipe:     row[\"Nom d'équipe\"] || null,\n        clubs_origine:  row[\"Club(s) d'origine\"] || null,\n        commentaire:    row['Commentaire éventuel'] || null,\n        liste_campeurs: row['Liste des campeurs'] || null\n      }).filter(([_, v]) => v !== null)\n    )\n  };\n\n  items.push({ json: inscription });\n}\n\nreturn items;"
+      },
+      "id": "41ce3fbb-02a9-4e6a-b38d-c06b29431c2c",
+      "name": "Transformer les données",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://odfijihyepuxjzeueiri.supabase.co/rest/v1/inscriptions_tournoi",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZmlqaWh5ZXB1eGp6ZXVlaXJpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTkwMTkwMCwiZXhwIjoyMDc3NDc3OTAwfQ.BaGvfw0klOuzGnpTQWv6kjijKIPbnSxziON2zcLpfXw"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kZmlqaWh5ZXB1eGp6ZXVlaXJpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTkwMTkwMCwiZXhwIjoyMDc3NDc3OTAwfQ.BaGvfw0klOuzGnpTQWv6kjijKIPbnSxziON2zcLpfXw"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "4e0922e4-2d2e-42e8-9efd-4521510c0ca3",
+      "name": "Upsert Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "plBYI5selbyH9zYt",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.all();\nconst success = results.filter(r => !r.json.error).length;\nconst errors  = results.filter(r =>  r.json.error).length;\n\nconsole.log(`Import terminé : ${success} succès, ${errors} erreurs`);\n\nreturn [{\n  json: {\n    message: '✅ Import terminé',\n    total_traite: results.length,\n    succes: success,\n    erreurs: errors,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "8e0383a6-bf71-4198-b53c-3b6573ec4453",
+      "name": "Résumé",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Formulaire d'import": {
+      "main": [
+        [
+          {
+            "node": "Préparer le fichier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer le fichier": {
+      "main": [
+        [
+          {
+            "node": "Lire le fichier Excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire le fichier Excel": {
+      "main": [
+        [
+          {
+            "node": "Transformer les données",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transformer les données": {
+      "main": [
+        [
+          {
+            "node": "Upsert Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Supabase": {
+      "main": [
+        [
+          {
+            "node": "Résumé",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "2d763f9b-4bec-4358-8c79-df451d8c479a",
+  "meta": {
+    "instanceId": "fdae617487b99d33dbaf20dbd37562091a56c4c4d679d6c8ad94985e99c7eeb6"
+  },
+  "id": "azZJXKBTaH2KkOY9",
+  "tags": []
+}

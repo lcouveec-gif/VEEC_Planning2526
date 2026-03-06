@@ -16,6 +16,7 @@ import LoginPage from './pages/LoginPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import LinksPage from './pages/LinksPage';
 import StagePage from './pages/StagePage';
+import TournoiPage from './pages/TournoiPage';
 
 export const router = createBrowserRouter([
   {
@@ -103,6 +104,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['admin', 'entraineur', 'user']}>
             <StagePage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'tournoi',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'entraineur', 'user']}>
+            <TournoiPage />
           </ProtectedRoute>
         )
       },

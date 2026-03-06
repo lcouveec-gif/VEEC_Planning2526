@@ -11,8 +11,9 @@ import GymnasesManager from './Admin/GymnasesManager';
 import EffectifsManager from './Admin/EffectifsManager';
 import StagesManager from './Admin/StagesManager';
 import QuestionnairesManager from './Admin/QuestionnairesManager';
+import TournoiManager from './Admin/TournoiManager';
 
-type AdminSection = 'menu' | 'teams' | 'effectifs' | 'stages' | 'questionnaires' | 'planning' | 'automation' | 'permissions' | 'links' | 'clubs' | 'gymnases';
+type AdminSection = 'menu' | 'teams' | 'effectifs' | 'stages' | 'questionnaires' | 'tournois' | 'planning' | 'automation' | 'permissions' | 'links' | 'clubs' | 'gymnases';
 
 const Admin: React.FC = () => {
   const { section: initialSection, teamId: selectedTeamId } = useParams<{ section?: string; teamId?: string }>();
@@ -125,6 +126,34 @@ const Admin: React.FC = () => {
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Gérer les stages et les inscriptions
+          </p>
+        </button>
+
+        {/* Carte Tournois */}
+        <button
+          onClick={() => setCurrentSection('tournois')}
+          className="bg-light-surface dark:bg-dark-surface rounded-lg p-6 shadow-md hover:shadow-lg transition-all border-2 border-transparent hover:border-light-primary dark:hover:border-dark-primary text-left group"
+        >
+          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/30 mb-4 group-hover:scale-110 transition-transform">
+            <svg
+              className="w-8 h-8 text-amber-600 dark:text-amber-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+              />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-light-onSurface dark:text-dark-onSurface mb-2">
+            Tournois
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Gérer les tournois et les inscriptions
           </p>
         </button>
 
@@ -406,6 +435,24 @@ const Admin: React.FC = () => {
               </h2>
             </div>
             <QuestionnairesManager />
+          </div>
+        );
+
+      case 'tournois':
+        return (
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-6 flex items-center gap-4">
+              <button
+                onClick={() => setCurrentSection('menu')}
+                className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+              >
+                ← Retour
+              </button>
+              <h2 className="text-2xl font-bold text-light-onSurface dark:text-dark-onSurface">
+                Tournois
+              </h2>
+            </div>
+            <TournoiManager />
           </div>
         );
 

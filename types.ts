@@ -319,6 +319,67 @@ export interface QuestionnaireStats {
   questions: QuestionStats[];
 }
 
+// ─── Module Tournoi ───────────────────────────────────────────────────────────
+
+export interface Tournoi {
+  id: number;
+  slug: string;
+  nom: string;
+  date_debut?: string | null;  // YYYY-MM-DD
+  date_fin?: string | null;    // YYYY-MM-DD
+  lieu?: string | null;
+  created_at?: string;
+}
+
+export interface InscriptionTournoi {
+  numero_billet: number;        // PK
+  tournoi_id: number;
+  reference_commande?: number | null;
+  date_commande?: string | null;
+  statut_commande?: string | null;
+  nom_participant?: string | null;
+  prenom_participant?: string | null;
+  nom_payeur?: string | null;
+  prenom_payeur?: string | null;
+  email_payeur?: string | null;
+  moyen_paiement?: string | null;
+  tarif?: string | null;
+  montant_tarif?: number | null;
+  code_promo?: string | null;
+  montant_code_promo?: number | null;
+  custom_fields?: Record<string, string | null> | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ImportTournoiResult {
+  upserted: number;
+  errors: string[];
+}
+
+export interface CompetitionTournoi {
+  id: number;
+  tournoi_id: number;
+  nom: string;
+  tarifs_eligibles?: string[];
+  nb_equipes?: number;    // calculé depuis le count Supabase
+  created_at?: string;
+}
+
+export interface EquipeCompetitionTournoi {
+  id: number;
+  competition_id: number;
+  nom_equipe: string;
+  niveau_equipe?: string | null;
+  is_staff?: boolean;
+  numero_billet_capitaine?: number | null;
+  nom_contact?: string | null;
+  prenom_contact?: string | null;
+  email_contact?: string | null;
+  telephone_contact?: string | null;
+  created_at?: string;
+}
+
 // ─── Types pour la gestion des gymnases ───────────────────────────────────────
 
 export interface Gymnase {
