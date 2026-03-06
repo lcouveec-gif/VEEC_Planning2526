@@ -23,6 +23,7 @@
     "web-push": "^3.6.7",
     "workbox-core": "^7.3.0",
     "workbox-precaching": "^7.3.0",
+    "xlsx": "^0.18.5",
     "zustand": "^5.0.9"
   },
   "devDependencies": {
