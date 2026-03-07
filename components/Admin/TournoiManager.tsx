@@ -780,10 +780,10 @@ interface EquipesPanelProps {
 }
 
 const EquipesPanel: React.FC<EquipesPanelProps> = ({ competition, tournoiInscriptions, onEquipesChanged }) => {
-  const { equipes, loading, createEquipe, updateEquipe, deleteEquipe, initFromInscriptions } = useEquipesCompetition(competition.id);
+  const { equipes, loading, createEquipe, updateEquipe, deleteEquipe, initFromInscriptions, initFromCompetField } = useEquipesCompetition(competition.id);
   const [editingEquipe, setEditingEquipe] = useState<EquipeCompetitionTournoi | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [initing, setIniting] = useState(false);
+  const [initing, setIniting] = useState<'tarif' | 'compet' | null>(null);
   const [initResult, setInitResult] = useState<{ created: number; errors: string[] } | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -840,13 +840,23 @@ const EquipesPanel: React.FC<EquipesPanelProps> = ({ competition, tournoiInscrip
     onEquipesChanged?.();
   };
 
-  const handleInit = async () => {
-    if (!window.confirm(`Initialiser les équipes depuis les inscriptions (tarifs : ${competition.tarifs_eligibles?.join(', ') || 'tous'}) ?`)) return;
-    setIniting(true);
+  const handleInitTarif = async () => {
+    if (!window.confirm(`Initialiser depuis les tarifs (${competition.tarifs_eligibles?.join(', ') || 'tous'}) ?`)) return;
+    setIniting('tarif');
     setInitResult(null);
     const res = await initFromInscriptions(tournoiInscriptions, competition);
     setInitResult(res);
-    setIniting(false);
+    setIniting(null);
+    onEquipesChanged?.();
+  };
+
+  const handleInitCompet = async () => {
+    if (!window.confirm(`Initialiser depuis le champ compétition = "${competition.nom}" ?`)) return;
+    setIniting('compet');
+    setInitResult(null);
+    const res = await initFromCompetField(tournoiInscriptions, competition);
+    setInitResult(res);
+    setIniting(null);
     onEquipesChanged?.();
   };
 
@@ -871,12 +881,21 @@ const EquipesPanel: React.FC<EquipesPanelProps> = ({ competition, tournoiInscrip
           )}
         </div>
         <div className="flex gap-2">
-          <button onClick={handleInit} disabled={initing}
-            className="px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center gap-1">
+          <button onClick={handleInitCompet} disabled={!!initing}
+            className="px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center gap-1"
+            title={`Filtre : custom_fields.equipe = "${competition.nom}"`}>
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            {initing ? 'Initialisation...' : 'Initialiser depuis inscriptions'}
+            {initing === 'compet' ? 'Initialisation...' : 'Init depuis compét.'}
+          </button>
+          <button onClick={handleInitTarif} disabled={!!initing}
+            className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center gap-1"
+            title={`Filtre : tarifs éligibles (${competition.tarifs_eligibles?.join(', ') || 'tous'})`}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+            {initing === 'tarif' ? 'Initialisation...' : 'Init depuis tarif'}
           </button>
           <button onClick={openCreate}
             className="px-3 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors flex items-center gap-1">
