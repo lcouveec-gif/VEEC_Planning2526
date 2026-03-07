@@ -24,8 +24,8 @@ const STATUTS = ['Validée', 'Annulée', 'En attente', 'Sur place'];
 const MOYENS_PAIEMENT_MANUEL = ['Sur place', 'Espèces', 'Virement', 'CB', 'Chèque', 'Staff'];
 
 const statutClass = (statut?: string | null) => {
-  if (statut === 'Validée' || statut === 'Validé') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200';
-  if (statut === 'Annulée' || statut === 'Annulé') return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200';
+  if (statut === 'Validée' || statut === 'Validé' || statut === 'Processed') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200';
+  if (statut === 'Annulée' || statut === 'Annulé' || statut === 'Refunded' || statut === 'Cancelled') return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200';
   if (statut === 'Sur place') return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200';
   return 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
 };
@@ -465,10 +465,12 @@ const InscriptionsTab: React.FC<InscriptionsTabProps> = ({ tournois }) => {
 
   const [importResult, setImportResult] = useState<ImportTournoiResult | null>(null);
   const [importing, setImporting] = useState(false);
-  const [filterStatut, setFilterStatut] = useState('');
+  const [filterNiveau, setFilterNiveau] = useState('');
   const [filterTarif, setFilterTarif] = useState('');
   const [filterMoyen, setFilterMoyen] = useState('');
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'billet' | 'participant' | 'tarif'>('billet');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { inscriptions, loading, error, createInscription, updateInscription, deleteInscription, importFromExcel } =
@@ -524,27 +526,52 @@ const InscriptionsTab: React.FC<InscriptionsTabProps> = ({ tournois }) => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const statuts = [...new Set(inscriptions.map(i => i.statut_commande).filter(Boolean))];
   const tarifs = [...new Set(inscriptions.map(i => i.tarif).filter(Boolean))];
   const moyens = [...new Set(inscriptions.map(i => i.moyen_paiement).filter(Boolean))];
+  const niveaux = [...new Set(inscriptions.map(i => i.custom_fields?.niveau_equipe).filter(Boolean))].sort() as string[];
 
-  const filtered = inscriptions.filter(i => {
-    if (filterStatut && i.statut_commande !== filterStatut) return false;
-    if (filterTarif && i.tarif !== filterTarif) return false;
-    if (filterMoyen && i.moyen_paiement !== filterMoyen) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      const haystack = [
-        i.prenom_participant, i.nom_participant,
-        i.custom_fields?.nom_equipe,
-        i.custom_fields?.email || i.email_payeur,
-        i.custom_fields?.telephone,
-        String(i.numero_billet),
-      ].filter(Boolean).join(' ').toLowerCase();
-      if (!haystack.includes(q)) return false;
-    }
-    return true;
-  });
+  const toggleSort = (col: 'billet' | 'participant' | 'tarif') => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(col); setSortDir('asc'); }
+  };
+
+  const SortIcon = ({ col }: { col: 'billet' | 'participant' | 'tarif' }) => (
+    <span className="ml-1 inline-block opacity-60">
+      {sortBy === col ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+    </span>
+  );
+
+  const filtered = inscriptions
+    .filter(i => {
+      if (filterNiveau && i.custom_fields?.niveau_equipe !== filterNiveau) return false;
+      if (filterTarif && i.tarif !== filterTarif) return false;
+      if (filterMoyen && i.moyen_paiement !== filterMoyen) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const haystack = [
+          i.prenom_participant, i.nom_participant,
+          i.custom_fields?.nom_equipe,
+          i.custom_fields?.email || i.email_payeur,
+          i.custom_fields?.telephone,
+          String(i.numero_billet),
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === 'participant') {
+        const na = [a.nom_participant, a.prenom_participant].filter(Boolean).join(' ').toLowerCase();
+        const nb = [b.nom_participant, b.prenom_participant].filter(Boolean).join(' ').toLowerCase();
+        cmp = na.localeCompare(nb, 'fr');
+      } else if (sortBy === 'tarif') {
+        cmp = (a.tarif ?? '').localeCompare(b.tarif ?? '', 'fr');
+      } else {
+        cmp = a.numero_billet - b.numero_billet;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
 
   // ── Vue formulaire ─────────────────────────────────────────────────────────
   if (viewMode === 'form' && billetForm) {
@@ -627,10 +654,10 @@ const InscriptionsTab: React.FC<InscriptionsTabProps> = ({ tournois }) => {
             placeholder="Recherche nom, équipe, n° billet..."
             className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface min-w-48"
           />
-          <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)}
+          <select value={filterNiveau} onChange={e => setFilterNiveau(e.target.value)}
             className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface">
-            <option value="">Tous statuts</option>
-            {statuts.map(s => <option key={s!} value={s!}>{s}</option>)}
+            <option value="">Tous niveaux</option>
+            {niveaux.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
           <select value={filterTarif} onChange={e => setFilterTarif(e.target.value)}
             className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface">
@@ -642,8 +669,8 @@ const InscriptionsTab: React.FC<InscriptionsTabProps> = ({ tournois }) => {
             <option value="">Tous paiements</option>
             {moyens.map(m => <option key={m!} value={m!}>{m}</option>)}
           </select>
-          {(filterStatut || filterTarif || filterMoyen || search) && (
-            <button onClick={() => { setFilterStatut(''); setFilterTarif(''); setFilterMoyen(''); setSearch(''); }}
+          {(filterNiveau || filterTarif || filterMoyen || search) && (
+            <button onClick={() => { setFilterNiveau(''); setFilterTarif(''); setFilterMoyen(''); setSearch(''); }}
               className="px-3 py-1.5 text-sm rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
               Effacer
             </button>
@@ -670,11 +697,20 @@ const InscriptionsTab: React.FC<InscriptionsTabProps> = ({ tournois }) => {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">N° billet</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Participant</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Tarif</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 cursor-pointer select-none whitespace-nowrap"
+                  onClick={() => toggleSort('billet')}>
+                  N° billet<SortIcon col="billet" />
+                </th>
+                <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 cursor-pointer select-none whitespace-nowrap"
+                  onClick={() => toggleSort('participant')}>
+                  Participant<SortIcon col="participant" />
+                </th>
+                <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 cursor-pointer select-none whitespace-nowrap"
+                  onClick={() => toggleSort('tarif')}>
+                  Tarif<SortIcon col="tarif" />
+                </th>
                 <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Montant</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Statut</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Origine</th>
                 <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Paiement</th>
                 <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Équipe</th>
                 <th className="px-3 py-2"></th>
@@ -700,9 +736,10 @@ const InscriptionsTab: React.FC<InscriptionsTabProps> = ({ tournois }) => {
                   <td className="px-3 py-2 text-light-onSurface dark:text-dark-onSurface">{ins.tarif || '-'}</td>
                   <td className="px-3 py-2 text-light-onSurface dark:text-dark-onSurface">{formatEuro(ins.montant_tarif)}</td>
                   <td className="px-3 py-2">
-                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${statutClass(ins.statut_commande)}`}>
-                      {ins.statut_commande || '-'}
-                    </span>
+                    {ins.reference_commande
+                      ? <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">HelloAsso</span>
+                      : <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">Manuel</span>
+                    }
                   </td>
                   <td className="px-3 py-2 text-light-onSurface dark:text-dark-onSurface">{ins.moyen_paiement || '-'}</td>
                   <td className="px-3 py-2 text-xs">
@@ -710,7 +747,9 @@ const InscriptionsTab: React.FC<InscriptionsTabProps> = ({ tournois }) => {
                       {ins.custom_fields?.nom_equipe || '-'}
                     </div>
                     {ins.custom_fields?.niveau_equipe && (
-                      <div className="text-gray-400 dark:text-gray-500">{ins.custom_fields.niveau_equipe}</div>
+                      <span className="inline-block mt-0.5 px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                        {ins.custom_fields.niveau_equipe}
+                      </span>
                     )}
                   </td>
                   <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
