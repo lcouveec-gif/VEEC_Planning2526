@@ -95,6 +95,7 @@ interface UseEquipesCompetitionResult {
   updateEquipe: (id: number, updates: Partial<Omit<EquipeCompetitionTournoi, 'id' | 'created_at'>>) => Promise<boolean>;
   deleteEquipe: (id: number) => Promise<boolean>;
   initFromInscriptions: (inscriptions: InscriptionTournoi[], competition: CompetitionTournoi) => Promise<{ created: number; errors: string[] }>;
+  initFromCompetField: (inscriptions: InscriptionTournoi[], competition: CompetitionTournoi) => Promise<{ created: number; errors: string[] }>;
 }
 
 export function useEquipesCompetition(competitionId: number | null): UseEquipesCompetitionResult {
@@ -154,6 +155,72 @@ export function useEquipesCompetition(competitionId: number | null): UseEquipesC
     } catch (e: any) {
       setError(e.message); return false;
     }
+  };
+
+  // Initialise les équipes depuis les inscriptions filtrées par custom_fields.equipe = competition.nom
+  const initFromCompetField = async (
+    inscriptions: InscriptionTournoi[],
+    competition: CompetitionTournoi
+  ): Promise<{ created: number; errors: string[] }> => {
+    const result = { created: 0, errors: [] as string[] };
+    const nomCompet = competition.nom.trim().toLowerCase();
+
+    const filtered = inscriptions.filter(i =>
+      (i.custom_fields?.equipe ?? '').trim().toLowerCase() === nomCompet
+    );
+
+    const avecEquipe = filtered.filter(i => i.custom_fields?.nom_equipe);
+
+    const groupes = new Map<string, InscriptionTournoi[]>();
+    for (const ins of avecEquipe) {
+      const key = (ins.custom_fields!.nom_equipe ?? '').trim();
+      if (!key) continue;
+      if (!groupes.has(key)) groupes.set(key, []);
+      groupes.get(key)!.push(ins);
+    }
+
+    if (groupes.size === 0) {
+      result.errors.push(`Aucune inscription avec custom_fields.equipe = "${competition.nom}" trouvée.`);
+      return result;
+    }
+
+    const { data: existing } = await supabase
+      .from('equipes_competitions_tournoi')
+      .select('nom_equipe')
+      .eq('competition_id', competition.id);
+    const existingNames = new Set((existing ?? []).map((e: { nom_equipe: string }) => e.nom_equipe.trim().toLowerCase()));
+
+    const toInsert: Omit<EquipeCompetitionTournoi, 'id' | 'created_at'>[] = [];
+
+    for (const [nomEquipe, billets] of groupes) {
+      if (existingNames.has(nomEquipe.toLowerCase())) continue;
+      const cap = billets.sort((a, b) => a.numero_billet - b.numero_billet)[0];
+      toInsert.push({
+        competition_id: competition.id,
+        nom_equipe: nomEquipe,
+        niveau_equipe: cap.custom_fields?.niveau_equipe || null,
+        is_staff: false,
+        numero_billet_capitaine: cap.numero_billet,
+        nom_contact: cap.nom_participant || null,
+        prenom_contact: cap.prenom_participant || null,
+        email_contact: cap.custom_fields?.email || cap.email_payeur || null,
+        telephone_contact: cap.custom_fields?.telephone || null,
+      });
+    }
+
+    if (toInsert.length === 0) {
+      result.errors.push('Toutes les équipes existent déjà dans cette compétition.');
+      return result;
+    }
+
+    const { error: insertErr } = await supabase.from('equipes_competitions_tournoi').insert(toInsert);
+    if (insertErr) {
+      result.errors.push(insertErr.message);
+    } else {
+      result.created = toInsert.length;
+      await fetchEquipes();
+    }
+    return result;
   };
 
   // Initialise les équipes depuis les inscriptions filtrées par tarifs_eligibles
@@ -238,5 +305,5 @@ export function useEquipesCompetition(competitionId: number | null): UseEquipesC
 
   useEffect(() => { fetchEquipes(); }, [fetchEquipes]);
 
-  return { equipes, loading, error, refetch: fetchEquipes, createEquipe, updateEquipe, deleteEquipe, initFromInscriptions };
+  return { equipes, loading, error, refetch: fetchEquipes, createEquipe, updateEquipe, deleteEquipe, initFromInscriptions, initFromCompetField };
 }

@@ -21,6 +21,29 @@ function todayStr(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
+const CAMPING_TARIF = 'Mode camping sur place, par personne';
+
+const NIVEAU_ORDER = ['Nationale', 'Régionale', 'Régional', 'Région', 'Départementale', 'Départemental', 'Loisir'];
+const niveauRank = (n: string): number => {
+  const lower = n.toLowerCase();
+  const idx = NIVEAU_ORDER.findIndex(o => lower.includes(o.toLowerCase()));
+  return idx === -1 ? 998 : idx;
+};
+
+/** Badge couleur selon la force du niveau (Nationale = or, Régionale = bleu, Départementale = teal, Loisir = gris) */
+const niveauBadgeClass = (niveau?: string | null): string => {
+  if (!niveau) return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300';
+  const lower = niveau.toLowerCase();
+  if (lower.includes('national')) return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200';
+  if (lower.includes('région') || lower.includes('regional') || lower.includes('régional'))
+    return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300';
+  if (lower.includes('départ') || lower.includes('depart'))
+    return 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300';
+  if (lower.includes('loisir'))
+    return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300';
+  return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300';
+};
+
 // HelloAsso peut retourner 'Validé'/'Validée' (FR), 'Processed' (EN) ou 'Sur place' (manuel)
 const isValide = (s?: string | null) => s === 'Validée' || s === 'Validé' || s === 'Sur place' || s === 'Processed';
 const isAnnule = (s?: string | null) => s === 'Annulée' || s === 'Annulé' || s === 'Refunded' || s === 'Cancelled';
@@ -80,12 +103,39 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
   const { competitions } = useCompetitionsTournoi(tournoiId);
   const { hasRole, user } = useAuth();
   const canSeePrivate = !!user && hasRole(['admin', 'entraineur']);
+  const [chartMode, setChartMode] = useState<'tarif' | 'niveau'>('tarif');
+  const [filterCompets, setFilterCompets] = useState<string[]>([]);
+
+  const compets = useMemo(() =>
+    [...new Set(inscriptions.map(i => i.custom_fields?.equipe).filter(Boolean))].sort() as string[],
+    [inscriptions]);
+
+  const toggleCompet = (c: string) =>
+    setFilterCompets(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+
+  const inscriptionsFiltered = useMemo(() =>
+    filterCompets.length > 0 ? inscriptions.filter(i => filterCompets.includes(i.custom_fields?.equipe ?? '')) : inscriptions,
+    [inscriptions, filterCompets]);
+
+  const parNiveauTarifFiltered = useMemo(() => {
+    const result: Record<string, Record<string, number>> = {};
+    inscriptionsFiltered
+      .filter(i => i.tarif !== CAMPING_TARIF)
+      .forEach(i => {
+        const niveau = i.custom_fields?.niveau_equipe || 'Non renseigné';
+        const tarif = i.tarif || 'Non renseigné';
+        if (!result[niveau]) result[niveau] = {};
+        result[niveau][tarif] = (result[niveau][tarif] ?? 0) + 1;
+      });
+    return result;
+  }, [inscriptionsFiltered]);
 
   const stats = useMemo(() => {
     const m = (v: number | string | null | undefined): number => { const n = Number(v ?? 0); return isNaN(n) ? 0 : n; };
     const validees = inscriptions.filter(i => isValide(i.statut_commande));
     const nbHelloAsso = inscriptions.filter(i => !!i.reference_commande).length;
     const nbManuelle = inscriptions.filter(i => !i.reference_commande).length;
+    const nbCamping = inscriptions.filter(i => i.tarif === CAMPING_TARIF).length;
     const montantBrut = validees.reduce((sum, i) => sum + m(i.montant_tarif), 0);
     const montantPromo = validees.reduce((sum, i) => sum + m(i.montant_code_promo), 0);
     const montantTotal = montantBrut - montantPromo;
@@ -115,7 +165,7 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
       parNiveauTarif[niveau][tarif] = (parNiveauTarif[niveau][tarif] ?? 0) + 1;
     });
 
-    return { total: inscriptions.length, nbHelloAsso, nbManuelle, montantTotal, montantBrut, montantPromo, parTarif, parMoyen, parNiveauTarif };
+    return { total: inscriptions.length, nbHelloAsso, nbManuelle, nbCamping, montantTotal, montantBrut, montantPromo, parTarif, parMoyen, parNiveauTarif };
   }, [inscriptions]);
 
   const nbEquipesTotal = competitions.reduce((s, c) => s + (c.nb_equipes ?? 0), 0);
@@ -131,9 +181,9 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <StatCard
-            label="Total inscriptions"
+            label="Inscriptions"
             value={stats.total}
-            sub={`dont ${stats.nbHelloAsso} HelloAsso · ${stats.nbManuelle} manuelle${stats.nbManuelle !== 1 ? 's' : ''}`}
+            sub={`dont ${stats.nbHelloAsso} HelloAsso · ${stats.nbManuelle} manuelle${stats.nbManuelle !== 1 ? 's' : ''}${stats.nbCamping > 0 ? ` · ${stats.nbCamping} camping` : ''}`}
             color="green"
           />
           <StatCard label="Équipes inscrites" value={nbEquipesTotal} color="teal" />
@@ -147,38 +197,91 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
           )}
         </div>
 
-        {/* ── Répartition Tarif × Niveau (barres empilées) ── */}
-        {Object.keys(stats.parNiveauTarif).length > 0 && (() => {
-          // Construire parTarifNiveau depuis la matrice inversée
+        {/* ── Répartition Tarif × Niveau / Niveau × Tarif (barres empilées) ── */}
+        {Object.keys(parNiveauTarifFiltered).length > 0 && (() => {
+          // Niveaux ordonnés par force (Nationale > … > Loisir)
+          const allNiveaux = [...new Set(Object.keys(parNiveauTarifFiltered))];
+          const niveauxList = allNiveaux.sort((a, b) => niveauRank(a) - niveauRank(b));
+
+          // Tarifs → matrice inversée pour mode tarif-majeur
           const parTarifNiveau: Record<string, Record<string, number>> = {};
-          Object.entries(stats.parNiveauTarif).forEach(([niveau, tarifs]) => {
+          Object.entries(parNiveauTarifFiltered).forEach(([niveau, tarifs]) => {
             Object.entries(tarifs).forEach(([tarif, count]) => {
               if (!parTarifNiveau[tarif]) parTarifNiveau[tarif] = {};
               parTarifNiveau[tarif][niveau] = (parTarifNiveau[tarif][niveau] ?? 0) + count;
             });
           });
-          // Niveaux ordonnés par total décroissant → palette cool
-          const niveauxList = Object.entries(
-            Object.values(parTarifNiveau).reduce<Record<string, number>>((acc, nv) => {
-              Object.entries(nv).forEach(([n, c]) => { acc[n] = (acc[n] ?? 0) + c; });
-              return acc;
-            }, {})
-          ).sort((a, b) => b[1] - a[1]).map(([n]) => n);
+
           const COLORS = ['#16a34a','#0d9488','#0891b2','#4f46e5','#7c3aed','#059669','#0369a1','#ca8a04'];
-          const colorOf = (n: string) => COLORS[niveauxList.indexOf(n) % COLORS.length] ?? '#6b7280';
-          // Tarifs ordonnés par total décroissant
+
+          // Mode tarif-majeur : barres = tarifs, segments = niveaux
           const tarifsSorted = Object.entries(parTarifNiveau)
-            .map(([t, nv]) => ({ tarif: t, niveaux: nv, total: Object.values(nv).reduce((s, v) => s + v, 0) }))
+            .map(([t, nv]) => ({ key: t, segments: nv, total: Object.values(nv).reduce((s, v) => s + v, 0) }))
             .sort((a, b) => b.total - a.total);
+          const colorOf_T = (n: string) => COLORS[niveauxList.indexOf(n) % COLORS.length] ?? '#6b7280';
+
+          // Mode niveau-majeur : barres = niveaux, segments = tarifs
+          const allTarifs = [...new Set(Object.values(parNiveauTarifFiltered).flatMap(t => Object.keys(t)))].sort();
+          const niveausSorted = niveauxList
+            .map(n => ({ key: n, segments: parNiveauTarifFiltered[n] ?? {}, total: Object.values(parNiveauTarifFiltered[n] ?? {}).reduce((s, v) => s + v, 0) }))
+            .filter(n => n.total > 0);
+          const colorOf_N = (t: string) => COLORS[allTarifs.indexOf(t) % COLORS.length] ?? '#6b7280';
+
+          const totalFiltered = chartMode === 'tarif'
+            ? tarifsSorted.reduce((s, r) => s + r.total, 0)
+            : niveausSorted.reduce((s, r) => s + r.total, 0);
+
+          const rows = chartMode === 'tarif' ? tarifsSorted : niveausSorted;
+          const legendItems = chartMode === 'tarif' ? niveauxList : allTarifs;
+          const colorOf = (k: string) => chartMode === 'tarif' ? colorOf_T(k) : colorOf_N(k);
+          const segmentKeys = chartMode === 'tarif' ? niveauxList : allTarifs;
 
           return (
             <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-md p-5">
-              <h3 className="text-base font-bold text-light-onSurface dark:text-dark-onSurface mb-1">Tarif × Niveau</h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Chaque barre = un tarif · segments colorés par niveau</p>
+              {/* Header avec toggle + filtre */}
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-base font-bold text-light-onSurface dark:text-dark-onSurface">
+                    {chartMode === 'tarif' ? 'Tarif × Niveau' : 'Niveau × Tarif'}
+                  </h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    {chartMode === 'tarif' ? 'Barres = tarifs · segments = niveaux' : 'Barres = niveaux · segments = tarifs'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {compets.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {compets.map(c => {
+                        const active = filterCompets.includes(c);
+                        return (
+                          <button key={c} onClick={() => toggleCompet(c)}
+                            className={`px-2 py-0.5 text-xs rounded-full font-medium border transition-colors whitespace-nowrap ${
+                              active
+                                ? 'bg-green-600 text-white border-green-600'
+                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-500'
+                            }`}>
+                            {c}
+                          </button>
+                        );
+                      })}
+                      {filterCompets.length > 0 && (
+                        <button onClick={() => setFilterCompets([])}
+                          className="px-2 py-0.5 text-xs rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 border border-dashed border-gray-300 dark:border-gray-600 transition-colors">
+                          ✕ tout
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <button onClick={() => setChartMode(m => m === 'tarif' ? 'niveau' : 'tarif')}
+                    className="px-3 py-1 text-xs rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium transition-colors whitespace-nowrap">
+                    ⇄ {chartMode === 'tarif' ? 'Vue Niveau' : 'Vue Tarif'}
+                  </button>
+                </div>
+              </div>
 
-              {/* Légende niveaux */}
+              {/* Légende */}
               <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-5">
-                {niveauxList.map(n => (
+                {legendItems.map(n => (
                   <span key={n} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
                     <span className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: colorOf(n) }} />
                     {n}
@@ -187,49 +290,53 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
               </div>
 
               <div className="space-y-4">
-                {tarifsSorted.map(({ tarif, niveaux, total }) => (
-                  <div key={tarif}>
-                    <div className="flex justify-between text-sm mb-1.5">
-                      <span className="font-semibold text-light-onSurface dark:text-dark-onSurface">
-                        {tarif}
-                        {canSeePrivate && (
+                {rows.map(({ key, segments, total }) => {
+                  const pctTotal = totalFiltered > 0 ? Math.round(total / totalFiltered * 100) : 0;
+                  return (
+                  <div key={key}>
+                    <div className="flex items-center justify-between mb-1.5 gap-2">
+                      <div className="min-w-0">
+                        <span className="font-semibold text-sm text-light-onSurface dark:text-dark-onSurface">
+                          {key}
+                        </span>
+                        {canSeePrivate && chartMode === 'tarif' && (
                           <span className="ml-2 text-xs font-normal text-gray-400 dark:text-gray-500">
-                            {formatEuro(stats.parTarif[tarif]?.montant ?? 0)}
+                            {formatEuro(stats.parTarif[key]?.montant ?? 0)}
                           </span>
                         )}
-                      </span>
-                      <span className="text-gray-500 dark:text-gray-400 tabular-nums">
-                        {total} inscr. · <span className="font-medium text-green-700 dark:text-green-400">{stats.total > 0 ? Math.round(total / stats.total * 100) : 0}%</span>
-                      </span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-lg font-bold tabular-nums text-light-onSurface dark:text-dark-onSurface leading-none">{total}</span>
+                        <span className="text-xs font-semibold tabular-nums text-gray-500 dark:text-gray-400">
+                          {pctTotal}%
+                        </span>
+                      </div>
                     </div>
-                    {/* Barre empilée */}
                     <div className="h-7 flex rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
-                      {niveauxList.map(n => {
-                        const count = niveaux[n] ?? 0;
+                      {segmentKeys.map(sk => {
+                        const count = segments[sk] ?? 0;
                         if (!count) return null;
                         const pct = (count / total) * 100;
                         return (
-                          <div key={n}
-                            style={{ width: `${pct}%`, backgroundColor: colorOf(n) }}
+                          <div key={sk} style={{ width: `${pct}%`, backgroundColor: colorOf(sk) }}
                             className="flex items-center justify-center"
-                            title={`${n} : ${count} inscr. (${Math.round(pct)}%)`}
-                          >
+                            title={`${sk} : ${count} (${Math.round(pct)}%)`}>
                             {pct >= 10 && <span className="text-white text-xs font-bold drop-shadow">{count}</span>}
                           </div>
                         );
                       })}
                     </div>
-                    {/* Détail compact */}
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-                      {niveauxList.filter(n => niveaux[n]).map(n => (
-                        <span key={n} className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                          <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: colorOf(n) }} />
-                          {n} : {niveaux[n]}
+                      {segmentKeys.filter(sk => segments[sk]).map(sk => (
+                        <span key={sk} className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: colorOf(sk) }} />
+                          {sk} : {segments[sk]}
                         </span>
                       ))}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
@@ -261,14 +368,17 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {competitions.map(comp => (
               <div key={comp.id} className="bg-light-surface dark:bg-dark-surface rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-semibold text-light-onSurface dark:text-dark-onSurface">{comp.nom}</p>
-                  <span className="flex-shrink-0 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full font-bold">
-                    {comp.nb_equipes ?? 0} équipe{(comp.nb_equipes ?? 0) !== 1 ? 's' : ''}
+                <p className="font-semibold text-light-onSurface dark:text-dark-onSurface mb-2">{comp.nom}</p>
+                <div className="flex items-end gap-1.5 mb-2">
+                  <span className="text-3xl font-extrabold text-green-600 dark:text-green-400 leading-none tabular-nums">
+                    {comp.nb_equipes ?? 0}
+                  </span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400 mb-0.5">
+                    équipe{(comp.nb_equipes ?? 0) !== 1 ? 's' : ''}
                   </span>
                 </div>
                 {comp.tarifs_eligibles && comp.tarifs_eligibles.length > 0 && (
-                  <div className="flex gap-1 flex-wrap mt-2">
+                  <div className="flex gap-1 flex-wrap">
                     {comp.tarifs_eligibles.map(t => (
                       <span key={t} className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs rounded">{t}</span>
                     ))}
@@ -334,7 +444,7 @@ const InscriptionDetail: React.FC<{ ins: InscriptionTournoi }> = ({ ins }) => {
         <p className="text-xs font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Équipe</p>
         <DetailRow label="Nom d'équipe" value={ins.custom_fields?.nom_equipe} />
         <DetailRow label="Niveau" value={ins.custom_fields?.niveau_equipe} />
-        <DetailRow label="Rôle" value={ins.custom_fields?.equipe} />
+        <DetailRow label="Compétition" value={ins.custom_fields?.equipe} />
         <DetailRow label="Club(s) d'origine" value={ins.custom_fields?.clubs_origine} />
         {ins.custom_fields?.commentaire && (
           <div>
@@ -369,6 +479,19 @@ const InscriptionsView: React.FC<InscriptionsViewProps> = ({ inscriptions, tourn
   const [filterNiveau, setFilterNiveau] = useState('');
   const [search, setSearch] = useState('');
   const [expandedBillet, setExpandedBillet] = useState<number | null>(null);
+  const [sortCol, setSortCol] = useState<'participant' | 'equipe' | 'niveau' | ''>('');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const toggleSort = (col: 'participant' | 'equipe' | 'niveau') => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  };
+  const SortTh = ({ col, label }: { col: 'participant' | 'equipe' | 'niveau'; label: string }) => (
+    <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400 cursor-pointer select-none whitespace-nowrap"
+      onClick={() => toggleSort(col)}>
+      {label}<span className="ml-1 opacity-60">{sortCol === col ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}</span>
+    </th>
+  );
 
   const stats = useMemo(() => {
     const valideesIns = inscriptions.filter(i => isValide(i.statut_commande));
@@ -385,22 +508,35 @@ const InscriptionsView: React.FC<InscriptionsViewProps> = ({ inscriptions, tourn
   const tarifs = [...new Set(inscriptions.map(i => i.tarif).filter(Boolean))];
   const niveaux = [...new Set(inscriptions.map(i => i.custom_fields?.niveau_equipe).filter(Boolean))];
 
-  const filtered = inscriptions.filter(i => {
-    if (filterTarif && i.tarif !== filterTarif) return false;
-    if (filterNiveau && i.custom_fields?.niveau_equipe !== filterNiveau) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      const haystack = [
-        i.prenom_participant, i.nom_participant,
-        i.custom_fields?.nom_equipe,
-        i.custom_fields?.niveau_equipe,
-        String(i.numero_billet),
-        ...(canSeePrivate ? [i.custom_fields?.email || i.email_payeur, i.custom_fields?.telephone] : []),
-      ].filter(Boolean).join(' ').toLowerCase();
-      if (!haystack.includes(q)) return false;
-    }
-    return true;
-  });
+  const filtered = inscriptions
+    .filter(i => {
+      if (filterTarif && i.tarif !== filterTarif) return false;
+      if (filterNiveau && i.custom_fields?.niveau_equipe !== filterNiveau) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const haystack = [
+          i.prenom_participant, i.nom_participant,
+          i.custom_fields?.nom_equipe,
+          i.custom_fields?.niveau_equipe,
+          String(i.numero_billet),
+          ...(canSeePrivate ? [i.custom_fields?.email || i.email_payeur, i.custom_fields?.telephone] : []),
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      let cmp = 0;
+      if (sortCol === 'participant') {
+        cmp = [a.nom_participant, a.prenom_participant].filter(Boolean).join(' ')
+          .localeCompare([b.nom_participant, b.prenom_participant].filter(Boolean).join(' '), 'fr');
+      } else if (sortCol === 'equipe') {
+        cmp = (a.custom_fields?.nom_equipe ?? '').localeCompare(b.custom_fields?.nom_equipe ?? '', 'fr');
+      } else if (sortCol === 'niveau') {
+        cmp = niveauRank(a.custom_fields?.niveau_equipe ?? '') - niveauRank(b.custom_fields?.niveau_equipe ?? '');
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
 
   return (
     <div className="space-y-4">
@@ -451,10 +587,11 @@ const InscriptionsView: React.FC<InscriptionsViewProps> = ({ inscriptions, tourn
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Participant</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Équipe / Niveau</th>
+                <SortTh col="participant" label="Participant" />
+                <SortTh col="equipe" label="Équipe" />
+                <SortTh col="niveau" label="Niveau" />
                 <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Tarif</th>
-                {canSeePrivate && <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Paiement</th>}
+                {canSeePrivate && <th className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Montant</th>}
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
@@ -474,21 +611,22 @@ const InscriptionsView: React.FC<InscriptionsViewProps> = ({ inscriptions, tourn
                     </td>
                     <td className="px-3 py-2 text-xs">
                       {ins.custom_fields?.nom_equipe
-                        ? <><div className="font-medium text-light-onSurface dark:text-dark-onSurface">{ins.custom_fields.nom_equipe}</div>
-                            {ins.custom_fields.niveau_equipe && (
-                              <span className="inline-block mt-0.5 px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs">
-                                {ins.custom_fields.niveau_equipe}
-                              </span>
-                            )}</>
+                        ? <span className="font-medium text-light-onSurface dark:text-dark-onSurface">{ins.custom_fields.nom_equipe}</span>
+                        : <span className="text-gray-400 dark:text-gray-500">-</span>
+                      }
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {ins.custom_fields?.niveau_equipe
+                        ? <span className={`inline-block px-1.5 py-0.5 rounded font-medium ${niveauBadgeClass(ins.custom_fields.niveau_equipe)}`}>
+                            {ins.custom_fields.niveau_equipe}
+                          </span>
                         : <span className="text-gray-400 dark:text-gray-500">-</span>
                       }
                     </td>
                     <td className="px-3 py-2 text-light-onSurface dark:text-dark-onSurface">{ins.tarif || '-'}</td>
                     {canSeePrivate && (
-                      <td className="px-3 py-2">
-                        <span className={`text-xs font-medium ${moyenColor(ins.moyen_paiement || '')}`}>
-                          {ins.moyen_paiement || '-'}
-                        </span>
+                      <td className="px-3 py-2 text-sm font-medium text-light-onSurface dark:text-dark-onSurface tabular-nums">
+                        {ins.montant_tarif != null ? formatEuro(Number(ins.montant_tarif)) : '-'}
                       </td>
                     )}
                     <td className="px-3 py-2 text-right">
@@ -505,7 +643,7 @@ const InscriptionsView: React.FC<InscriptionsViewProps> = ({ inscriptions, tourn
                   </tr>
                   {expandedBillet === ins.numero_billet && (
                     <tr>
-                      <td colSpan={canSeePrivate ? 5 : 4} className="p-0 border-t border-green-200 dark:border-green-800">
+                      <td colSpan={canSeePrivate ? 6 : 5} className="p-0 border-t border-green-200 dark:border-green-800">
                         <InscriptionDetail ins={ins} />
                       </td>
                     </tr>
@@ -524,34 +662,87 @@ const InscriptionsView: React.FC<InscriptionsViewProps> = ({ inscriptions, tourn
 
 const CompetitionEquipesPanel: React.FC<{ competition: CompetitionTournoi }> = ({ competition }) => {
   const { equipes, loading } = useEquipesCompetition(competition.id);
+  const [search, setSearch] = useState('');
+
+  const displayed = equipes
+    .filter(eq => !search || eq.nom_equipe.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      const rA = niveauRank(a.niveau_equipe ?? '');
+      const rB = niveauRank(b.niveau_equipe ?? '');
+      if (rA !== rB) return rA - rB;
+      return a.nom_equipe.localeCompare(b.nom_equipe, 'fr');
+    });
 
   return (
-    <div className="px-4 pb-4">
+    <div className="px-4 pb-5">
       {loading ? (
-        <p className="text-sm text-gray-400 py-2">Chargement...</p>
+        <p className="text-sm text-gray-400 py-3">Chargement...</p>
       ) : equipes.length === 0 ? (
-        <p className="text-sm text-gray-400 py-2">Aucune équipe configurée</p>
+        <p className="text-sm text-gray-400 py-3">Aucune équipe configurée</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
-          {equipes.map(eq => (
-            <div key={eq.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-white dark:bg-gray-800">
-              <div className="flex items-start justify-between gap-2">
-                <span className="font-medium text-light-onSurface dark:text-dark-onSurface text-sm">{eq.nom_equipe}</span>
-                {eq.is_staff && (
-                  <span className="flex-shrink-0 px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded font-medium">STAFF</span>
+        <>
+          <div className="flex items-center gap-3 mt-3 mb-4">
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Rechercher une équipe..."
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface min-w-48" />
+            <span className="text-xs text-gray-400">{displayed.length} / {equipes.length}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {displayed.map((eq, idx) => (
+              <div key={eq.id} className="relative border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-white dark:bg-gray-800 hover:shadow-md transition-shadow">
+                {/* Numéro + badges */}
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <span className="text-xs font-mono text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                    #{idx + 1}
+                  </span>
+                  <div className="flex gap-1.5 flex-wrap justify-end">
+                    {eq.niveau_equipe && (
+                      <span className={`px-2 py-0.5 text-xs rounded-full font-semibold ${niveauBadgeClass(eq.niveau_equipe)}`}>
+                        {eq.niveau_equipe}
+                      </span>
+                    )}
+                    {eq.is_staff && (
+                      <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded-full font-semibold">STAFF</span>
+                    )}
+                  </div>
+                </div>
+                {/* Nom équipe */}
+                <p className="font-bold text-light-onSurface dark:text-dark-onSurface text-sm leading-snug mb-3">
+                  {eq.nom_equipe}
+                </p>
+                {/* Contact */}
+                {(eq.prenom_contact || eq.nom_contact || eq.email_contact || eq.telephone_contact) && (
+                  <div className="border-t border-gray-100 dark:border-gray-700 pt-2.5 space-y-1">
+                    {(eq.prenom_contact || eq.nom_contact) && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-100">
+                        <svg className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <span className="font-medium">{[eq.prenom_contact, eq.nom_contact].filter(Boolean).join(' ')}</span>
+                      </div>
+                    )}
+                    {eq.telephone_contact && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-200">
+                        <svg className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                        {eq.telephone_contact}
+                      </div>
+                    )}
+                    {eq.email_contact && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-200">
+                        <svg className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <span className="truncate">{eq.email_contact}</span>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
-              {eq.niveau_equipe && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{eq.niveau_equipe}</p>}
-              {(eq.prenom_contact || eq.nom_contact) && (
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1.5">
-                  {[eq.prenom_contact, eq.nom_contact].filter(Boolean).join(' ')}
-                </p>
-              )}
-              {eq.email_contact && <p className="text-xs text-gray-500 dark:text-gray-500">{eq.email_contact}</p>}
-              {eq.telephone_contact && <p className="text-xs text-gray-500 dark:text-gray-500">{eq.telephone_contact}</p>}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -586,7 +777,7 @@ const CompetitionsView: React.FC<CompetitionsViewProps> = ({ tournoiId }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
               <span className="font-semibold text-light-onSurface dark:text-dark-onSurface">{comp.nom}</span>
-              <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-xs rounded-full font-bold">
+              <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full font-bold">
                 {comp.nb_equipes ?? 0} équipe{(comp.nb_equipes ?? 0) !== 1 ? 's' : ''}
               </span>
               {comp.tarifs_eligibles && comp.tarifs_eligibles.length > 0 && (

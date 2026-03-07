@@ -170,12 +170,11 @@ export const gymnasesService = {
       const fullAddress = [adresse, codePostal, ville].filter(Boolean).join(', ');
       console.log('🗺️ Géocodage de l\'adresse:', fullAddress);
 
-      // Note: Vous devrez ajouter votre clé API Google Maps
-      // dans les variables d'environnement: VITE_GOOGLE_MAPS_API_KEY
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+      // Clé dédiée au géocodage (sans restriction référent HTTP)
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_GEOCODING_KEY || import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
       if (!apiKey) {
-        console.warn('❌ VITE_GOOGLE_MAPS_API_KEY non définie');
+        console.warn('❌ VITE_GOOGLE_MAPS_GEOCODING_KEY non définie');
         return null;
       }
 
