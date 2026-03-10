@@ -307,3 +307,83 @@ export function useEquipesCompetition(competitionId: number | null): UseEquipesC
 
   return { equipes, loading, error, refetch: fetchEquipes, createEquipe, updateEquipe, deleteEquipe, initFromInscriptions, initFromCompetField };
 }
+
+// ─── Fonctions globales (toutes compétitions d'un tournoi) ────────────────────
+
+type InitAllResult = { totalCreated: number; errors: string[] };
+
+async function runInitForComp(
+  competition: CompetitionTournoi,
+  inscriptions: InscriptionTournoi[],
+  mode: 'compet' | 'tarif'
+): Promise<{ created: number; errors: string[] }> {
+  const result = { created: 0, errors: [] as string[] };
+
+  let filtered: InscriptionTournoi[];
+  if (mode === 'compet') {
+    const nomCompet = competition.nom.trim().toLowerCase();
+    filtered = inscriptions.filter(i => (i.custom_fields?.equipe ?? '').trim().toLowerCase() === nomCompet);
+  } else {
+    const tarifs = competition.tarifs_eligibles ?? [];
+    filtered = tarifs.length > 0 ? inscriptions.filter(i => i.tarif && tarifs.includes(i.tarif)) : inscriptions;
+  }
+
+  const avecEquipe = filtered.filter(i => i.custom_fields?.nom_equipe);
+  const groupes = new Map<string, InscriptionTournoi[]>();
+  for (const ins of avecEquipe) {
+    const key = (ins.custom_fields!.nom_equipe ?? '').trim();
+    if (!key) continue;
+    if (!groupes.has(key)) groupes.set(key, []);
+    groupes.get(key)!.push(ins);
+  }
+  if (groupes.size === 0) return result;
+
+  const { data: existing } = await supabase
+    .from('equipes_competitions_tournoi').select('nom_equipe').eq('competition_id', competition.id);
+  const existingNames = new Set((existing ?? []).map((e: { nom_equipe: string }) => e.nom_equipe.trim().toLowerCase()));
+
+  const toInsert: Omit<EquipeCompetitionTournoi, 'id' | 'created_at'>[] = [];
+  for (const [nomEquipe, billets] of groupes) {
+    if (existingNames.has(nomEquipe.toLowerCase())) continue;
+    const cap = billets.sort((a, b) => a.numero_billet - b.numero_billet)[0];
+    toInsert.push({
+      competition_id: competition.id,
+      nom_equipe: nomEquipe,
+      niveau_equipe: cap.custom_fields?.niveau_equipe || null,
+      is_staff: false,
+      numero_billet_capitaine: cap.numero_billet,
+      nom_contact: cap.nom_participant || null,
+      prenom_contact: cap.prenom_participant || null,
+      email_contact: cap.custom_fields?.email || cap.email_payeur || null,
+      telephone_contact: cap.custom_fields?.telephone || null,
+    });
+  }
+
+  if (toInsert.length === 0) return result;
+  const { error: insertErr } = await supabase.from('equipes_competitions_tournoi').insert(toInsert);
+  if (insertErr) result.errors.push(`${competition.nom}: ${insertErr.message}`);
+  else result.created = toInsert.length;
+  return result;
+}
+
+export async function initAllEquipesFromCompet(
+  competitions: CompetitionTournoi[], inscriptions: InscriptionTournoi[]
+): Promise<InitAllResult> {
+  let totalCreated = 0; const errors: string[] = [];
+  for (const comp of competitions) {
+    const r = await runInitForComp(comp, inscriptions, 'compet');
+    totalCreated += r.created; errors.push(...r.errors);
+  }
+  return { totalCreated, errors };
+}
+
+export async function initAllEquipesFromTarif(
+  competitions: CompetitionTournoi[], inscriptions: InscriptionTournoi[]
+): Promise<InitAllResult> {
+  let totalCreated = 0; const errors: string[] = [];
+  for (const comp of competitions) {
+    const r = await runInitForComp(comp, inscriptions, 'tarif');
+    totalCreated += r.created; errors.push(...r.errors);
+  }
+  return { totalCreated, errors };
+}
