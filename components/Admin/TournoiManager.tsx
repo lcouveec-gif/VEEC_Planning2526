@@ -385,10 +385,13 @@ function formToPayload(f: BilletFormData, tournoiId: number): InscriptionTournoi
 interface TournoiFormProps {
   form: TournoiFormData; setForm: (f: TournoiFormData) => void;
   isEdit: boolean; saving: boolean;
+  currentLogoUrl?: string | null; logoUploading?: boolean;
   onSave: () => void; onCancel: () => void; onDelete?: () => void;
+  onLogoUpload?: (file: File) => Promise<void>;
 }
 
-const TournoiForm: React.FC<TournoiFormProps> = ({ form, setForm, isEdit, saving, onSave, onCancel, onDelete }) => {
+const TournoiForm: React.FC<TournoiFormProps> = ({ form, setForm, isEdit, saving, currentLogoUrl, logoUploading, onSave, onCancel, onDelete, onLogoUpload }) => {
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const handleNomChange = (nom: string) =>
     setForm({ ...form, nom, slug: isEdit ? form.slug : slugify(nom) });
 
@@ -430,6 +433,27 @@ const TournoiForm: React.FC<TournoiFormProps> = ({ form, setForm, isEdit, saving
             className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface"
             placeholder="Ex: Val d'Europe" />
         </div>
+        {isEdit && onLogoUpload && (
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium mb-1 text-light-onSurface dark:text-dark-onSurface">Logo du tournoi</label>
+            <div className="flex items-center gap-4">
+              {currentLogoUrl
+                ? <img src={currentLogoUrl} alt="Logo" className="w-20 h-20 object-contain rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 p-1" />
+                : <div className="w-20 h-20 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-400 text-xs">Aucun</div>
+              }
+              <div>
+                <button type="button" disabled={logoUploading}
+                  onClick={() => logoInputRef.current?.click()}
+                  className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg disabled:opacity-50 transition-colors">
+                  {logoUploading ? 'Upload...' : currentLogoUrl ? 'Changer le logo' : 'Choisir un logo'}
+                </button>
+                <p className="text-xs text-gray-400 mt-1">PNG, JPG, WebP · max 2 Mo</p>
+                <input ref={logoInputRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) onLogoUpload(f); e.target.value = ''; }} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       <div className="flex gap-3 pt-2">
         <button onClick={onSave} disabled={saving}
@@ -1045,7 +1069,7 @@ const CompetitionsTab: React.FC<CompetitionsTabProps> = ({ tournois }) => {
   const [expandedCompId, setExpandedCompId] = useState<number | null>(null);
   const [showCompForm, setShowCompForm] = useState(false);
   const [editingComp, setEditingComp] = useState<CompetitionTournoi | null>(null);
-  const [compForm, setCompForm] = useState({ nom: '', tarifs_raw: '' });
+  const [compForm, setCompForm] = useState({ nom: '', tarifs_raw: '', nb_joueurs: '' });
   const [savingComp, setSavingComp] = useState(false);
   const [globalIniting, setGlobalIniting] = useState<'compet' | 'tarif' | null>(null);
   const [globalInitResult, setGlobalInitResult] = useState<{ totalCreated: number; errors: string[] } | null>(null);
@@ -1057,10 +1081,10 @@ const CompetitionsTab: React.FC<CompetitionsTabProps> = ({ tournois }) => {
   const inputClass = "w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface text-sm";
   const labelClass = "block text-xs font-medium mb-1 text-gray-600 dark:text-gray-400 uppercase tracking-wide";
 
-  const openCreateComp = () => { setEditingComp(null); setCompForm({ nom: '', tarifs_raw: '' }); setShowCompForm(true); };
+  const openCreateComp = () => { setEditingComp(null); setCompForm({ nom: '', tarifs_raw: '', nb_joueurs: '' }); setShowCompForm(true); };
   const openEditComp = (c: CompetitionTournoi) => {
     setEditingComp(c);
-    setCompForm({ nom: c.nom, tarifs_raw: (c.tarifs_eligibles ?? []).join(', ') });
+    setCompForm({ nom: c.nom, tarifs_raw: (c.tarifs_eligibles ?? []).join(', '), nb_joueurs: c.nb_joueurs != null ? String(c.nb_joueurs) : '' });
     setShowCompForm(true);
   };
 
@@ -1068,10 +1092,11 @@ const CompetitionsTab: React.FC<CompetitionsTabProps> = ({ tournois }) => {
     if (!compForm.nom.trim() || !selectedTournoiId) { alert('Le nom est obligatoire.'); return; }
     setSavingComp(true);
     const tarifs = compForm.tarifs_raw.split(',').map(t => t.trim()).filter(Boolean);
+    const nb_joueurs = compForm.nb_joueurs !== '' ? Number(compForm.nb_joueurs) : null;
     if (editingComp) {
-      await updateCompetition(editingComp.id, { nom: compForm.nom.trim(), tarifs_eligibles: tarifs });
+      await updateCompetition(editingComp.id, { nom: compForm.nom.trim(), tarifs_eligibles: tarifs, nb_joueurs });
     } else {
-      await createCompetition({ tournoi_id: selectedTournoiId, nom: compForm.nom.trim(), tarifs_eligibles: tarifs });
+      await createCompetition({ tournoi_id: selectedTournoiId, nom: compForm.nom.trim(), tarifs_eligibles: tarifs, nb_joueurs });
     }
     setSavingComp(false);
     setShowCompForm(false);
@@ -1170,6 +1195,10 @@ const CompetitionsTab: React.FC<CompetitionsTabProps> = ({ tournois }) => {
               <input type="text" value={compForm.nom} onChange={e => setCompForm(f => ({ ...f, nom: e.target.value }))} className={inputClass} placeholder="Ex: Senior, Jeunes A..." />
             </div>
             <div>
+              <label className={labelClass}>Joueurs / équipe <span className="text-xs font-normal text-gray-400">(nb théorique)</span></label>
+              <input type="number" min="1" max="20" value={compForm.nb_joueurs} onChange={e => setCompForm(f => ({ ...f, nb_joueurs: e.target.value }))} className={inputClass} placeholder="Ex: 4" />
+            </div>
+            <div>
               <label className={labelClass}>Tarifs éligibles <span className="text-xs font-normal text-gray-400">(séparés par des virgules)</span></label>
               <input type="text" value={compForm.tarifs_raw} onChange={e => setCompForm(f => ({ ...f, tarifs_raw: e.target.value }))} className={inputClass} placeholder="Adulte, Jeune..." />
               {tarifsDisponibles.length > 0 && (
@@ -1224,6 +1253,11 @@ const CompetitionsTab: React.FC<CompetitionsTabProps> = ({ tournois }) => {
                   <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs rounded-full font-medium">
                     {comp.nb_equipes ?? 0} équipe{(comp.nb_equipes ?? 0) !== 1 ? 's' : ''}
                   </span>
+                  {comp.nb_joueurs != null && (
+                    <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full font-medium">
+                      {comp.nb_joueurs} j/éq.
+                    </span>
+                  )}
                   {comp.tarifs_eligibles && comp.tarifs_eligibles.length > 0 && (
                     <div className="flex gap-1 flex-wrap">
                       {comp.tarifs_eligibles.map(t => (
@@ -1265,12 +1299,13 @@ const CompetitionsTab: React.FC<CompetitionsTabProps> = ({ tournois }) => {
 // ─── Composant principal ───────────────────────────────────────────────────────
 
 const TournoiManager: React.FC = () => {
-  const { tournois, loading, error, createTournoi, updateTournoi, deleteTournoi } = useTournois();
+  const { tournois, loading, error, createTournoi, updateTournoi, deleteTournoi, uploadLogo } = useTournois();
   const [activeTab, setActiveTab] = useState<Tab>('tournois');
   const [viewMode, setViewMode] = useState<TournoiViewMode>('list');
   const [editingTournoi, setEditingTournoi] = useState<Tournoi | null>(null);
   const [form, setForm] = useState<TournoiFormData>(emptyTournoiForm());
   const [saving, setSaving] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
 
   const openCreate = () => { setEditingTournoi(null); setForm(emptyTournoiForm()); setViewMode('form'); };
   const openEdit = (t: Tournoi) => {
@@ -1300,6 +1335,13 @@ const TournoiManager: React.FC = () => {
     if (ok) setViewMode('list');
   };
 
+  const handleLogoUpload = async (file: File) => {
+    if (!editingTournoi) return;
+    setLogoUploading(true);
+    await uploadLogo(editingTournoi.id, editingTournoi.slug, file);
+    setLogoUploading(false);
+  };
+
   const tabClass = (tab: Tab) =>
     `px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${activeTab === tab
       ? 'border-amber-500 text-amber-600 dark:text-amber-400 bg-light-surface dark:bg-dark-surface'
@@ -1316,8 +1358,10 @@ const TournoiManager: React.FC = () => {
       {activeTab === 'tournois' && (
         viewMode === 'form'
           ? <TournoiForm form={form} setForm={setForm} isEdit={!!editingTournoi} saving={saving}
+              currentLogoUrl={editingTournoi?.logo_url} logoUploading={logoUploading}
               onSave={handleSave} onCancel={() => setViewMode('list')}
-              onDelete={editingTournoi ? () => handleDelete(editingTournoi) : undefined} />
+              onDelete={editingTournoi ? () => handleDelete(editingTournoi) : undefined}
+              onLogoUpload={editingTournoi ? handleLogoUpload : undefined} />
           : <div className="space-y-4">
               <div className="flex justify-end">
                 <button onClick={openCreate}

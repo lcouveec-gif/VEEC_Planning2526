@@ -236,6 +236,8 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
   }, [inscriptions]);
 
   const nbEquipesTotal = competitions.reduce((s, c) => s + (c.nb_equipes ?? 0), 0);
+  const nbJoueursTotal = competitions.reduce((s, c) =>
+    s + (c.nb_joueurs != null ? (c.nb_equipes ?? 0) * c.nb_joueurs : 0), 0);
 
   return (
     <div className="space-y-6">
@@ -253,7 +255,12 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
             sub={`dont ${stats.nbHelloAsso} HelloAsso · ${stats.nbManuelle} manuelle${stats.nbManuelle !== 1 ? 's' : ''}${stats.nbCamping > 0 ? ` · ${stats.nbCamping} camping` : ''}`}
             color="green"
           />
-          <StatCard label="Équipes inscrites" value={nbEquipesTotal} color="teal" />
+          <StatCard
+            label="Équipes inscrites"
+            value={nbEquipesTotal}
+            sub={nbJoueursTotal > 0 ? `≈ ${nbJoueursTotal} joueurs théoriques` : undefined}
+            color="teal"
+          />
           {canSeePrivate && (
             <StatCard
               label="Montant encaissé"
@@ -950,22 +957,35 @@ const TournoiPage: React.FC = () => {
   return (
     <main className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
       {/* En-tête */}
-      <div className="flex flex-wrap gap-4 items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-light-onSurface dark:text-dark-onSurface">Tournois</h1>
-          {selectedTournoi && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {selectedTournoi.lieu && `${selectedTournoi.lieu} · `}
-              {selectedTournoi.date_debut && formatDate(selectedTournoi.date_debut)}
-              {selectedTournoi.date_fin && selectedTournoi.date_debut !== selectedTournoi.date_fin &&
-                ` → ${formatDate(selectedTournoi.date_fin)}`}
-            </p>
+      <div className="flex flex-wrap gap-3 items-center justify-between">
+        {/* Logo + titre */}
+        <div className="flex items-center gap-3 min-w-0">
+          {selectedTournoi?.logo_url && (
+            <img
+              src={selectedTournoi.logo_url}
+              alt={selectedTournoi.nom}
+              className="h-16 sm:h-20 w-auto max-w-[80px] sm:max-w-[100px] object-contain drop-shadow-sm flex-shrink-0"
+            />
           )}
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-light-onSurface dark:text-dark-onSurface leading-tight">
+              {selectedTournoi?.nom ?? 'Tournois'}
+            </h1>
+            {selectedTournoi && (
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                {selectedTournoi.lieu && `${selectedTournoi.lieu} · `}
+                {selectedTournoi.date_debut && formatDate(selectedTournoi.date_debut)}
+                {selectedTournoi.date_fin && selectedTournoi.date_debut !== selectedTournoi.date_fin &&
+                  ` → ${formatDate(selectedTournoi.date_fin)}`}
+              </p>
+            )}
+          </div>
         </div>
+        {/* Sélecteur tournoi */}
         <select
           value={selectedTournoiId ?? ''}
           onChange={e => setSelectedTournoiId(e.target.value ? Number(e.target.value) : null)}
-          className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface">
+          className="flex-shrink-0 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface text-sm max-w-[200px]">
           {tournois.map(t => <option key={t.id} value={t.id}>{t.nom}</option>)}
         </select>
       </div>
