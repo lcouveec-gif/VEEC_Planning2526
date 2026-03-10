@@ -328,6 +328,7 @@ export interface Tournoi {
   date_debut?: string | null;  // YYYY-MM-DD
   date_fin?: string | null;    // YYYY-MM-DD
   lieu?: string | null;
+  logo_url?: string | null;
   created_at?: string;
 }
 
@@ -362,7 +363,8 @@ export interface CompetitionTournoi {
   tournoi_id: number;
   nom: string;
   tarifs_eligibles?: string[];
-  nb_equipes?: number;    // calculé depuis le count Supabase
+  nb_joueurs?: number | null;  // nb théorique de joueurs par équipe
+  nb_equipes?: number;         // calculé depuis le count Supabase
   created_at?: string;
 }
 

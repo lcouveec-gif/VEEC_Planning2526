@@ -1,6 +1,6 @@
 -- ============================================================
 --  VEEC Planning 2025/2026 — Schéma Supabase COMPLET
---  Généré le : 2026-02-27 (mis à jour)
+--  Généré le : 2026-03-10 (mis à jour)
 --  Usage : recréer from scratch une base Supabase vierge
 --
 --  ORDRE D'EXÉCUTION OBLIGATOIRE (dépendances FK) :
@@ -28,9 +28,14 @@
 --   22. stage_questionnaires  (FK → stages, questionnaire_templates)
 --   23. questionnaire_reponses  (FK → stage_questionnaires, stage_inscriptions)
 --   24. questionnaire_reponses_details  (FK → questionnaire_reponses, questionnaire_questions)
---   25. Fonctions et triggers
---   26. Politiques RLS
---   27. Fonction is_admin_user (helper RLS)
+--   25. tournois  (module Tournoi)
+--   26. inscriptions_tournoi  (FK → tournois)
+--   27. competitions_tournoi  (FK → tournois)
+--   28. equipes_competitions_tournoi  (FK → competitions_tournoi)
+--   29. webhooks
+--   30. Fonctions et triggers
+--   31. Politiques RLS
+--   32. Fonction is_admin_user (helper RLS)
 --
 --  NOTES :
 --  - RLS désactivé sur VEEC_Equipes (accès anonyme requis)
@@ -876,24 +881,220 @@ CREATE POLICY "Admins can view all profiles"
 
 
 -- ============================================================
--- 22. STORAGE BUCKETS  (à créer manuellement dans Supabase UI)
+-- 25. tournois  (module Tournoi — liste des tournois)
 -- ============================================================
 
--- Bucket 'club-logos'   → public, pour les logos des clubs
+CREATE TABLE IF NOT EXISTS tournois (
+  id          BIGSERIAL PRIMARY KEY,
+  slug        TEXT NOT NULL UNIQUE,     -- identifiant URL (ex: green_veec_2026)
+  nom         TEXT NOT NULL,
+  date_debut  DATE,
+  date_fin    DATE,
+  lieu        TEXT,
+  logo_url    TEXT,                     -- URL dans Storage VEEC_Media/tournoi-logos/
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE tournois ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Lecture publique des tournois"
+  ON tournois FOR SELECT TO public USING (true);
+
+CREATE POLICY "Admin et entraineurs gèrent les tournois"
+  ON tournois FOR ALL TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM veec_profiles WHERE user_id = auth.uid() AND role IN ('admin', 'entraineur'))
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM veec_profiles WHERE user_id = auth.uid() AND role IN ('admin', 'entraineur'))
+  );
+
+COMMENT ON TABLE  tournois          IS 'Tournois organisés par VEEC';
+COMMENT ON COLUMN tournois.slug     IS 'Identifiant URL unique (ex: green_veec_2026)';
+COMMENT ON COLUMN tournois.logo_url IS 'URL du logo dans Storage VEEC_Media/tournoi-logos/{slug}.{ext}';
+
+
+-- ============================================================
+-- 26. inscriptions_tournoi  (billets HelloAsso ou manuels)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS inscriptions_tournoi (
+  numero_billet         INTEGER PRIMARY KEY,              -- PK : numéro de billet HelloAsso ou manuel (négatif)
+  tournoi_id            INTEGER NOT NULL,                 -- → tournois.id (pas de FK formelle)
+  reference_commande    INTEGER,                          -- NULL = inscription manuelle
+  date_commande         TIMESTAMPTZ,
+  statut_commande       TEXT,                             -- 'Validée','Annulée','Processed','Refunded'…
+  nom_participant       TEXT,
+  prenom_participant    TEXT,
+  nom_payeur            TEXT,
+  prenom_payeur         TEXT,
+  email_payeur          TEXT,
+  moyen_paiement        TEXT,
+  tarif                 TEXT,
+  montant_tarif         NUMERIC,
+  code_promo            TEXT,
+  montant_code_promo    NUMERIC,
+  custom_fields         JSONB,                            -- champs libres HelloAsso (nom_equipe, niveau_equipe, clubs_origine…)
+  created_at            TIMESTAMPTZ DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_inscriptions_tournoi_tournoi_id      ON inscriptions_tournoi (tournoi_id);
+CREATE INDEX IF NOT EXISTS idx_inscriptions_tournoi_statut          ON inscriptions_tournoi (statut_commande);
+CREATE INDEX IF NOT EXISTS idx_inscriptions_tournoi_reference       ON inscriptions_tournoi (reference_commande);
+
+ALTER TABLE inscriptions_tournoi ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Lecture publique des inscriptions tournoi"
+  ON inscriptions_tournoi FOR SELECT TO public USING (true);
+
+CREATE POLICY "Admin et entraineurs gèrent les inscriptions tournoi"
+  ON inscriptions_tournoi FOR ALL TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM veec_profiles WHERE user_id = auth.uid() AND role IN ('admin', 'entraineur'))
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM veec_profiles WHERE user_id = auth.uid() AND role IN ('admin', 'entraineur'))
+  );
+
+COMMENT ON TABLE  inscriptions_tournoi              IS 'Inscriptions HelloAsso ou manuelles pour un tournoi';
+COMMENT ON COLUMN inscriptions_tournoi.numero_billet IS 'PK : numéro HelloAsso (positif) ou manuel (négatif, généré côté JS)';
+COMMENT ON COLUMN inscriptions_tournoi.custom_fields IS 'Champs libres HelloAsso : nom_equipe, niveau_equipe, equipe, clubs_origine, email, telephone, commentaire';
+
+
+-- ============================================================
+-- 27. competitions_tournoi  (compétitions dans un tournoi)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS competitions_tournoi (
+  id               BIGSERIAL PRIMARY KEY,
+  tournoi_id       INTEGER NOT NULL,         -- → tournois.id (pas de FK formelle)
+  nom              TEXT NOT NULL,
+  tarifs_eligibles TEXT[],                   -- tarifs HelloAsso rattachés à cette compétition
+  nb_joueurs       INTEGER,                  -- nb théorique de joueurs par équipe (ex: 4, 6)
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_competitions_tournoi_tournoi_id ON competitions_tournoi (tournoi_id);
+
+ALTER TABLE competitions_tournoi ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Lecture publique des compétitions tournoi"
+  ON competitions_tournoi FOR SELECT TO public USING (true);
+
+CREATE POLICY "Admin et entraineurs gèrent les compétitions tournoi"
+  ON competitions_tournoi FOR ALL TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM veec_profiles WHERE user_id = auth.uid() AND role IN ('admin', 'entraineur'))
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM veec_profiles WHERE user_id = auth.uid() AND role IN ('admin', 'entraineur'))
+  );
+
+COMMENT ON TABLE  competitions_tournoi              IS 'Compétitions/catégories au sein d'un tournoi';
+COMMENT ON COLUMN competitions_tournoi.nb_joueurs   IS 'Nombre théorique de joueurs par équipe (pour calcul total joueurs)';
+COMMENT ON COLUMN competitions_tournoi.tarifs_eligibles IS 'Liste des tarifs HelloAsso rattachés à cette compétition';
+
+
+-- ============================================================
+-- 28. equipes_competitions_tournoi  (équipes inscrites par compétition)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS equipes_competitions_tournoi (
+  id                      BIGSERIAL PRIMARY KEY,
+  competition_id          INTEGER NOT NULL,   -- → competitions_tournoi.id
+  nom_equipe              TEXT NOT NULL,
+  niveau_equipe           TEXT,               -- ex: Régionale, Départementale, Loisir
+  is_staff                BOOLEAN DEFAULT false,
+  numero_billet_capitaine INTEGER,            -- → inscriptions_tournoi.numero_billet
+  nom_contact             TEXT,
+  prenom_contact          TEXT,
+  email_contact           TEXT,
+  telephone_contact       TEXT,
+  created_at              TIMESTAMPTZ DEFAULT NOW(),
+  FOREIGN KEY (competition_id) REFERENCES competitions_tournoi (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_equipes_comp_tournoi_competition_id ON equipes_competitions_tournoi (competition_id);
+
+ALTER TABLE equipes_competitions_tournoi ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Lecture publique des équipes tournoi"
+  ON equipes_competitions_tournoi FOR SELECT TO public USING (true);
+
+CREATE POLICY "Admin et entraineurs gèrent les équipes tournoi"
+  ON equipes_competitions_tournoi FOR ALL TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM veec_profiles WHERE user_id = auth.uid() AND role IN ('admin', 'entraineur'))
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM veec_profiles WHERE user_id = auth.uid() AND role IN ('admin', 'entraineur'))
+  );
+
+COMMENT ON TABLE equipes_competitions_tournoi IS 'Équipes inscrites dans une compétition d'un tournoi';
+
+
+-- ============================================================
+-- 29. webhooks  (webhooks sortants pour import HelloAsso)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS webhooks (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL,
+  endpoint    TEXT NOT NULL,
+  method      TEXT NOT NULL DEFAULT 'POST'
+              CHECK (method IN ('GET', 'POST', 'PUT', 'PATCH', 'DELETE')),
+  auth_type   TEXT NOT NULL DEFAULT 'none'
+              CHECK (auth_type IN ('none', 'bearer', 'basic', 'header')),
+  auth_value  TEXT,                           -- bearer: token | basic: "user:pass" | header: "HeaderName:value"
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE webhooks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admin et entraineurs gèrent les webhooks"
+  ON webhooks FOR ALL TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM veec_profiles WHERE user_id = auth.uid() AND role IN ('admin', 'entraineur'))
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM veec_profiles WHERE user_id = auth.uid() AND role IN ('admin', 'entraineur'))
+  );
+
+COMMENT ON TABLE webhooks IS 'Webhooks sortants (ex: import HelloAsso vers inscriptions_tournoi)';
+
+
+-- ============================================================
+-- 30. STORAGE BUCKETS  (à créer manuellement dans Supabase UI)
+-- ============================================================
+
+-- Bucket 'club-logos'   → public, pour les logos des clubs adverses
 --   INSERT INTO storage.buckets (id, name, public) VALUES ('club-logos', 'club-logos', true)
 --   ON CONFLICT (id) DO NOTHING;
 --
--- Bucket 'team-images'  → public, pour les logos des équipes VEEC
---   INSERT INTO storage.buckets (id, name, public) VALUES ('team-images', 'team-images', true)
+-- Bucket 'VEEC_Media'   → public, pour les images équipes VEEC ET logos tournois
+--   Sous-dossiers : team-images/  →  logos des équipes VEEC
+--                   tournoi-logos/ → logos des tournois ({slug}.{ext})
+--   INSERT INTO storage.buckets (id, name, public) VALUES ('VEEC_Media', 'VEEC_Media', true)
 --   ON CONFLICT (id) DO NOTHING;
 --
--- Politique de stockage (exemple club-logos) :
+-- Politiques de stockage (à créer dans Supabase UI ou via SQL) :
 --   CREATE POLICY "Public read club logos"
 --     ON storage.objects FOR SELECT TO public
 --     USING (bucket_id = 'club-logos');
 --   CREATE POLICY "Auth write club logos"
 --     ON storage.objects FOR INSERT TO authenticated
 --     WITH CHECK (bucket_id = 'club-logos');
+--
+--   CREATE POLICY "Public read VEEC_Media"
+--     ON storage.objects FOR SELECT TO public
+--     USING (bucket_id = 'VEEC_Media');
+--   CREATE POLICY "Auth write VEEC_Media"
+--     ON storage.objects FOR INSERT TO authenticated
+--     WITH CHECK (bucket_id = 'VEEC_Media');
+--   CREATE POLICY "Auth update VEEC_Media"
+--     ON storage.objects FOR UPDATE TO authenticated
+--     USING (bucket_id = 'VEEC_Media');
 
 
 -- ============================================================
@@ -924,9 +1125,11 @@ BEGIN
   RAISE NOTICE '  - stage_encadrants, stage_groupe_encadrants';
   RAISE NOTICE '  - questionnaire_templates, questionnaire_questions';
   RAISE NOTICE '  - stage_questionnaires, questionnaire_reponses, questionnaire_reponses_details';
+  RAISE NOTICE '  - tournois, inscriptions_tournoi, competitions_tournoi';
+  RAISE NOTICE '  - equipes_competitions_tournoi, webhooks';
   RAISE NOTICE '';
   RAISE NOTICE 'Étapes post-installation :';
-  RAISE NOTICE '  1. Créer les buckets Storage : club-logos, team-images';
+  RAISE NOTICE '  1. Créer les buckets Storage : club-logos (public), VEEC_Media (public)';
   RAISE NOTICE '  2. Créer un compte via /login';
   RAISE NOTICE '  3. UPDATE veec_profiles SET role = ''admin'' WHERE email = ''...''';
 END $$;

@@ -10,6 +10,7 @@ interface UseTournoisResult {
   createTournoi: (data: Omit<Tournoi, 'id' | 'created_at'>) => Promise<Tournoi | null>;
   updateTournoi: (id: number, updates: Partial<Omit<Tournoi, 'id' | 'created_at'>>) => Promise<boolean>;
   deleteTournoi: (id: number) => Promise<boolean>;
+  uploadLogo: (id: number, slug: string, file: File) => Promise<string | null>;
 }
 
 export function useTournois(): UseTournoisResult {
@@ -107,6 +108,27 @@ export function useTournois(): UseTournoisResult {
     }
   };
 
+  const uploadLogo = async (id: number, slug: string, file: File): Promise<string | null> => {
+    try {
+      if (file.size > 2 * 1024 * 1024) throw new Error('Le fichier ne doit pas dépasser 2 Mo.');
+      if (!file.type.startsWith('image/')) throw new Error('Seules les images sont acceptées.');
+      const ext = file.name.split('.').pop() ?? 'png';
+      const filePath = `tournoi-logos/${slug}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from('VEEC_Media')
+        .upload(filePath, file, { cacheControl: '3600', upsert: true });
+      if (uploadErr) throw uploadErr;
+      const { data: { publicUrl } } = supabase.storage.from('VEEC_Media').getPublicUrl(filePath);
+      await supabase.from('tournois').update({ logo_url: publicUrl }).eq('id', id);
+      await fetchTournois();
+      return publicUrl;
+    } catch (err: any) {
+      console.error('Error uploading logo:', err);
+      setError(err.message || 'Erreur upload logo.');
+      return null;
+    }
+  };
+
   useEffect(() => {
     fetchTournois();
   }, [fetchTournois]);
@@ -119,5 +141,6 @@ export function useTournois(): UseTournoisResult {
     createTournoi,
     updateTournoi,
     deleteTournoi,
+    uploadLogo,
   };
 }
