@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useTournois } from '../../hooks/useTournois';
 import { useInscriptionsTournoi, generateManualBillet } from '../../hooks/useInscriptionsTournoi';
-import { useCompetitionsTournoi, useEquipesCompetition } from '../../hooks/useCompetitionsTournoi';
+import { useCompetitionsTournoi, useEquipesCompetition, initAllEquipesFromCompet, initAllEquipesFromTarif } from '../../hooks/useCompetitionsTournoi';
 import type { Tournoi, InscriptionTournoi, ImportTournoiResult, CompetitionTournoi, EquipeCompetitionTournoi } from '../../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1047,6 +1047,8 @@ const CompetitionsTab: React.FC<CompetitionsTabProps> = ({ tournois }) => {
   const [editingComp, setEditingComp] = useState<CompetitionTournoi | null>(null);
   const [compForm, setCompForm] = useState({ nom: '', tarifs_raw: '' });
   const [savingComp, setSavingComp] = useState(false);
+  const [globalIniting, setGlobalIniting] = useState<'compet' | 'tarif' | null>(null);
+  const [globalInitResult, setGlobalInitResult] = useState<{ totalCreated: number; errors: string[] } | null>(null);
 
   const { competitions, loading, refetch: refetchCompetitions, createCompetition, updateCompetition, deleteCompetition } =
     useCompetitionsTournoi(selectedTournoiId);
@@ -1084,6 +1086,24 @@ const CompetitionsTab: React.FC<CompetitionsTabProps> = ({ tournois }) => {
   // Tarifs distincts dans les inscriptions du tournoi sélectionné (pour aide à la saisie)
   const tarifsDisponibles = [...new Set(inscriptions.map(i => i.tarif).filter(Boolean))].sort();
 
+  const handleGlobalInitCompet = async () => {
+    if (competitions.length === 0) return;
+    if (!window.confirm(`Initialiser les équipes depuis le champ compétition pour TOUTES les ${competitions.length} compétitions ?`)) return;
+    setGlobalIniting('compet'); setGlobalInitResult(null);
+    const r = await initAllEquipesFromCompet(competitions, inscriptions);
+    setGlobalInitResult(r); setGlobalIniting(null);
+    refetchCompetitions();
+  };
+
+  const handleGlobalInitTarif = async () => {
+    if (competitions.length === 0) return;
+    if (!window.confirm(`Initialiser les équipes depuis les tarifs pour TOUTES les ${competitions.length} compétitions ?`)) return;
+    setGlobalIniting('tarif'); setGlobalInitResult(null);
+    const r = await initAllEquipesFromTarif(competitions, inscriptions);
+    setGlobalInitResult(r); setGlobalIniting(null);
+    refetchCompetitions();
+  };
+
   return (
     <div className="space-y-4">
       {/* Sélecteur tournoi */}
@@ -1099,15 +1119,44 @@ const CompetitionsTab: React.FC<CompetitionsTabProps> = ({ tournois }) => {
           </select>
         </div>
         {selectedTournoiId && (
-          <button onClick={openCreateComp}
-            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold transition-colors text-sm flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Nouvelle compétition
-          </button>
+          <>
+            <button onClick={openCreateComp}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold transition-colors text-sm flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Nouvelle compétition
+            </button>
+            <button onClick={handleGlobalInitCompet} disabled={!!globalIniting || competitions.length === 0}
+              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-semibold transition-colors text-sm flex items-center gap-1.5 whitespace-nowrap"
+              title="Init toutes compétitions depuis custom_fields.equipe">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {globalIniting === 'compet' ? 'Init...' : 'Init toutes (compét.)'}
+            </button>
+            <button onClick={handleGlobalInitTarif} disabled={!!globalIniting || competitions.length === 0}
+              className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-semibold transition-colors text-sm flex items-center gap-1.5 whitespace-nowrap"
+              title="Init toutes compétitions depuis tarifs éligibles">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+              {globalIniting === 'tarif' ? 'Init...' : 'Init toutes (tarif)'}
+            </button>
+          </>
         )}
       </div>
+      {globalInitResult && (
+        <div className={`p-3 rounded-lg text-sm ${globalInitResult.errors.length > 0 ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700' : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700'}`}>
+          <span className="font-semibold">{globalInitResult.totalCreated} équipe{globalInitResult.totalCreated !== 1 ? 's' : ''} créée{globalInitResult.totalCreated !== 1 ? 's' : ''}</span>
+          {globalInitResult.errors.length > 0 && (
+            <ul className="mt-1 text-xs text-amber-700 dark:text-amber-300 list-disc list-inside">
+              {globalInitResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+            </ul>
+          )}
+          <button onClick={() => setGlobalInitResult(null)} className="ml-3 text-xs text-gray-400 hover:text-gray-600">✕</button>
+        </div>
+      )}
 
       {/* Formulaire compétition */}
       {showCompForm && (

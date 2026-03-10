@@ -3,6 +3,7 @@ import { useTournois } from '../hooks/useTournois';
 import { useInscriptionsTournoi } from '../hooks/useInscriptionsTournoi';
 import { useCompetitionsTournoi, useEquipesCompetition } from '../hooks/useCompetitionsTournoi';
 import { useAuth } from '../hooks/useAuth';
+import { useClubs } from '../hooks/useClubs';
 import type { InscriptionTournoi, CompetitionTournoi } from '../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -22,6 +23,45 @@ function todayStr(): string {
 }
 
 const CAMPING_TARIF = 'Mode camping sur place, par personne';
+
+const normStr = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+interface ClubMatch { name: string; logo_url?: string | null; }
+
+function matchClubName(
+  token: string,
+  clubs: { nom: string; nom_court?: string | null; logo_url?: string | null }[]
+): ClubMatch | null {
+  const t = normStr(token);
+  if (!t || t.length < 2) return null;
+  const tWords = t.split(' ').filter(w => w.length >= 3);
+
+  let best: { score: number; club: typeof clubs[0] } | null = null;
+  for (const club of clubs) {
+    const c = normStr(club.nom);
+    const cShort = club.nom_court ? normStr(club.nom_court) : '';
+    // Acronyme auto : premières lettres des mots >= 3 du nom complet (ex: VAL EUROPE ESBLY COUPVRAY → VEEC)
+    const acronym = c.split(' ').filter(w => w.length >= 3).map(w => w[0]).join('');
+
+    let score = 0;
+    if (cShort && t === cShort)  score = 1000; // exact sur nom_court
+    else if (t === c)             score = 999;  // exact sur nom complet
+    else if (acronym && t === acronym) score = 950; // acronyme (ex: VEEC)
+    else if (c.includes(t) && t.length >= 4) score = 10 + t.length; // token dans le nom
+    else if (tWords.length > 0) {
+      // Matching mot par mot
+      for (const w of tWords) {
+        if (cShort && w === cShort)   score += 5;
+        else if (c.includes(w))       score += 2;
+      }
+    }
+
+    if (score > 0 && (!best || score > best.score)) best = { score, club };
+  }
+  if (!best || best.score < 2) return null;
+  return { name: best.club.nom_court || best.club.nom, logo_url: best.club.logo_url };
+}
 
 const NIVEAU_ORDER = ['Nationale', 'Régionale', 'Régional', 'Région', 'Départementale', 'Départemental', 'Loisir'];
 const niveauRank = (n: string): number => {
@@ -103,6 +143,7 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
   const { competitions } = useCompetitionsTournoi(tournoiId);
   const { hasRole, user } = useAuth();
   const canSeePrivate = !!user && hasRole(['admin', 'entraineur']);
+  const { clubs } = useClubs();
   const [chartMode, setChartMode] = useState<'tarif' | 'niveau'>('tarif');
   const [filterCompets, setFilterCompets] = useState<string[]>([]);
 
@@ -129,6 +170,32 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
       });
     return result;
   }, [inscriptionsFiltered]);
+
+  const parClub = useMemo(() => {
+    const counts: Record<string, { count: number; logo_url?: string | null }> = {};
+    inscriptionsFiltered.forEach(i => {
+      const raw = i.custom_fields?.clubs_origine;
+      if (!raw?.trim()) return;
+      const tokens = raw.split(/[/,;]+|\s+et\s+/i).map(t => t.trim()).filter(Boolean);
+      let matched = false;
+      for (const tok of tokens) {
+        const m = matchClubName(tok, clubs);
+        if (m) {
+          if (!counts[m.name]) counts[m.name] = { count: 0, logo_url: m.logo_url };
+          counts[m.name].count++;
+          matched = true;
+        }
+      }
+      if (!matched) {
+        const key = raw.trim();
+        if (!counts[key]) counts[key] = { count: 0 };
+        counts[key].count++;
+      }
+    });
+    return Object.entries(counts)
+      .map(([name, { count, logo_url }]) => ({ name, count, logo_url }))
+      .sort((a, b) => b.count - a.count);
+  }, [inscriptionsFiltered, clubs]);
 
   const stats = useMemo(() => {
     const m = (v: number | string | null | undefined): number => { const n = Number(v ?? 0); return isNaN(n) ? 0 : n; };
@@ -250,24 +317,19 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   {compets.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {compets.map(c => {
-                        const active = filterCompets.includes(c);
-                        return (
-                          <button key={c} onClick={() => toggleCompet(c)}
-                            className={`px-2 py-0.5 text-xs rounded-full font-medium border transition-colors whitespace-nowrap ${
-                              active
-                                ? 'bg-green-600 text-white border-green-600'
-                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-500'
-                            }`}>
-                            {c}
-                          </button>
-                        );
-                      })}
+                    <div className="flex flex-col gap-0.5">
+                      <select
+                        multiple
+                        size={Math.min(compets.length, 4)}
+                        value={filterCompets}
+                        onChange={e => setFilterCompets(Array.from(e.target.selectedOptions, o => o.value))}
+                        className="text-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-light-onSurface dark:text-dark-onSurface px-2 py-1 min-w-36">
+                        {compets.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
                       {filterCompets.length > 0 && (
                         <button onClick={() => setFilterCompets([])}
-                          className="px-2 py-0.5 text-xs rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 border border-dashed border-gray-300 dark:border-gray-600 transition-colors">
-                          ✕ tout
+                          className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-left transition-colors">
+                          ✕ tout désélectionner
                         </button>
                       )}
                     </div>
@@ -342,19 +404,44 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
           );
         })()}
 
-        {/* Répartition par moyen de paiement (visible admins/entraîneurs uniquement) */}
-        {canSeePrivate && (
+        {/* Clubs d'origine */}
+        {parClub.length > 0 && (
           <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-md p-5">
-            <h3 className="text-base font-bold text-light-onSurface dark:text-dark-onSurface mb-4">Par moyen de paiement</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {Object.entries(stats.parMoyen).sort((a, b) => b[1].count - a[1].count).map(([moyen, data]) => (
-                <div key={moyen} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
-                  <p className={`text-base font-bold ${moyenColor(moyen)}`}>{moyen}</p>
-                  <p className="text-2xl font-bold text-light-onSurface dark:text-dark-onSurface mt-1">{data.count}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{formatEuro(data.montant)}</p>
-                </div>
-              ))}
+            <h3 className="text-base font-bold text-light-onSurface dark:text-dark-onSurface mb-4">Clubs d'origine</h3>
+            <div className="space-y-2">
+              {(() => {
+                const maxCount = parClub[0]?.count ?? 1;
+                return parClub.map(({ name, count, logo_url }) => {
+                  const isHome = name === 'VEEC';
+                  return (
+                    <div key={name} className="flex items-center gap-2">
+                      {/* Logo ou initiale */}
+                      <div className="w-7 h-7 flex-shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                        {logo_url
+                          ? <img src={logo_url} alt={name} className="w-full h-full object-contain" />
+                          : <span className="text-[10px] font-bold text-gray-400">{name.slice(0, 2)}</span>
+                        }
+                      </div>
+                      {/* Nom + badge */}
+                      <div className="w-44 flex-shrink-0 flex items-center gap-1.5 min-w-0">
+                        <span className="text-xs text-light-onSurface dark:text-dark-onSurface truncate" title={name}>{name}</span>
+                        {isHome && (
+                          <span className="flex-shrink-0 text-[10px] font-semibold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-1 py-0.5 rounded">notre club</span>
+                        )}
+                      </div>
+                      <div className="flex-1 h-4 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${isHome ? 'bg-green-500 dark:bg-green-400' : 'bg-blue-500 dark:bg-blue-400'}`}
+                          style={{ width: `${Math.round(count / maxCount * 100)}%` }} />
+                      </div>
+                      <span className="text-xs font-bold tabular-nums text-light-onSurface dark:text-dark-onSurface w-6 text-right">{count}</span>
+                    </div>
+                  );
+                });
+              })()}
             </div>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
+              Correspondance automatique sur les clubs enregistrés · saisie libre normalisée
+            </p>
           </div>
         )}
       </section>
@@ -386,6 +473,27 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
                 )}
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Moyen de paiement (admin/entraîneur, tout en bas) ── */}
+      {canSeePrivate && (
+        <section className="space-y-4">
+          <h2 className="text-base font-semibold text-light-onSurface dark:text-dark-onSurface uppercase tracking-wide">
+            Paiements
+          </h2>
+          <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-md p-5">
+            <h3 className="text-base font-bold text-light-onSurface dark:text-dark-onSurface mb-4">Par moyen de paiement</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {Object.entries(stats.parMoyen).sort((a, b) => b[1].count - a[1].count).map(([moyen, data]) => (
+                <div key={moyen} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                  <p className={`text-base font-bold ${moyenColor(moyen)}`}>{moyen}</p>
+                  <p className="text-2xl font-bold text-light-onSurface dark:text-dark-onSurface mt-1">{data.count}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{formatEuro(data.montant)}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       )}
