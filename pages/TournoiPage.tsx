@@ -504,6 +504,76 @@ const StatsView: React.FC<StatsViewProps> = ({ inscriptions, tournoiId }) => {
           </div>
         </section>
       )}
+
+      {/* ── Évolution temporelle des inscriptions ── */}
+      {(() => {
+        const byDay: Record<string, number> = {};
+        inscriptions.forEach(i => {
+          if (!i.date_commande) return;
+          const day = i.date_commande.slice(0, 10);
+          byDay[day] = (byDay[day] ?? 0) + 1;
+        });
+        const sorted = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
+        if (sorted.length < 2) return null;
+
+        let cumul = 0;
+        const points = sorted.map(([date, count]) => {
+          cumul += count;
+          return { date, count, cumul };
+        });
+
+        const W = 600, H = 120, PAD = { t: 10, r: 10, b: 30, l: 36 };
+        const maxC = points[points.length - 1].cumul;
+        const px = (i: number) => PAD.l + (i / (points.length - 1)) * (W - PAD.l - PAD.r);
+        const py = (v: number) => PAD.t + (1 - v / maxC) * (H - PAD.t - PAD.b);
+
+        const pathLine = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${px(i)},${py(p.cumul)}`).join(' ');
+        const pathArea = `${pathLine} L${px(points.length - 1)},${H - PAD.b} L${px(0)},${H - PAD.b} Z`;
+
+        const yTicks = [0, Math.round(maxC / 2), maxC];
+        const xStep = Math.max(1, Math.floor(points.length / 4));
+        const xTickIdxs = [...new Set([0, ...Array.from({ length: 3 }, (_, k) => Math.round((k + 1) * xStep)).filter(i => i < points.length - 1), points.length - 1])];
+
+        return (
+          <section className="space-y-4">
+            <h2 className="text-base font-semibold text-light-onSurface dark:text-dark-onSurface uppercase tracking-wide">
+              Évolution
+            </h2>
+            <div className="bg-light-surface dark:bg-dark-surface rounded-lg shadow-md p-5">
+              <h3 className="text-sm font-semibold text-light-onSurface dark:text-dark-onSurface mb-3">
+                Évolution des inscriptions
+              </h3>
+              <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 140 }}>
+                <defs>
+                  <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#16a34a" stopOpacity="0.25" />
+                    <stop offset="100%" stopColor="#16a34a" stopOpacity="0.02" />
+                  </linearGradient>
+                </defs>
+                {yTicks.map(v => (
+                  <g key={v}>
+                    <line x1={PAD.l} x2={W - PAD.r} y1={py(v)} y2={py(v)} stroke="currentColor" strokeOpacity="0.08" strokeWidth="1" />
+                    <text x={PAD.l - 4} y={py(v) + 4} textAnchor="end" fontSize="9" fill="currentColor" fillOpacity="0.5">{v}</text>
+                  </g>
+                ))}
+                <path d={pathArea} fill="url(#areaGrad)" />
+                <path d={pathLine} fill="none" stroke="#16a34a" strokeWidth="2" strokeLinejoin="round" />
+                {points.map((p, i) => (
+                  <circle key={i} cx={px(i)} cy={py(p.cumul)} r="3" fill="#16a34a">
+                    <title>{p.date} — {p.count} nouvelle{p.count > 1 ? 's' : ''} · {p.cumul} total</title>
+                  </circle>
+                ))}
+                {xTickIdxs.map(i => (
+                  <text key={i} x={px(i)} y={H - PAD.b + 14} textAnchor="middle" fontSize="8" fill="currentColor" fillOpacity="0.5">
+                    {points[i].date.slice(5)}
+                  </text>
+                ))}
+                <line x1={PAD.l} x2={W - PAD.r} y1={H - PAD.b} y2={H - PAD.b} stroke="currentColor" strokeOpacity="0.15" strokeWidth="1" />
+              </svg>
+            </div>
+          </section>
+        );
+      })()}
     </div>
   );
 };
