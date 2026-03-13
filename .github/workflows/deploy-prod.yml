@@ -1,0 +1,68 @@
+name: Deploy Production (main)
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  FRONTEND_IMAGE: ghcr.io/lcouveec-gif/veec-frontend
+  BACKEND_IMAGE: ghcr.io/lcouveec-gif/veec-backend
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.FRONTEND_IMAGE }}:prod
+          build-args: |
+            VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+            VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            VITE_API_URL=/api
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          push: true
+          tags: ${{ env.BACKEND_IMAGE }}:prod
+
+      - name: Deploy on VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            cd /opt/veec-prod
+            docker compose pull
+            docker compose up -d
+            docker image prune -f
+
+      - name: Update last deploy date
+        run: |
+          echo "## Dernier déploiement Production" > LAST_DEPLOY_PROD.md
+          echo "" >> LAST_DEPLOY_PROD.md
+          echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> LAST_DEPLOY_PROD.md
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add LAST_DEPLOY_PROD.md
+          git commit -m "Update last deploy date (Prod) [skip ci]" || echo "No changes"
+          git push

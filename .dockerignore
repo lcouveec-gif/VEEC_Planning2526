@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+.git/
+.github/
+server/node_modules/
+*.md
+docs/
+supabase/
+.claude/
