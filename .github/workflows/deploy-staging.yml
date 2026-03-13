@@ -36,6 +36,7 @@ jobs:
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY_STAGING }}
             VITE_API_URL=/api
 
+
       - name: Build & push backend
         uses: docker/build-push-action@v5
         with:
