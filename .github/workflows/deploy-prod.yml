@@ -6,7 +6,6 @@ on:
       - main
 
 env:
-  REGISTRY: ghcr.io
   FRONTEND_IMAGE: ghcr.io/lcouveec-gif/veec-frontend
   BACKEND_IMAGE: ghcr.io/lcouveec-gif/veec-backend
 
@@ -56,3 +55,14 @@ jobs:
             docker compose pull
             docker compose up -d
             docker image prune -f
+
+      - name: Update last deploy date
+        run: |
+          echo "## Dernier déploiement Production" > LAST_DEPLOY_PROD.md
+          echo "" >> LAST_DEPLOY_PROD.md
+          echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> LAST_DEPLOY_PROD.md
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add LAST_DEPLOY_PROD.md
+          git commit -m "Update last deploy date (Prod) [skip ci]" || echo "No changes"
+          git push

@@ -6,7 +6,6 @@ on:
       - recette
 
 env:
-  REGISTRY: ghcr.io
   FRONTEND_IMAGE: ghcr.io/lcouveec-gif/veec-frontend
   BACKEND_IMAGE: ghcr.io/lcouveec-gif/veec-backend
 
@@ -56,3 +55,14 @@ jobs:
             docker compose pull
             docker compose up -d
             docker image prune -f
+
+      - name: Update last deploy date
+        run: |
+          echo "## Dernier déploiement Recette" > LAST_DEPLOY_RECETTE.md
+          echo "" >> LAST_DEPLOY_RECETTE.md
+          echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> LAST_DEPLOY_RECETTE.md
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add LAST_DEPLOY_RECETTE.md
+          git commit -m "Update last deploy date (Recette) [skip ci]" || echo "No changes"
+          git push
